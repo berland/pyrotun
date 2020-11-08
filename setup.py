@@ -13,6 +13,7 @@ REQUIREMENTS = [
     "lxml",
     "numpy",
     "pandas",
+    "pylunar",
     "pytibber",
     "python-openhab",
     "requests>2.23",
