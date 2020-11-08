@@ -16,6 +16,7 @@ REQUIREMENTS = [
     "pytibber",
     "python-openhab",
     "requests>2.23",
+    "smappy",
 ]
 
 SETUP_REQUIREMENTS = [
