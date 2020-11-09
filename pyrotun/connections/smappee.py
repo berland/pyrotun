@@ -42,8 +42,10 @@ class SmappeeConnection:
         dframe = self.mysmappee.get_consumption_dataframe(
             self.locationid, earlier, now, aggregation
         )
-
-        dframe.index = dframe.index.tz_convert(tz)
+        if dframe.empty:
+            logger.error("Empty smappee dataframe in get_recent_df()")
+        else:
+            dframe.index = dframe.index.tz_convert(tz)
         return dframe
 
     def avg_watt_5min(self):
@@ -63,6 +65,9 @@ class SmappeeConnection:
         dframe = self.mysmappee.get_consumption_dataframe(
             self.locationid, midnight, now, 1
         )
+        if dframe.empty:
+            logger.error("Empty smappee dataframe in get_recent_df()")
+            return
 
         dframe.index = dframe.index.tz_convert(tz)
 

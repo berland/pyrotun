@@ -7,6 +7,8 @@ from setuptools import find_packages
 
 
 REQUIREMENTS = [
+    "aiocron",
+    "asyncio",
     "astral",
     "python-dotenv",
     "holidays",

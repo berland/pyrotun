@@ -10,7 +10,7 @@ class OpenHABConnection:
         else:
             self.openhab_url = openhab_url
 
-        if not openhab_url:
+        if not self.openhab_url:
             raise ValueError("openhab_url not set")
 
         self.client = openhab.openHAB(self.openhab_url)

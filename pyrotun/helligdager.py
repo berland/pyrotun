@@ -1,13 +1,24 @@
 import datetime
 import holidays
 
-import pyrotun.connections
+import pyrotun
+import pyrotun.connections.openhab
+
+logger = pyrotun.getLogger(__name__)
 
 
-def main():
-    openhab = pyrotun.connections.openhab.OpenHABConnection()
+def main(connections=None):
+    if connections is None:
+        connections = {}
+        connections["openhab"] = pyrotun.connections.openhab.OpenHABConnection()
 
     if datetime.datetime.now() in holidays.Norway():
-        openhab.set_item("Fridag", "ON")
+        logger.info("Det er fridag")
+        connections["openhab"].set_item("Fridag", "ON")
     else:
-        openhab.set_item("Fridag", "OFF")
+        logger.info("Det er ikke fridag")
+        connections["openhab"].set_item("Fridag", "OFF")
+
+
+if __name__ == "__main__":
+    main()

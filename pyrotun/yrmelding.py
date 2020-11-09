@@ -1,27 +1,24 @@
 import os
 import logging
 
-
-import openhab
-
-from dotenv import load_dotenv
 from lxml import objectify
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+import pyrotun
+import pyrotun.connections.openhab
+
+logger = pyrotun.getLogger()
 
 
-def main():
-    load_dotenv()
-
-    openhab_client = openhab.openHAB(os.getenv("OPENHAB_URL"))
+def main(connections=None):
+    if connections is None:
+        connections = {}
+        connections["openhab"] = pyrotun.connections.openhab.OpenHABConnection()
 
     weather = get_weather()
-    print(weather)
 
     for item, value in map_weatherdict_to_openhab(weather).items():
         logger.info("Submitting %s=%s to OpenHAB", item, str(value))
-        openhab_client.get_item(item).state = value
+        connections["openhab"].set_item(item, value)
 
 
 def map_weatherdict_to_openhab(weather):
@@ -49,7 +46,7 @@ def get_weather(xmlfile=None):
     if not xmlfile:
         logger.error("provided xmlfile was empty")
         return
-    print("Downloading: " + str(xmlfile))
+    logger.info("Downloading: %s", str(xmlfile))
     root = objectify.parse(xmlfile).getroot()
 
     nexthours = [
