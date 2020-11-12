@@ -17,7 +17,6 @@ import os
 import math
 from datetime import datetime, date, time
 import pytz
-import logging
 import argparse
 
 import pylunar
@@ -26,6 +25,9 @@ import astral
 from astral.sun import sun  # noqa
 from astral import moon
 
+import pyrotun
+
+logger = pyrotun.getLogger()
 
 WIDTH = 100
 HEIGHT = 100
@@ -39,7 +41,7 @@ SUN_RADIUS = 8
 MOON_COLOR = "#999999"
 MOON_RADIUS = 6
 STROKE_WIDTH = "1"
-#FILENAME = "/etc/openhab2/html/husskygge.svg"
+# FILENAME = "/etc/openhab2/html/husskygge.svg"
 LATITUDE = float(os.getenv("LOCAL_LATITUDE"))
 LONGITUDE = float(os.getenv("LOCAL_LONGITUDE"))
 
@@ -82,14 +84,14 @@ class shadow(object):
         self.city = astral.LocationInfo(
             "HOME", os.getenv("LOCAL_CITY"), os.getenv("TIMEZOME"), LATITUDE, LONGITUDE
         )
-        print(self.city)
+        logger.debug(self.city)
         self.now = timezone.localize(datetime.now())
         self.sun = astral.sun.sun(self.city.observer, self.now)
-        print(self.sun)
+        logger.debug(self.sun)
         self.sun_azimuth = astral.sun.azimuth(self.city.observer, self.now)
-        print("Sun azimuth: " + str(self.sun_azimuth))
+        logger.debug("Sun azimuth: " + str(self.sun_azimuth))
         self.sun_elevation = astral.sun.elevation(self.city.observer, self.now)
-        print("Sun elevation: " + str(self.sun_elevation))
+        logger.debug("Sun elevation: " + str(self.sun_elevation))
 
         self.sunrise_azimuth = astral.sun.azimuth(
             self.city.observer, self.sun["sunrise"]
@@ -110,9 +112,7 @@ class shadow(object):
         )
         self.moon_info.update(self.now)
         self.moon_azimuth = self.moon_info.azimuth()
-        print("Moon azimuth: " + str(self.moon_azimuth))
         self.moon_elevation = self.moon_info.altitude()
-        print("Moon elevation: " + str(self.moon_elevation))
 
         if self.sun_elevation > 0:
             self.elevation = self.sun_elevation
@@ -210,8 +210,6 @@ class shadow(object):
 
     def generateSVG(self):
         realSun_pos = self.degreesToPoint(self.sun_azimuth, 10000)
-        if self.debug:
-            print(realSun_pos)
 
         sun_pos = self.degreesToPoint(self.sun_azimuth, WIDTH / 2)
         moon_pos = self.degreesToPoint(self.moon_azimuth, WIDTH / 2)
@@ -577,16 +575,20 @@ class shadow(object):
         return svg
 
 
-def main():
+def main(filename=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("svgfile", help="SVG file to write to")
+    parser.add_argument("--svgfile", help="SVG file to write to")
     args = parser.parse_args()
 
     s = shadow()
     svg = s.generateSVG()
-    with open(args.svgfile, "w") as f_handle:
+
+    if filename is None:
+        filename = args.svgfile
+
+    with open(filename, "w") as f_handle:
         f_handle.write(svg)
-    logging.info("Written SVG to %s", args.svgfile)
+    logger.info("Written SVG to %s", filename)
 
 
 if __name__ == "__main__":

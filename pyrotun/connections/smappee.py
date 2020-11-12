@@ -4,6 +4,10 @@ import pytz
 
 import smappy
 
+import pyrotun
+
+logger = pyrotun.getLogger(__name__)
+
 
 class SmappeeConnection:
     def __init__(self):
@@ -20,6 +24,7 @@ class SmappeeConnection:
 
         if self.authenticate():
             self.authenticated = True
+            logger.info("Smappee authenticated")
 
         if self.authenticated:
             # Get a location ID, an integer for where the account is registered (?)
@@ -35,17 +40,24 @@ class SmappeeConnection:
         return False
 
     def get_recent_df(self, minutes, aggregation=1):
+
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         now = datetime.datetime.now().astimezone(tz)
         earlier = now - datetime.timedelta(minutes=minutes)
+        # How to test if connection is active?
 
         dframe = self.mysmappee.get_consumption_dataframe(
             self.locationid, earlier, now, aggregation
         )
         if dframe.empty:
-            logger.error("Empty smappee dataframe in get_recent_df()")
-        else:
-            dframe.index = dframe.index.tz_convert(tz)
+            self.authenticate()
+            dframe = self.mysmappee.get_consumption_dataframe(
+                self.locationid, earlier, now, aggregation
+            )
+            if dframe.empty:
+                logger.error("Empty smappee dataframe in get_recent_df()")
+            else:
+                dframe.index = dframe.index.tz_convert(tz)
         return dframe
 
     def avg_watt_5min(self):
@@ -56,6 +68,7 @@ class SmappeeConnection:
         return avgwatt
 
     def get_daily_cum(self):
+        self.mysmappee.re_authenticate()
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         now = datetime.datetime.now().astimezone(tz)
         midnight = datetime.datetime.combine(
