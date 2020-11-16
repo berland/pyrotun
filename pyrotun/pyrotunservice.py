@@ -15,6 +15,7 @@ import pyrotun.yrmelding
 import pyrotun.pollsmappee
 import pyrotun.polltibber
 import pyrotun.houseshadow
+import pyrotun.vent_calculations
 import pyrotun.connections.smappee
 import pyrotun.connections.openhab
 import pyrotun.connections.mqtt
@@ -24,6 +25,7 @@ import pyrotun.connections.tibber
 logger = pyrotun.getLogger(__name__)
 
 EVERY_SECOND = "* * * * * *"
+EVERY_15_SECOND = "* * * * * */15"
 EVERY_MINUTE = "* * * * *"
 EVERY_5_MINUTE = "*/5 * * * *"
 EVERY_15_MINUTE = "*/15 * * * *"
@@ -42,6 +44,10 @@ CONNECTIONS = {
 async def heartbeat():
     logger.info("<puls>")
 
+@aiocron.crontab(EVERY_15_SECOND)
+async def vent_calc():
+    logger.info("ventcalc")
+    pyrotun.vent_calculations.main(CONNECTIONS)
 
 @aiocron.crontab(EVERY_5_MINUTE)
 async def pollsmappe():
@@ -55,7 +61,7 @@ async def helligdager():
     logger.info("helligdager")
     pyrotun.helligdager.main(CONNECTIONS)
 
-@aiocron.crontab(EVERY_5_MINUTE)
+@aiocron.crontab(EVERY_15_MINUTE)
 async def polltibber():
     logger.info("polling tibber")
     await pyrotun.polltibber.main(CONNECTIONS)
@@ -73,6 +79,7 @@ async def houseshadow():
 
 
 async def at_startup():
+    pyrotun.vent_calculations.main(CONNECTIONS)
     await pyrotun.polltibber.main(CONNECTIONS)
     pyrotun.pollsmappee.main(CONNECTIONS)
     pyrotun.houseshadow.main("shadow.svg")

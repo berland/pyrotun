@@ -67,7 +67,16 @@ class SmappeeConnection:
         avgwatt = (60 / 5) * float(lastrow["consumption"].values)
         return avgwatt
 
-    def get_daily_cum(self):
+    def get_daily_df(self, aggregation="1hour"):
+        """Get dataframe of consumption since midnight
+
+        Aggregated pr. hour
+
+        Returns:
+            pd.DataFrame
+
+        """
+        agg_integer = {"1hour": 2, "5min": 1}[aggregation]
         self.mysmappee.re_authenticate()
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         now = datetime.datetime.now().astimezone(tz)
@@ -76,13 +85,44 @@ class SmappeeConnection:
         ).astimezone(tz)
 
         dframe = self.mysmappee.get_consumption_dataframe(
-            self.locationid, midnight, now, 1
+            self.locationid, midnight, now, agg_integer
+        )
+        dframe.drop(
+            ["solar", "gridExport", "selfConsumption", "gridImport", "selfSufficiency"],
+            axis=1,
+            inplace=True,
+            errors="ignore",
         )
         if dframe.empty:
             logger.error("Empty smappee dataframe in get_recent_df()")
-            return
-
+            return pd.DataFrame()
         dframe.index = dframe.index.tz_convert(tz)
+        return dframe
+
+    def get_daily_cum(self):
+        """Compute KWh up until now since midnight
+
+        Returns:
+            float
+        """
+        dframe = self.get_daily_df(aggregation="5min")
+
+        # aggregation_5min = 1
+        # self.mysmappee.re_authenticate()
+        # tz = pytz.timezone(os.getenv("TIMEZONE"))
+        # now = datetime.datetime.now().astimezone(tz)
+        # midnight = datetime.datetime.combine(
+        #    datetime.date.today(), datetime.time.min
+        # ).astimezone(tz)
+        #
+        ##        dframe = self.mysmappee.get_consumption_dataframe(
+        #            self.locationid, midnight, now, aggregation_5min
+        #        )
+        #        if dframe.empty:
+        #            logger.error("Empty smappee dataframe in get_recent_df()")
+        #            return
+
+        #        dframe.index = dframe.index.tz_convert(tz)
 
         # always_on_cum = round(dframe["alwaysOn"].sum() / 1000, 2)
 

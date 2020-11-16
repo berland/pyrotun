@@ -13,12 +13,15 @@ REQUIREMENTS = [
     "python-dotenv",
     "holidays",
     "lxml",
+    "metpy",
+    "networkx",
     "numpy",
     "pandas",
     "pylunar",
     "pytibber",
     "python-openhab",
     "requests>2.23",
+    "sklearn",
     "smappy",
 ]
 

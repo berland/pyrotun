@@ -16,8 +16,8 @@ def main(connections=None):
     weather = get_weather()
 
     for item, value in map_weatherdict_to_openhab(weather).items():
-        logger.info("Submitting %s=%s to OpenHAB", item, str(value))
-        connections["openhab"].set_item(item, value)
+        logger.info("Submitting %s=%s to OpenHAB", item, str(round(value, 1)))
+        connections["openhab"].set_item(item, round(value, 1))
 
 
 def map_weatherdict_to_openhab(weather):

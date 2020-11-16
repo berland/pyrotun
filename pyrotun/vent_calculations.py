@@ -130,12 +130,10 @@ def main(connections=None):
         "Ventilasjon_virkningsgrad_fukt", moisture_efficiency, log=True
     )
 
-    fuktproduksjon = round(mixs["fraluft"] - mixs["tilluft"], 6)
-    fuktfrahusnetto = round(mixs["avkast"] - mixs["inntak"], 6) * 1000
-    fuktfravarmeveksler = round(mixs["tilluft"] - mixs["inntak"], 6) * 1000
-    connections["openhab"].set_item(
-        "Fuktproduksjon_hus", fuktproduksjon * 1000, log=True
-    )
+    fuktproduksjon = round((mixs["fraluft"] - mixs["tilluft"]) * 1000, 3)
+    fuktfrahusnetto = round((mixs["avkast"] - mixs["inntak"]) * 1000, 3)
+    fuktfravarmeveksler = round((mixs["tilluft"] - mixs["inntak"]) * 1000, 3)
+    connections["openhab"].set_item("Fuktproduksjon_hus", fuktproduksjon, log=True)
     connections["openhab"].set_item("Ventilasjon_hustorking", fuktfrahusnetto)
 
     connections["openhab"].set_item(
