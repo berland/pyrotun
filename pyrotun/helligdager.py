@@ -1,24 +1,24 @@
+import asyncio
 import datetime
 import holidays
 
 import pyrotun
-import pyrotun.connections.openhab
+import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
 
 
-def main(connections=None):
-    if connections is None:
-        connections = {}
-        connections["openhab"] = pyrotun.connections.openhab.OpenHABConnection()
-
+async def main(pers):
     if datetime.datetime.now() in holidays.Norway():
         logger.info("Det er fridag")
-        connections["openhab"].set_item("Fridag", "ON")
+        await pers.openhab.set_item("Fridag", "ON")
     else:
         logger.info("Det er ikke fridag")
-        connections["openhab"].set_item("Fridag", "OFF")
+        await pers.openhab.set_item("Fridag", "OFF")
 
 
 if __name__ == "__main__":
-    main()
+    pers = pyrotun.persist.PyrotunPersistence()
+    asyncio.run(pers.ainit())
+    asyncio.run(main(pers))
+    asyncio.run(pers.aclose())

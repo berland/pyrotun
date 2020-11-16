@@ -15,6 +15,9 @@ PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 SENSOR_ITEM = "Varmtvannsbereder_temperatur"
 VACATION_ITEM = "Ferie"
 
+class WaterHeater():
+    def run():
+        pass
 
 async def main(connections=None):
     if connections is None:

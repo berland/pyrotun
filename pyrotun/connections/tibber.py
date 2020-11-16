@@ -21,12 +21,15 @@ class TibberConnection:
             headers={aiohttp.hdrs.USER_AGENT: f"brlndpyTibber/0.x.x"}
         )
 
-    async def ainit(self):
-
+    async def ainit(self, websession=None):
+        logger.info("tibberconnections.ainit()")
         self.mytibber = None  # will be set by authenticate()
         self.home = None  # A Tibber home
 
-        self.websession = None
+        self.websession = websession
+        if self.websession is None:
+            self.websession = aiohttp.ClientSession()
+
         self.token = os.getenv("TIBBER_TOKEN")
 
         if not self.token:
@@ -47,7 +50,7 @@ class TibberConnection:
 
     async def get_prices(self):
         """Prices in the dataframe is valid *forwards* in time"""
-        #if not self.authenticated:
+        # if not self.authenticated:
         #    await self.authenticate()
         await self.home.update_price_info()
         tz = pytz.timezone(os.getenv("TIMEZONE"))
@@ -66,4 +69,4 @@ class TibberConnection:
         )
 
         prices = await self.get_prices()
-        return prices.loc[nowhour, "NOK/KWh"]*100
+        return prices.loc[nowhour, "NOK/KWh"] * 100

@@ -55,37 +55,30 @@ def hum_ratio(rh, temp, pressure):
     return rh * saturated_mixing_ratio
 
 
-def main(connections=None):
-    if connections is None:
-        connections = {
-            "openhab": openhab.OpenHABConnection(),
-        }
+async def main(pers):
     temps = {}
     rhs = {}
     enthalpies = {}
     mixs = {}
 
-    pressure = float(connections["openhab"].get_item("Netatmo_stue_trykk"))
+    pressure = float(await pers.openhab.get_item("Netatmo_stue_trykk"))
 
     for sensor in SENSORS:
         temps[sensor] = float(
-            connections["openhab"].get_item("Sensor_" + sensor + "_temperatur")
+            await pers.openhab.get_item("Sensor_" + sensor + "_temperatur")
         )
         #  RH in unit 0 to 1, not percent.
         rhs[sensor] = round(
-            float(connections["openhab"].get_item("Sensor_" + sensor + "_fuktighet"))
-            / 100,
+            float(await pers.openhab.get_item("Sensor_" + sensor + "_fuktighet")) / 100,
             4,
         )
         enthalpies[sensor] = round(enthalpy(temps[sensor], rhs[sensor], pressure), 4)
 
         mixs[sensor] = round(hum_ratio(rhs[sensor], temps[sensor], pressure), 6)
 
-        connections["openhab"].set_item(
-            "Sensor_" + sensor + "_entalpi", enthalpies[sensor]
-        )
+        await pers.openhab.set_item("Sensor_" + sensor + "_entalpi", enthalpies[sensor])
 
-        connections["openhab"].set_item(
+        await pers.openhab.set_item(
             "Sensor_" + sensor + "_masseforhold", mixs[sensor] * 1000
         )
     logger.debug("temps: %s", temps)
@@ -115,28 +108,28 @@ def main(connections=None):
         (mixs["fraluft"] - mixs["avkast"]) / (mixs["fraluft"] - mixs["inntak"]), 3
     )
 
-    connections["openhab"].set_item(
+    await pers.openhab.set_item(
         "Ventilasjon_virkningsgrad_temperatur", temp_virkningsgrad, log=True
     )
-    connections["openhab"].set_item(
+    await pers.openhab.set_item(
         "Ventilasjon_virkningsgrad_temperaturoppvarming",
         temp_virkningsgradopp,
         log=True,
     )
-    connections["openhab"].set_item(
+    await pers.openhab.set_item(
         "Ventilasjon_virkningsgrad_entalpi", enthalpy_efficiency, log=True
     )
-    connections["openhab"].set_item(
+    await pers.openhab.set_item(
         "Ventilasjon_virkningsgrad_fukt", moisture_efficiency, log=True
     )
 
     fuktproduksjon = round((mixs["fraluft"] - mixs["tilluft"]) * 1000, 3)
     fuktfrahusnetto = round((mixs["avkast"] - mixs["inntak"]) * 1000, 3)
     fuktfravarmeveksler = round((mixs["tilluft"] - mixs["inntak"]) * 1000, 3)
-    connections["openhab"].set_item("Fuktproduksjon_hus", fuktproduksjon, log=True)
-    connections["openhab"].set_item("Ventilasjon_hustorking", fuktfrahusnetto)
+    await pers.openhab.set_item("Fuktproduksjon_hus", fuktproduksjon, log=True)
+    await pers.openhab.set_item("Ventilasjon_hustorking", fuktfrahusnetto)
 
-    connections["openhab"].set_item(
+    await pers.openhab.set_item(
         "Ventilasjon_fuktvekslingsmengde", fuktfravarmeveksler, log=True
     )
 

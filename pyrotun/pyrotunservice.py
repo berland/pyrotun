@@ -20,7 +20,7 @@ import pyrotun.connections.smappee
 import pyrotun.connections.openhab
 import pyrotun.connections.mqtt
 import pyrotun.connections.tibber
-
+import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
 
@@ -31,14 +31,8 @@ EVERY_5_MINUTE = "*/5 * * * *"
 EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
 
-CONNECTIONS = {
-    "smappee": pyrotun.connections.smappee.SmappeeConnection(),
-    "mqtt": pyrotun.connections.mqtt.MqttConnection(),
-    "openhab": pyrotun.connections.openhab.OpenHABConnection(),
-    "tibber": None,
-    # must be awaited # "tibber":  pyrotun.connections.tibber.TibberConnection(),
-}
 
+PERS =None
 
 @aiocron.crontab(EVERY_MINUTE)
 async def heartbeat():
@@ -47,48 +41,53 @@ async def heartbeat():
 @aiocron.crontab(EVERY_15_SECOND)
 async def vent_calc():
     logger.info("ventcalc")
-    pyrotun.vent_calculations.main(CONNECTIONS)
+    await pyrotun.vent_calculations.main(PERS)
 
 @aiocron.crontab(EVERY_5_MINUTE)
-async def pollsmappe():
+async def pollsmappe(pers):
     # Todo use the same connection instead of reauth.
     logger.info("pollsmappee")
-    pyrotun.pollsmappee.main(CONNECTIONS)
+    pyrotun.pollsmappee.main(PERS)
 
 
 @aiocron.crontab(EVERY_HOUR)
-async def helligdager():
+async def helligdager(pers):
     logger.info("helligdager")
-    pyrotun.helligdager.main(CONNECTIONS)
+    await pyrotun.helligdager.main(pers)
 
 @aiocron.crontab(EVERY_15_MINUTE)
-async def polltibber():
+async def polltibber(pers):
     logger.info("polling tibber")
-    await pyrotun.polltibber.main(CONNECTIONS)
+    await pyrotun.polltibber.main(pers)
 
 @aiocron.crontab(EVERY_HOUR)
-async def yrmelding():
+async def yrmelding(pers):
     logger.info("yrmelding")
-    pyrotun.yrmelding.main(CONNECTIONS)
+    await pyrotun.yrmelding.main(pers)
 
 
 @aiocron.crontab(EVERY_15_MINUTE)
-async def houseshadow():
+async def houseshadow(pers):
     logger.info("houseshadow")
     pyrotun.houseshadow.main("shadow.svg")
 
 
-async def at_startup():
-    pyrotun.vent_calculations.main(CONNECTIONS)
-    await pyrotun.polltibber.main(CONNECTIONS)
-    pyrotun.pollsmappee.main(CONNECTIONS)
+async def at_startup(pers):
+    await pyrotun.vent_calculations.main(pers)
+    await pyrotun.polltibber.main(pers)
+
+    await pyrotun.pollsmappee.main(pers)
     pyrotun.houseshadow.main("shadow.svg")
-    pyrotun.yrmelding.main(CONNECTIONS)
-    pyrotun.helligdager.main(CONNECTIONS)
+    await pyrotun.yrmelding.main(pers)
+    await pyrotun.helligdager.main(pers)
+
 
 
 if __name__ == "__main__":
     logger.info("Starting pyrotun service loop")
+    pers = pyrotun.persist.PyrotunPersistence()
+    PERS = pers
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(at_startup())
+    loop.run_until_complete(pers.ainit())
+    loop.run_until_complete(at_startup(pers))
     loop.run_forever()

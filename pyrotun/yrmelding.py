@@ -8,16 +8,13 @@ import pyrotun.connections.openhab
 logger = pyrotun.getLogger()
 
 
-def main(connections=None):
-    if connections is None:
-        connections = {}
-        connections["openhab"] = pyrotun.connections.openhab.OpenHABConnection()
+async def main(pers):
 
-    weather = get_weather()
+    weather = await get_weather(persistence=pers)
 
     for item, value in map_weatherdict_to_openhab(weather).items():
         logger.info("Submitting %s=%s to OpenHAB", item, str(round(value, 1)))
-        connections["openhab"].set_item(item, round(value, 1))
+        await pers.openhab.set_item(item, round(value, 1))
 
 
 def map_weatherdict_to_openhab(weather):
@@ -30,7 +27,7 @@ def map_weatherdict_to_openhab(weather):
     }
 
 
-def get_weather(xmlfile=None):
+async def get_weather(xmlfile=None, persistence=None):
     """Returns:
 
     dict with keys:
@@ -46,7 +43,14 @@ def get_weather(xmlfile=None):
         logger.error("provided xmlfile was empty")
         return
     logger.info("Downloading: %s", str(xmlfile))
-    root = objectify.parse(xmlfile).getroot()
+
+    resp =  await persistence.websession.get(xmlfile)
+    xmlstring = await resp.read()  # read() to get bytes.
+    #print(xmlstring)
+    root = objectify.fromstring(xmlstring)
+    #print(root)
+    #root = objectify.parse(xmlfile).getroot()
+    print(root)
 
     nexthours = [
         int(
