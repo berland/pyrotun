@@ -6,46 +6,37 @@ import pandas as pd
 from matplotlib import pyplot
 
 import pyrotun
-from pyrotun.connections import influxdb, tibber
+from pyrotun import persist
 
 logger = pyrotun.getLogger(__name__)
 
-TIMEDELTA_MINUTES = 30   # 60 is smooth enough. 30 and lower is too noisy.
+TIMEDELTA_MINUTES = 30  # 60 is smooth enough. 30 and lower is too noisy.
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 SENSOR_ITEM = "Varmtvannsbereder_temperatur"
 VACATION_ITEM = "Ferie"
 
-class WaterHeater():
-    def run():
-        pass
 
-async def main(connections=None):
-    if connections is None:
-        connections = {
-            "influxdb": influxdb.InfluxDBConnection(),
-            "tibber": tibber.TibberConnection(),
-        }
-        await connections["tibber"].ainit()
-    tib = connections["tibber"]
-    inf = connections["influxdb"]
+class WaterHeater:
+    def __init__(self):
+        self.weekly_water_usage_frame = None
 
-    temp = await inf.get_lastvalue("InneTemperatur")
-    print(temp)
-    prices = await tib.get_prices()
+        # The global persistence object
+        self.pers = None
 
-    print(prices)
+    async def ainit(self, pers):
+        self.pers = pers
+        self.weekly_water_usage_frame = await weekly_profile(pers)
 
-    await weekly_profile(connections)
+    async def future_temp_cost_graph():
+        """Build the networkx Directed 2D ~lattice  Graph, with
+        datetime on the x-axis and water-temperatur on the y-axis.
 
-
-async def manualmodel():
-    """Manually made linear model that fits better with physics than the raw
-    numbers.
-
-    Waterheater temperature loss pr. hour as a function of waterheater
-    temperature.
-    """
-    return (0.44, (-0.013 / (60 / TIMEDELTA_MINUTES)))
+        Edges from nodes determined by (time, temp) has an associated
+        cost in NOK.
+        """
+        prices_df = self.pers.tibber.get_prices_df()
+        datetimes = pd.date_range(datetime.datetime.now(),
+                prices_df.index.max(), freq=PD_TIMEDELTA, tz=tz)
 
 
 async def waterusage_weekly(dframe, plot=False):
@@ -90,11 +81,10 @@ async def heatloss_diffusion_model(dframe_away, plot=False):
 
 
 
-async def weekly_profile(connections, vacation=False):
-    tib = connections["tibber"]
-    inf = connections["influxdb"]
 
-    dframe = await inf.get_series(SENSOR_ITEM)
+
+async def weekly_profile(pers, vacation=False):
+    dframe = await pers.influxdb.get_series(SENSOR_ITEM)
     dframe.columns = ["watertemp"]
     dframe["watertemp"].clip(lower=20, upper=85, inplace=True)
     dframe = dframe.resample(PD_TIMEDELTA).mean().interpolate(method="linear")
@@ -106,7 +96,7 @@ async def weekly_profile(connections, vacation=False):
     # and that is not want we want to estimate from.
     dframe = dframe[dframe["waterdiff"] < 0]
 
-    vacation = await inf.get_series(VACATION_ITEM)
+    vacation = await pers.influxdb.get_series(VACATION_ITEM)
     vacation = vacation.resample(PD_TIMEDELTA).max().fillna(method="ffill")
     vacation.columns = ["vacation"]
 
@@ -119,14 +109,28 @@ async def weekly_profile(connections, vacation=False):
 
     (intercept, coef) = await heatloss_diffusion_model(dframe_away.copy(), plot=False)
 
-    profile = await waterusage_weekly(dframe_athome.copy(), plot=True)
+    profile = await waterusage_weekly(dframe_athome.copy(), plot=False)
     print(profile)
     profile.to_csv("watertempprofile.csv")
     # print(watertemps)
     # print(d_watertemps)
 
-    await tib.websession.close()
+
+async def main():
+    pers = pyrotun.persist.PyrotunPersistence()
+    # Make the weekly water usage profile, and persist it:
+    await pers.ainit() # This also initializes this very waterheater object.
+    print(pers.waterheater.weekly_water_usage_frame)
+    graph = await pers.waterheater.future_temp_cost_graph()
+
+    #temp = await pers.influxdb.get_lastvalue("InneTemperatur")
+    #print(temp)
+    #prices = await pers.tibber.get_prices()
+#
+#    print(prices)
+
+#    await weekly_profile(connections)
 
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())

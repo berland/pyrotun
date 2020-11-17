@@ -1,6 +1,8 @@
 import sys
 import logging
 
+# from . import persist
+
 # Singleton pattern for the logger
 logger = None
 

@@ -32,42 +32,47 @@ EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
 
 
-PERS =None
+PERS = None
+
 
 @aiocron.crontab(EVERY_MINUTE)
 async def heartbeat():
     logger.info("<puls>")
+
 
 @aiocron.crontab(EVERY_15_SECOND)
 async def vent_calc():
     logger.info("ventcalc")
     await pyrotun.vent_calculations.main(PERS)
 
+
 @aiocron.crontab(EVERY_5_MINUTE)
-async def pollsmappe(pers):
+async def pollsmappe():
     # Todo use the same connection instead of reauth.
     logger.info("pollsmappee")
     pyrotun.pollsmappee.main(PERS)
 
 
 @aiocron.crontab(EVERY_HOUR)
-async def helligdager(pers):
+async def helligdager():
     logger.info("helligdager")
-    await pyrotun.helligdager.main(pers)
+    await pyrotun.helligdager.main(PERS)
+
 
 @aiocron.crontab(EVERY_15_MINUTE)
-async def polltibber(pers):
+async def polltibber():
     logger.info("polling tibber")
-    await pyrotun.polltibber.main(pers)
+    await pyrotun.polltibber.main(PERS)
+
 
 @aiocron.crontab(EVERY_HOUR)
-async def yrmelding(pers):
+async def yrmelding():
     logger.info("yrmelding")
-    await pyrotun.yrmelding.main(pers)
+    await pyrotun.yrmelding.main(PERS)
 
 
 @aiocron.crontab(EVERY_15_MINUTE)
-async def houseshadow(pers):
+async def houseshadow():
     logger.info("houseshadow")
     pyrotun.houseshadow.main("shadow.svg")
 
@@ -80,7 +85,6 @@ async def at_startup(pers):
     pyrotun.houseshadow.main("shadow.svg")
     await pyrotun.yrmelding.main(pers)
     await pyrotun.helligdager.main(pers)
-
 
 
 if __name__ == "__main__":

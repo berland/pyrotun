@@ -11,7 +11,7 @@ NETTLEIE = 0.4154
 async def main(pers):
 
     prices_df = await pers.tibber.get_prices()
-    logger.info("Tibber prices %s", str(prices_df))
+    logger.info("Got Tibber prices")# , str(prices_df))
 
     daily_consumption = pers.smappee.get_daily_df()
     # logger.info("Daily consumption %s", str(daily_consumption))
