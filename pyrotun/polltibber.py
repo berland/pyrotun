@@ -39,6 +39,8 @@ async def main(pers):
     logger.info("Pris nå: %s øre", nupris)
     await pers.openhab.set_item("Tibber_current_price", nupris)
 
+    # TODO: PowerPriceOrder og RelativePriceOrder
+
 
 if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(main())

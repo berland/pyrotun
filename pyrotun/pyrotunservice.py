@@ -31,7 +31,6 @@ EVERY_5_MINUTE = "*/5 * * * *"
 EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
 
-
 PERS = None
 
 
@@ -50,7 +49,7 @@ async def vent_calc():
 async def pollsmappe():
     # Todo use the same connection instead of reauth.
     logger.info("pollsmappee")
-    pyrotun.pollsmappee.main(PERS)
+    await pyrotun.pollsmappee.main(PERS)
 
 
 @aiocron.crontab(EVERY_HOUR)
@@ -64,6 +63,10 @@ async def polltibber():
     logger.info("polling tibber")
     await pyrotun.polltibber.main(PERS)
 
+@aiocron.crontab(EVERY_5_MINUTE)
+async def waterheater_controller():
+    logger.info("Running waterheater controller")
+    await pyrotun.waterheater.controller(PERS)
 
 @aiocron.crontab(EVERY_HOUR)
 async def yrmelding():
@@ -85,6 +88,7 @@ async def at_startup(pers):
     pyrotun.houseshadow.main("shadow.svg")
     await pyrotun.yrmelding.main(pers)
     await pyrotun.helligdager.main(pers)
+    await pyrotun.waterheater.controller(pers)
 
 
 if __name__ == "__main__":

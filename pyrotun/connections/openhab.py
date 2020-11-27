@@ -27,12 +27,20 @@ class OpenHABConnection:
         # This is not async..
         self.client = openhab.openHAB(self.openhab_url)
 
-    async def get_item(self, item_name):
+    async def get_item(self, item_name, datatype=str):
         async with self.websession.get(
             self.openhab_url + "/items/" + str(item_name)
         ) as resp:
             resp = await resp.json()
-            return resp["state"]
+            if datatype==str:
+                return resp["state"]
+            elif datatype==float:
+                return float(resp["state"])
+            elif datatype==bool:
+                if resp["state"] == "ON":
+                    return True
+                else:
+                    return False
 
     async def set_item(self, item_name, new_state, log=None):
         if log:

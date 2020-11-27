@@ -17,10 +17,12 @@ class TibberConnection:
         self.home = None
         self.authenticated = False
         self.lastpriceframe = None
+        self.lastpriceframe_timestamp = None
+        self._close_websession_in_aclose = False
 
     async def _create_session(self):
         return aiohttp.ClientSession(
-            headers={aiohttp.hdrs.USER_AGENT: f"brlndpyTibber/0.x.x"}
+            headers={aiohttp.hdrs.USER_AGENT: "brlndpyTibber/0.x.x"}
         )
 
     async def ainit(self, websession=None):
@@ -31,6 +33,7 @@ class TibberConnection:
         self.websession = websession
         if self.websession is None:
             self.websession = aiohttp.ClientSession()
+            self._close_websession_in_aclose = True
 
         self.token = os.getenv("TIBBER_TOKEN")
 
@@ -41,39 +44,56 @@ class TibberConnection:
             self.authenticated = True
             logger.info("Tibber authenticated")
 
+    async def aclose(self):
+        await self.mytibber.close_connection()
+        if self._close_websession_in_aclose:
+            self.websession.close()
+
     async def authenticate(self):
         if self.authenticated:
             return
         self.websession = await self._create_session()
-        self.mytibber = tibber.Tibber(self.token, websession=self.websession)
+        self.mytibber = tibber.Tibber(self.token, timeout=2, websession=self.websession)
         try:
             await self.mytibber.update_info()
             self.home = self.mytibber.get_homes()[0]
             await self.home.update_info()
+            self.authenticated = True
         except asyncio.TimeoutError:
             self.authenticated = False
 
     async def get_prices(self):
         """Prices in the dataframe is valid *forwards* in time"""
+        tz = pytz.timezone(os.getenv("TIMEZONE"))
+        if (
+            self.lastpriceframe_timestamp is not None
+            and datetime.datetime.now() - self.lastpriceframe_timestamp
+            < datetime.timedelta(hours=1)
+        ):
+            return self.lastpriceframe
         try:
             if not self.authenticated:
+                logger.debug("Reauth in tibber")
                 await self.authenticate()
             await self.home.update_price_info()
-        except asyncio.TimeoutError:
+        except (asyncio.TimeoutError, AttributeError):
             logger.warning("Timeout connecting to Tibber")
             if self.lastpriceframe is not None:
                 logger.warning("Using internal cache for price_df")
                 return self.lastpriceframe
             else:
                 logger.warning("Using on-disk frame for price_df")
-                return pd.read_csv("/var/run/tibber_lastpriceframe.csv")
-        tz = pytz.timezone(os.getenv("TIMEZONE"))
+                disk_frame = pd.read_csv(
+                    "/var/tmp/tibber_lastpriceframe.csv", index_col=0, parse_dates=True
+                )
+                disk_frame.index = disk_frame.index.tz_convert(tz)
+                return disk_frame
         prices_df = pd.DataFrame.from_dict(self.home.price_total, orient="index")
         prices_df.columns = ["NOK/KWh"]
         prices_df.index = pd.to_datetime(prices_df.index).tz_convert(tz)
-        prices_df.to_csv("/var/run/tibber_lastpriceframe.csv")
+        prices_df.to_csv("/var/tmp/tibber_lastpriceframe.csv")
         self.lastpriceframe = prices_df
-        self.lastpriceframe_update = datetime.datetime.now()
+        self.lastpriceframe_timestamp = datetime.datetime.now()
         return prices_df
 
     async def get_currentprice(self):

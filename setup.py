@@ -35,6 +35,7 @@ TEST_REQUIREMENTS = [
     "black>=20.8b0",
     "flake8",
     "pytest",
+    "pytest-asyncio"
     "rstcheck",
 ]
 

@@ -1,20 +1,29 @@
 import os
+import asyncio
 
 from lxml import objectify
 
 import pyrotun
+from pyrotun import persist
 import pyrotun.connections.openhab
 
 logger = pyrotun.getLogger()
 
 
-async def main(pers):
+async def main(pers=None):
+    close_pers_here = False  # todo: use context manager?
+    if pers is None:
+        pers = persist.PyrotunPersistence()
+        close_pers_here = True
+    await pers.ainit(requested="openhab")
 
     weather = await get_weather(persistence=pers)
 
     for item, value in map_weatherdict_to_openhab(weather).items():
         logger.info("Submitting %s=%s to OpenHAB", item, str(round(value, 1)))
         await pers.openhab.set_item(item, round(value, 1))
+    if close_pers_here:
+        await pers.aclose()
 
 
 def map_weatherdict_to_openhab(weather):
@@ -44,12 +53,12 @@ async def get_weather(xmlfile=None, persistence=None):
         return
     logger.info("Downloading: %s", str(xmlfile))
 
-    resp =  await persistence.websession.get(xmlfile)
+    resp = await persistence.websession.get(xmlfile)
     xmlstring = await resp.read()  # read() to get bytes.
-    #print(xmlstring)
+    # print(xmlstring)
     root = objectify.fromstring(xmlstring)
-    #print(root)
-    #root = objectify.parse(xmlfile).getroot()
+    # print(root)
+    # root = objectify.parse(xmlfile).getroot()
     print(root)
 
     nexthours = [
@@ -87,4 +96,4 @@ async def get_weather(xmlfile=None, persistence=None):
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
