@@ -109,7 +109,7 @@ async def main(pers):
     )
 
     await pers.openhab.set_item(
-        "Ventilasjon_virkningsgrad_temperatur", temp_virkningsgrad, log=True
+        "Ventilasjon_virkningsgrad_temperatur", temp_virkningsgrad, log=False
     )
     await pers.openhab.set_item(
         "Ventilasjon_virkningsgrad_temperaturoppvarming",
@@ -117,16 +117,16 @@ async def main(pers):
         log=True,
     )
     await pers.openhab.set_item(
-        "Ventilasjon_virkningsgrad_entalpi", enthalpy_efficiency, log=True
+        "Ventilasjon_virkningsgrad_entalpi", enthalpy_efficiency, log=False
     )
     await pers.openhab.set_item(
-        "Ventilasjon_virkningsgrad_fukt", moisture_efficiency, log=True
+        "Ventilasjon_virkningsgrad_fukt", moisture_efficiency, log=False
     )
 
     fuktproduksjon = round((mixs["fraluft"] - mixs["tilluft"]) * 1000, 3)
     fuktfrahusnetto = round((mixs["avkast"] - mixs["inntak"]) * 1000, 3)
     fuktfravarmeveksler = round((mixs["tilluft"] - mixs["inntak"]) * 1000, 3)
-    await pers.openhab.set_item("Fuktproduksjon_hus", fuktproduksjon, log=True)
+    await pers.openhab.set_item("Fuktproduksjon_hus", fuktproduksjon, log=False)
     await pers.openhab.set_item("Ventilasjon_hustorking", fuktfrahusnetto)
 
     await pers.openhab.set_item(

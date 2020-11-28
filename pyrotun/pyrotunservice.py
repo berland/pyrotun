@@ -35,14 +35,14 @@ EVERY_HOUR = "0 * * * *"
 PERS = None
 
 
-@aiocron.crontab(EVERY_MINUTE)
-async def heartbeat():
-    logger.info("<puls>")
+# @aiocron.crontab(EVERY_MINUTE)
+# async def heartbeat():
+#    logger.info("<puls>")
 
 
 @aiocron.crontab(EVERY_15_SECOND)
 async def vent_calc():
-    logger.info("ventcalc")
+    logger.info("Running ventilation calculations")
     await pyrotun.vent_calculations.main(PERS)
 
 
@@ -64,10 +64,12 @@ async def polltibber():
     logger.info("polling tibber")
     await pyrotun.polltibber.main(PERS)
 
+
 @aiocron.crontab(EVERY_5_MINUTE)
 async def waterheater_controller():
     logger.info("Running waterheater controller")
     await pyrotun.waterheater.controller(PERS)
+
 
 @aiocron.crontab(EVERY_HOUR)
 async def yrmelding():

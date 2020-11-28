@@ -2,14 +2,19 @@ import asyncio
 import pandas as pd
 
 import pyrotun
+import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
 
 NETTLEIE = 0.4154
 
+PERS = None
 
-async def main(pers):
-
+async def main(pers=PERS):
+    if pers is None:
+        pers = pyrotun.persist.PyrotunPersistence()
+    if pers.tibber is None:
+        await pers.ainit(["tibber", "smappee"])
     prices_df = await pers.tibber.get_prices()
     logger.info("Got Tibber prices")# , str(prices_df))
 
@@ -35,12 +40,15 @@ async def main(pers):
         str(round(dframe["NOK/KWh"].mean()*100, 2)),
     )
 
-    nupris = await pers.tibber.get_currentprice()
+    nupris, priceorder, relpriceorder = await pers.tibber.get_currentprice()
     logger.info("Pris nå: %s øre", nupris)
     await pers.openhab.set_item("Tibber_current_price", nupris)
+    await pers.openhab.set_item("PowerPriceOrder", priceorder)
+    await pers.openhab.set_item("RelativePriceOrder", relpriceorder)
 
     # TODO: PowerPriceOrder og RelativePriceOrder
 
 
 if __name__ == "__main__":
+    PERS = pyrotun.persist.PyrotunPersistence()
     asyncio.get_event_loop().run_until_complete(main())

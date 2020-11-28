@@ -25,7 +25,7 @@ def setup_logger(name="pyrotun"):
     screen_handler = logging.StreamHandler(stream=sys.stdout)
     screen_handler.setFormatter(formatter)
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     logger.addHandler(handler)
     logger.addHandler(screen_handler)
     return logger
