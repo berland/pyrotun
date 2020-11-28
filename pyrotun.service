@@ -1,0 +1,14 @@
+[Unit]
+Description=pyrotun
+After=syslog.target network.target openhab2.service
+
+[Service]
+Type=simple
+User=berland
+WorkingDirectory=/home/berland/pyrotun
+ExecStart=/home/berland/pyrotun/venv/bin/python pyrotun/pyrotunservice.py
+Restart=on-abort
+EnvironmentFile=/home/berland/pyrotun/.env
+
+[Install]
+WantedBy=multi-user.target

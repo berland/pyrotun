@@ -8,6 +8,7 @@ from asyncio at regular intervals (similar to crontab)
 import asyncio
 
 import aiocron
+import dotenv
 
 import pyrotun
 import pyrotun.helligdager
@@ -93,6 +94,7 @@ async def at_startup(pers):
 
 if __name__ == "__main__":
     logger.info("Starting pyrotun service loop")
+    dotenv.load_dotenv(verbose=True)
     pers = pyrotun.persist.PyrotunPersistence()
     PERS = pers
     loop = asyncio.get_event_loop()

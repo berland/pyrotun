@@ -42,8 +42,8 @@ MOON_COLOR = "#999999"
 MOON_RADIUS = 6
 STROKE_WIDTH = "1"
 # FILENAME = "/etc/openhab2/html/husskygge.svg"
-LATITUDE = float(os.getenv("LOCAL_LATITUDE"))
-LONGITUDE = float(os.getenv("LOCAL_LONGITUDE"))
+LATITUDE = None
+LONGITUDE = None
 
 # Shape of the house in a 100 by 100 units square
 
@@ -75,6 +75,9 @@ class shadow(object):
 
         self.debug = False
         timezone = pytz.timezone(os.getenv("TIMEZONE"))
+
+        LATITUDE = float(os.getenv("LOCAL_LATITUDE"))
+        LONGITUDE = float(os.getenv("LOCAL_LONGITUDE"))
 
         assert LATITUDE is not None
         assert LONGITUDE is not None

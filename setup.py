@@ -52,7 +52,7 @@ setuptools.setup(
     license="Private",
     platforms="any",
     include_package_data=False,
-    packages=find_packages(include=["pyrotun"]),
+    packages=find_packages(include=["pyrotun*"]),
     install_requires=REQUIREMENTS,
     setup_requires=SETUP_REQUIREMENTS,
     use_scm_version={"write_to": "pyrotun/version.py"},
