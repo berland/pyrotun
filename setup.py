@@ -11,6 +11,7 @@ REQUIREMENTS = [
     "aioinflux",
     "asyncio",
     "astral",
+    "paho-mqtt",
     "python-dotenv",
     "holidays",
     "lxml",
