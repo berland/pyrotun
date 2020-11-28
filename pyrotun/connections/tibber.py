@@ -91,6 +91,10 @@ class TibberConnection:
         prices_df = pd.DataFrame.from_dict(self.home.price_total, orient="index")
         prices_df.columns = ["NOK/KWh"]
         prices_df.index = pd.to_datetime(prices_df.index).tz_convert(tz)
+        prices_df["weekday"] = prices_df.index.weekday
+        prices_df["dayrank"] = (
+            prices_df.groupby("weekday")["NOK/KWh"].rank().astype(int)
+        )
         prices_df.to_csv("/var/tmp/tibber_lastpriceframe.csv")
         self.lastpriceframe = prices_df
         self.lastpriceframe_timestamp = datetime.datetime.now()
