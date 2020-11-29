@@ -6,6 +6,7 @@ import pytz
 from sklearn import linear_model
 import pandas as pd
 from matplotlib import pyplot
+import dotenv
 
 import aiocron
 
@@ -92,6 +93,15 @@ class WaterHeater:
         await self.pers.openhab.set_item(
             SAVINGS24H_ITEM, str(opt_results["savings24h"])
         )
+
+        # Dump CSV for legacy plotting solution, naive timestamps:
+        isonowhour = datetime.datetime.now().replace(minute=0).strftime("%Y-%m-%d-%H00")
+        onoff = pd.DataFrame(
+            columns=["onoff"], data=path_onoff(opt_results["opt_path"])
+        )
+        onoff.index = onoff.index.tz_localize(None)
+        onoff["timestamp"] = onoff.index
+        onoff.to_csv("/home/berland/heatoptplots/waterheater-" + isonowhour + ".csv")
 
     def future_temp_cost_graph(
         self,
@@ -458,7 +468,18 @@ def waterusage_weekly(dframe, plot=False):
 
 
 def path_costs(graph, path):
+    """Compute a list of the cost along a temperature path, in NOK"""
     return [graph.edges[path[i], path[i + 1]]["cost"] for i in range(len(path) - 1)]
+
+
+def path_onoff(path):
+    """Compute a pandas series with 1 or 0 whether the heater
+    should be on or off along a path"""
+    timestamps = [node[0] for node in path][:-1]  # skip the last one
+    temps = [node[1] for node in path]
+    onoff = pd.Series(temps).diff().shift(-1).dropna()
+    onoff.index = timestamps
+    return (onoff > 0).astype(int)
 
 
 def path_kwh(graph, path):
@@ -467,13 +488,14 @@ def path_kwh(graph, path):
 
 def analyze_graph(graph, starttemp=60, endtemp=60):
     startnode = find_node(graph, datetime.datetime.now(), starttemp)
-    endnode = find_node(graph, datetime.datetime.now() + pd.Timedelta("48h"), starttemp)
+    endnode = find_node(graph, datetime.datetime.now() + pd.Timedelta("48h"), endtemp)
     path = networkx.shortest_path(
         graph, source=startnode, target=endnode, weight="cost"
     )
     no_opt_path = networkx.shortest_path(
         graph, source=startnode, target=endnode, weight="abstempchange"
     )
+    onoff = path_onoff(path)
     opt_cost = sum(path_costs(graph, path))
     no_opt_cost = sum(path_costs(graph, no_opt_path))
     kwh = sum(path_kwh(graph, path))
@@ -534,6 +556,7 @@ async def main():
 
 
 if __name__ == "__main__":
+    dotenv.load_dotenv()
     # loop = asyncio.get_event_loop()
     # asyncio.ensure_future(main())
     # loop.run_forever()

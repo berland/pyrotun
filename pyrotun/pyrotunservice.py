@@ -29,6 +29,7 @@ EVERY_SECOND = "* * * * * *"
 EVERY_15_SECOND = "* * * * * */15"
 EVERY_MINUTE = "* * * * *"
 EVERY_5_MINUTE = "*/5 * * * *"
+EVERY_8_MINUTE = "*/8 * * * *"
 EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
 
@@ -65,7 +66,7 @@ async def polltibber():
     await pyrotun.polltibber.main(PERS)
 
 
-@aiocron.crontab(EVERY_5_MINUTE)
+@aiocron.crontab(EVERY_8_MINUTE)
 async def waterheater_controller():
     logger.info("Running waterheater controller")
     await pyrotun.waterheater.controller(PERS)

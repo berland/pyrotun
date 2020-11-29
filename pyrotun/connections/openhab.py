@@ -8,7 +8,9 @@ logger = pyrotun.getLogger(__name__)
 
 
 class OpenHABConnection:
-    def __init__(self, openhab_url="", websession=None):
+    def __init__(self, openhab_url="", websession=None, readonly=False):
+
+        self.readonly = readonly
 
         if not openhab_url:
             self.openhab_url = os.getenv("OPENHAB_URL")
@@ -32,17 +34,20 @@ class OpenHABConnection:
             self.openhab_url + "/items/" + str(item_name)
         ) as resp:
             resp = await resp.json()
-            if datatype==str:
+            if datatype == str:
                 return resp["state"]
-            elif datatype==float:
+            elif datatype == float:
                 return float(resp["state"])
-            elif datatype==bool:
+            elif datatype == bool:
                 if resp["state"] == "ON":
                     return True
                 else:
                     return False
 
     async def set_item(self, item_name, new_state, log=None):
+        if self.readonly:
+            logger.info("OpenHAB: Would have set %s to %s", item_name, str(new_state))
+            return
         if log:
             logger.info("OpenHAB: Setting %s to %s", item_name, str(new_state))
         async with self.websession.post(
@@ -55,6 +60,9 @@ class OpenHABConnection:
         return self.client.get_item(item_name).state
 
     def sync_set_item(self, item_name, new_state, log=False):
+        if self.readonly:
+            logger.info("OpenHAB: Would have set %s to %s", item_name, str(new_state))
+            return
         if log:
             logger.info("OpenHAB: Setting %s to %s", item_name, str(new_state))
         self.client.get_item(item_name).state = new_state

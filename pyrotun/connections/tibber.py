@@ -110,9 +110,10 @@ class TibberConnection:
         )
 
         prices = await self.get_prices()
-        nowprice =  prices.loc[nowhour, "NOK/KWh"] * 100
-        if "rank" in prices:
-            priceorder = prices.loc[nowhour, "rank"]
+        nowprice = prices.loc[nowhour, "NOK/KWh"] * 100
+        if "dayrank" in prices:
+            priceorder = prices.loc[nowhour, "dayrank"]
+            relpriceorder = priceorder / float(len(prices))
         else:
             priceorder = None
             relpriceorder = None

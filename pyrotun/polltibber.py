@@ -1,5 +1,6 @@
 import asyncio
 import pandas as pd
+import dotenv
 
 import pyrotun
 import pyrotun.persist
@@ -10,13 +11,15 @@ NETTLEIE = 0.4154
 
 PERS = None
 
+
 async def main(pers=PERS):
+    dotenv.load_dotenv()
     if pers is None:
-        pers = pyrotun.persist.PyrotunPersistence()
+        pers = pyrotun.persist.PyrotunPersistence(readonly=True)
     if pers.tibber is None:
-        await pers.ainit(["tibber", "smappee"])
+        await pers.ainit(["tibber", "smappee", "openhab"])
     prices_df = await pers.tibber.get_prices()
-    logger.info("Got Tibber prices")# , str(prices_df))
+    logger.info("Got Tibber prices")  # , str(prices_df))
 
     daily_consumption = pers.smappee.get_daily_df()
     # logger.info("Daily consumption %s", str(daily_consumption))
@@ -37,16 +40,14 @@ async def main(pers=PERS):
 
     logger.info(
         "Gjennomsnittspris til nå i dag: %s øre",
-        str(round(dframe["NOK/KWh"].mean()*100, 2)),
+        str(round(dframe["NOK/KWh"].mean() * 100, 2)),
     )
 
     nupris, priceorder, relpriceorder = await pers.tibber.get_currentprice()
     logger.info("Pris nå: %s øre", nupris)
     await pers.openhab.set_item("Tibber_current_price", nupris)
-    await pers.openhab.set_item("PowerPriceOrder", priceorder)
-    await pers.openhab.set_item("RelativePriceOrder", relpriceorder)
-
-    # TODO: PowerPriceOrder og RelativePriceOrder
+    await pers.openhab.set_item("PowerPriceOrder", priceorder, log=True)
+    await pers.openhab.set_item("RelativePowerPriceOrder", relpriceorder, log=True)
 
 
 if __name__ == "__main__":
