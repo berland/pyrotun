@@ -43,7 +43,7 @@ PERS = None
 
 @aiocron.crontab(EVERY_15_SECOND)
 async def vent_calc():
-    logger.info("Running ventilation calculations")
+    logger.info(" ** Ventilation calculations")
     await pyrotun.vent_calculations.main(PERS)
 
 
