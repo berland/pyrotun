@@ -50,38 +50,38 @@ async def vent_calc():
 @aiocron.crontab(EVERY_5_MINUTE)
 async def pollsmappe():
     # Todo use the same connection instead of reauth.
-    logger.info("pollsmappee")
+    logger.info(" ** Pollsmappee")
     await pyrotun.pollsmappee.main(PERS)
 
 
 @aiocron.crontab(EVERY_HOUR)
 async def helligdager():
-    logger.info("helligdager")
+    logger.info(" ** Helligdager")
     await pyrotun.helligdager.main(PERS)
 
 
 @aiocron.crontab(EVERY_15_MINUTE)
 async def polltibber():
-    logger.info("polling tibber")
+    logger.info(" ** Polling tibber")
     await pyrotun.polltibber.main(PERS)
 
 
 @aiocron.crontab(EVERY_8_MINUTE)
 async def waterheater_controller():
-    logger.info("Running waterheater controller")
+    logger.info(" ** Waterheater controller")
     await pyrotun.waterheater.controller(PERS)
 
 
 @aiocron.crontab(EVERY_HOUR)
 async def yrmelding():
-    logger.info("yrmelding")
+    logger.info(" ** Yrmelding")
     await pyrotun.yrmelding.main(PERS)
 
 
 @aiocron.crontab(EVERY_15_MINUTE)
 async def houseshadow():
-    logger.info("houseshadow")
-    pyrotun.houseshadow.main("shadow.svg")
+    logger.info(" ** Houseshadow")
+    pyrotun.houseshadow.main("/etc/openhab2/html/husskygge.svg")
 
 
 async def at_startup(pers):
