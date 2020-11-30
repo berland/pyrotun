@@ -113,7 +113,7 @@ class TibberConnection:
         nowprice = prices.loc[nowhour, "NOK/KWh"] * 100
         if "dayrank" in prices:
             priceorder = prices.loc[nowhour, "dayrank"]
-            relpriceorder = priceorder / float(len(prices))
+            relpriceorder = round(priceorder / float(len(prices)), 2)
         else:
             priceorder = None
             relpriceorder = None
