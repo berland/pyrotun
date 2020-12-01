@@ -76,6 +76,13 @@ class WaterHeater:
             mintemp=40,
             maxtemp=84,
         )
+        # If we are below minimum temperature, we get a graph with 0 nodes.
+        # Turn on waterheater if so.
+        if not graph:
+            logger.info("Below minimum water temperature, forcing ON")
+            await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
+            return
+
         opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=55)
 
         # Turn on if temperature in the path should increase:
@@ -521,7 +528,7 @@ async def main():
     # Make the weekly water usage profile, and persist it:
     await pers.ainit(["tibber", "waterheater", "influxdb"])
     prices_df = await pers.tibber.get_prices()
-    starttemp = 60
+    starttemp = 48
     graph = pers.waterheater.future_temp_cost_graph(
         # starttemp=60, prices_df=prices_df, mintemp=0.75, maxtemp=84, vacation=False
         starttemp=starttemp,
@@ -531,6 +538,10 @@ async def main():
         vacation=False,
     )
 
+    if not graph:
+        logger.warning("Water temperature below minimum, should force on")
+        await pers.aclose()
+        return
     opt_results = analyze_graph(graph, starttemp=starttemp, endtemp=starttemp)
     # Use plus/minus 2 degrees and 8 minute accuracy to estimate the do-nothing
     # scenario.
