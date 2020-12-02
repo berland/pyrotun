@@ -14,6 +14,7 @@ class PyrotunPersistence:
         self.waterheater = None
         self.smappee = None
         self.openhab = None
+        self.mqtt = None
 
         # If true, no values are ever sent anywhere
         self.readonly = readonly
@@ -38,8 +39,16 @@ class PyrotunPersistence:
         if "smappee" in requested or "all" in requested:
             self.smappee = connections.smappee.SmappeeConnection()
 
+        if "mqtt" in requested or "all" in requested:
+            self.mqtt = connections.mqtt.MqttConnection()
+            await self.mqtt.ainit()
+
     async def aclose(self):
         logger.info("Tearing down pyrotunpersistence")
         if self.tibber is not None:
             await self.tibber.aclose()
+
         await self.websession.close()
+
+        if self.mqtt is not None:
+            await self.mqtt.aclose()

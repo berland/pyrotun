@@ -1,6 +1,15 @@
 import os
 
-import paho.mqtt.client as pahomqttclient
+import dotenv
+
+import asyncio_mqtt
+import pyrotun
+
+logger = pyrotun.getLogger(__name__)
+
+dotenv.load_dotenv()
+
+assert os.getenv("MQTT_HOST"), "You must provide MQTT_HOST as env variable"
 
 
 class MqttConnection:
@@ -11,11 +20,14 @@ class MqttConnection:
         else:
             self.host = host
 
+        self.client = asyncio_mqtt.Client(self.host)
+
         if not self.host:
             raise ValueError("MQTT_HOST not provided")
 
-        self.client = pahomqttclient.Client()
-        self.client.connect(self.host, port)
+    async def ainit(self):
+        logger.info("Connecting to MQTT server %s", self.host)
+        await self.client.__aenter__()  # yes yes, should have used context manager
 
-    def publish(self, topic, payload):
-        self.client.publish(topic=topic, payload=str(payload))
+    async def aclose(self):
+        await self.cleint.__aexit__()

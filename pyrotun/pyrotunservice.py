@@ -17,6 +17,8 @@ import pyrotun.pollsmappee
 import pyrotun.polltibber
 import pyrotun.houseshadow
 import pyrotun.vent_calculations
+import pyrotun.discord
+
 import pyrotun.connections.smappee
 import pyrotun.connections.openhab
 import pyrotun.connections.mqtt
@@ -85,6 +87,7 @@ async def houseshadow():
 
 
 async def at_startup(pers):
+    await  pyrotun.discord.main(pers)
     await pyrotun.vent_calculations.main(pers)
     await pyrotun.polltibber.main(pers)
 
