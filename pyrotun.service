@@ -7,7 +7,8 @@ Type=simple
 User=berland
 WorkingDirectory=/home/berland/pyrotun
 ExecStart=/home/berland/pyrotun/venv/bin/python pyrotun/pyrotunservice.py
-Restart=on-abort
+Restart=always
+RestartSec=5s
 EnvironmentFile=/home/berland/pyrotun/.env
 
 [Install]
