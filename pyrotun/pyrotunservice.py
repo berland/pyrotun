@@ -1,9 +1,9 @@
 """
-Main script for my house
+Addon-service to OpenHAB for things that are better programmed in CPython rather
+than Jython (inside OpenHAB).
 
 Runs continously as a service, calls underlying tools/scripts
 from asyncio at regular intervals (similar to crontab)
-
 """
 import asyncio
 
@@ -18,6 +18,7 @@ import pyrotun.polltibber
 import pyrotun.houseshadow
 import pyrotun.vent_calculations
 import pyrotun.discord
+import pyrotun.dataspike_remover
 
 import pyrotun.connections.smappee
 import pyrotun.connections.openhab
@@ -87,15 +88,21 @@ async def houseshadow():
 
 
 async def at_startup(pers):
-    await  pyrotun.discord.main(pers)
-    await pyrotun.vent_calculations.main(pers)
-    await pyrotun.polltibber.main(pers)
 
-    await pyrotun.pollsmappee.main(pers)
-    pyrotun.houseshadow.main("shadow.svg")
-    await pyrotun.yrmelding.main(pers)
-    await pyrotun.helligdager.main(pers)
-    await pyrotun.waterheater.controller(pers)
+    tasks = list()
+    tasks.append(asyncio.create_task(pyrotun.dataspike_remover.main(pers)))
+    tasks.append(asyncio.create_task(pyrotun.vent_calculations.main(pers)))
+    tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
+    tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
+    tasks.extend(await pyrotun.discord.main(pers, gather=False))
+    tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
+    tasks.append(pyrotun.waterheater.controller(pers))
+    tasks.append(pyrotun.yrmelding.main(pers))
+    tasks.append(pyrotun.helligdager.main(pers))
+
+    # This "blocks" because at least the discord modules contains
+    # infinite generators.
+    asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":

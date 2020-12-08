@@ -26,3 +26,12 @@ class InfluxDBConnection:
     async def get_lastvalue(self, item):
         resp = await self.client.query("SELECT last(value) FROM " + item)
         return resp["last"].values[0]
+
+    async def get_measurements(self):
+        """Return a list of all measurements in database"""
+        resp = await self.client.query("SHOW MEASUREMENTS")
+        return resp["name"].values
+
+    async def dframe_query(self, query):
+        resp = await self.client.query(query)
+        return resp

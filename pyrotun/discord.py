@@ -12,7 +12,7 @@ logger = pyrotun.getLogger(__name__)
 dotenv.load_dotenv()
 
 
-async def main(pers=None):
+async def main(pers=None, gather=False):
     if pers is None:
         dotenv.load_dotenv()
         pers = pyrotun.persist.PyrotunPersistence()
@@ -29,8 +29,10 @@ async def main(pers=None):
 
     await pers.mqtt.client.subscribe("discordmessage/#")
 
-    await asyncio.gather(task)
-
+    if gather:
+        await asyncio.gather(task)
+    else:
+        return [task]
 
 async def push_many_to_discord(messages, pers):
     """Loop over an async generator that provides messages to push
@@ -48,4 +50,4 @@ async def push_to_discord(message, pers):
 
 if __name__ == "__main__":
     assert os.getenv("DISCORD_WEBHOOK"), "You must set the env variable DISCORD_WEBHOOK"
-    asyncio.run(main())
+    asyncio.run(main(gather=True))
