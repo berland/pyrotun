@@ -37,7 +37,11 @@ class OpenHABConnection:
             if datatype == str:
                 return resp["state"]
             elif datatype == float:
-                return float(resp["state"])
+                try:
+                    return float(resp["state"])
+                except ValueError:
+                    logger.error(f"{item_name} was UNDEF")
+                    return None
             elif datatype == bool:
                 if resp["state"] == "ON":
                     return True

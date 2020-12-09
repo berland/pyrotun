@@ -63,6 +63,11 @@ class WaterHeater:
         assert self.pers.openhab is not None
 
         currenttemp = await self.pers.openhab.get_item(SENSOR_ITEM, datatype=float)
+        if currenttemp is None:
+            logger.warning("Waterheater set ON, no temperature knowledge")
+            await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
+            return
+
         vacation = await self.pers.openhab.get_item(VACATION_ITEM, datatype=bool)
 
         prices_df = await self.pers.tibber.get_prices()
@@ -79,7 +84,10 @@ class WaterHeater:
         # If we are below minimum temperature, we get a graph with 0 nodes.
         # Turn on waterheater if so.
         if not graph:
-            logger.info("Below minimum water temperature, forcing ON")
+            logger.info(
+                "Temperature now %s is below minimum water temperature, forcing ON",
+                str(currenttemp),
+            )
             await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
             return
 
@@ -526,9 +534,10 @@ async def controller(pers):
 async def main():
     pers = pyrotun.persist.PyrotunPersistence()
     # Make the weekly water usage profile, and persist it:
-    await pers.ainit(["tibber", "waterheater", "influxdb"])
+    await pers.ainit(["tibber", "waterheater", "influxdb", "openhab"])
     prices_df = await pers.tibber.get_prices()
-    starttemp = 48
+    currenttemp = await pers.openhab.get_item(SENSOR_ITEM, datatype=float)
+    starttemp = currenttemp
     graph = pers.waterheater.future_temp_cost_graph(
         # starttemp=60, prices_df=prices_df, mintemp=0.75, maxtemp=84, vacation=False
         starttemp=starttemp,
