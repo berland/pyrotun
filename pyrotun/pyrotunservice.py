@@ -19,6 +19,7 @@ import pyrotun.houseshadow
 import pyrotun.vent_calculations
 import pyrotun.discord
 import pyrotun.dataspike_remover
+import pyrotun.polar_dump
 
 import pyrotun.connections.smappee
 import pyrotun.connections.openhab
@@ -85,6 +86,12 @@ async def yrmelding():
 async def houseshadow():
     logger.info(" ** Houseshadow")
     pyrotun.houseshadow.main("/etc/openhab2/html/husskygge.svg")
+
+@aiocron.crontab(EVERY_MINUTE)
+async def polar_dump_now():
+    """Blocking(!)"""
+    logger.info(" ** Polar dumper")
+    pyrotun.polar_dump.main()
 
 
 async def at_startup(pers):
