@@ -87,7 +87,7 @@ async def houseshadow():
     logger.info(" ** Houseshadow")
     pyrotun.houseshadow.main("/etc/openhab2/html/husskygge.svg")
 
-@aiocron.crontab(EVERY_MINUTE)
+@aiocron.crontab(EVERY_15_MINUTE)
 async def polar_dump_now():
     """Blocking(!)"""
     logger.info(" ** Polar dumper")
