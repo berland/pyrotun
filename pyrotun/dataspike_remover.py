@@ -13,10 +13,10 @@ async def main(pers=None, readonly=True):
         pers = pyrotun.persist.PyrotunPersistence()
         await pers.ainit(["influxdb"])
 
-    await remove_spikes(pers, readonly=readonly)
+    await remove_spikes(pers, mindev=7, stddevs=3, readonly=readonly)
 
 
-async def remove_spikes(pers, mindev=3, stddevs=3, readonly=True):
+async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True):
     """
 
     Args:
