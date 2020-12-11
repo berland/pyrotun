@@ -14,6 +14,7 @@ REQUIREMENTS = [
     "asyncio_mqtt",
     "dotenv",
     "holidays",
+    "isodate",
     "lxml",
     "metpy",
     "networkx",
