@@ -20,8 +20,7 @@ async def main(pers=None):
     weather = await get_weather(persistence=pers)
 
     for item, value in map_weatherdict_to_openhab(weather).items():
-        logger.info("Submitting %s=%s to OpenHAB", item, str(round(value, 1)))
-        await pers.openhab.set_item(item, round(value, 1))
+        await pers.openhab.set_item(item, round(value, 1), log=True)
     if close_pers_here:
         await pers.aclose()
 
