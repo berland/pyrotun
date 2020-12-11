@@ -18,6 +18,7 @@ import pyrotun.polltibber
 import pyrotun.houseshadow
 import pyrotun.vent_calculations
 import pyrotun.discord
+import pyrotun.exercise_uploader
 import pyrotun.dataspike_remover
 import pyrotun.polar_dump
 
@@ -87,6 +88,7 @@ async def houseshadow():
     logger.info(" ** Houseshadow")
     pyrotun.houseshadow.main("/etc/openhab2/html/husskygge.svg")
 
+
 @aiocron.crontab(EVERY_15_MINUTE)
 async def polar_dump_now():
     """Blocking(!)"""
@@ -102,6 +104,7 @@ async def at_startup(pers):
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
     tasks.extend(await pyrotun.discord.main(pers, gather=False))
+    tasks.extend(await pyrotun.exercise_uploader.main(pers))
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
     tasks.append(pyrotun.waterheater.controller(pers))
     tasks.append(pyrotun.yrmelding.main(pers))
