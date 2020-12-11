@@ -7,13 +7,13 @@ import pyrotun.persist
 logger = pyrotun.getLogger(__name__)
 
 
-async def main(pers=None):
+async def main(pers=None, readonly=True):
     if pers is None:
         dotenv.load_dotenv()
         pers = pyrotun.persist.PyrotunPersistence()
         await pers.ainit(["influxdb"])
 
-    await remove_spikes(pers, readonly=True)
+    await remove_spikes(pers, readonly=readonly)
 
 
 async def remove_spikes(pers, mindev=3, stddevs=3, readonly=True):

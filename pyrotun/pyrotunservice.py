@@ -99,12 +99,14 @@ async def polar_dump_now():
 async def at_startup(pers):
 
     tasks = list()
-    tasks.append(asyncio.create_task(pyrotun.dataspike_remover.main(pers)))
+    tasks.append(
+        asyncio.create_task(pyrotun.dataspike_remover.main(pers, readonly=False))
+    )
     tasks.append(asyncio.create_task(pyrotun.vent_calculations.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
     tasks.extend(await pyrotun.discord.main(pers, gather=False))
-    #tasks.append(await pyrotun.exercise_uploader.main(pers))
+    # tasks.append(await pyrotun.exercise_uploader.main(pers))
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
     tasks.append(pyrotun.waterheater.controller(pers))
     tasks.append(pyrotun.yrmelding.main(pers))
