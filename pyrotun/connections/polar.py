@@ -18,6 +18,11 @@ def pretty_print_json(data):
     return json.dumps(data, indent=4, sort_keys=True, ensure_ascii=False)
 
 
+def pretty_print_xml(xmltext):
+    tree = etree.fromstring(bytes(bytearray(xmltext, encoding="utf-8")))
+    return etree.tostring(tree, pretty_print=True).decode()
+
+
 class Polar(object):
     """Personal application for getting
     last exercise from  Polar API (v3)"""
@@ -66,13 +71,12 @@ class Polar(object):
             (exportdir / "heart_rate_zones").write_text(
                 pretty_print_json(heart_rate_zones)
             )
-            (exportdir / "gpx").write_text(str(gpx))
+
+            if gpx:
+                (exportdir / "gpx").write_text(pretty_print_xml(gpx))
+
             if tcx:
-                tcx = bytes(bytearray(tcx, encoding="utf-8"))
-                tcx_tree = etree.fromstring(tcx)
-                (exportdir / "tcx").write_text(
-                    etree.tostring(tcx_tree, pretty_print=True).decode()
-                )
+                (exportdir / "tcx").write_text(pretty_print_xml(tcx))
 
             logger.info("Dumped data in " + str(exportdir))
         transaction.commit()

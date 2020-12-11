@@ -26,6 +26,7 @@ REQUIREMENTS = [
     "requests>2.23",
     "sklearn",
     "smappy",
+    "watchgod",
 ]
 
 SETUP_REQUIREMENTS = [
