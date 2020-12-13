@@ -1,24 +1,29 @@
 import sys
 import logging
 
-# from . import persist
-
-# Singleton pattern for the logger
-logger = None
+logger = {}
 
 
 def getLogger(name="pyrotun"):
     global logger
-    if logger is None:
-        logger = setup_logger(name)
-        return logger
+    if name == "__main__":
+        name = "ad-hoc"
+    if len(name.split(".")) > 1:
+        name = name.replace("pyrotun.", "")
+    if "connections." in name:
+        name = name.replace("connections.", "c.")
+    if name not in logger:
+        logger[name] = setup_logger(name)
+        return logger[name]
     else:
-        return logger
+        return logger[name]
 
 
 def setup_logger(name="pyrotun"):
+    shortname =  name[:8]
     formatter = logging.Formatter(
-        fmt="%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s " + f"{shortname:<8s}" + " %(levelname)-6s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     handler = logging.FileHandler("log.txt", mode="w")
     handler.setFormatter(formatter)
