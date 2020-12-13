@@ -22,7 +22,7 @@ async def main(pers=PERS):
     logger.info("Got Tibber prices")  # , str(prices_df))
 
     daily_consumption = pers.smappee.get_daily_df()
-    # logger.info("Daily consumption %s", str(daily_consumption))
+    # NB: This dataframe is always empty right after 00:00
 
     dframe = (
         pd.concat([daily_consumption, prices_df], axis=1, sort=True)
@@ -30,9 +30,13 @@ async def main(pers=PERS):
         .dropna()
     )
     dframe["gridrental"] = NETTLEIE
-    dframe["cost"] = (
-        dframe["consumption"] / 1000 * (dframe["NOK/KWh"] + dframe["gridrental"])
-    )
+
+    if "consumption" in dframe:
+        dframe["cost"] = (
+            dframe["consumption"] / 1000 * (dframe["NOK/KWh"] + dframe["gridrental"])
+        )
+    else:
+        dframe["cost"] = 0  # Every day at 00:00
 
     todayscost = round(dframe["cost"].sum(), 1)  # i kroner
     logger.info("Strømkostnad til nå i dag: %s NOK", todayscost)
