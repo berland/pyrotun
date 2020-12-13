@@ -41,11 +41,6 @@ EVERY_HOUR = "0 * * * *"
 PERS = None
 
 
-# @aiocron.crontab(EVERY_MINUTE)
-# async def heartbeat():
-#    logger.info("<puls>")
-
-
 @aiocron.crontab(EVERY_15_SECOND)
 async def vent_calc():
     logger.info(" ** Ventilation calculations")
@@ -106,7 +101,7 @@ async def at_startup(pers):
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
     tasks.extend(await pyrotun.discord.main(pers, gather=False))
-    # tasks.append(await pyrotun.exercise_uploader.main(pers))
+    tasks.append(await pyrotun.exercise_uploader.main(pers))
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
     tasks.append(pyrotun.waterheater.controller(pers))
     tasks.append(pyrotun.yrmelding.main(pers))
