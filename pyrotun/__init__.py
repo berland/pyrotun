@@ -7,7 +7,7 @@ logger = {}
 def getLogger(name="pyrotun"):
     global logger
     if name == "__main__":
-        name = "ad-hoc"
+        name = "service"
     if len(name.split(".")) > 1:
         name = name.replace("pyrotun.", "")
     if "connections." in name:
