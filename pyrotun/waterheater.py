@@ -2,13 +2,12 @@ import os
 import asyncio
 import networkx
 import datetime
+import itertools
 import pytz
 from sklearn import linear_model
 import pandas as pd
 from matplotlib import pyplot
 import dotenv
-
-import aiocron
 
 import pyrotun
 
@@ -101,13 +100,6 @@ class WaterHeater:
 
         logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
         logger.info(f"KWh is {opt_results['kwh']:.2f}")
-        logger.info(f"Non-optimized cost is {opt_results['no_opt_cost']:.3f} NOK")
-        logger.info(
-            f"24-hour saving from Dijkstra: {opt_results['savings24h']:.2f} NOK"
-        )
-        await self.pers.openhab.set_item(
-            SAVINGS24H_ITEM, str(opt_results["savings24h"])
-        )
 
         # Dump CSV for legacy plotting solution, naive timestamps:
         isonowhour = datetime.datetime.now().replace(minute=0).strftime("%Y-%m-%d-%H00")
@@ -117,6 +109,44 @@ class WaterHeater:
         onoff.index = onoff.index.tz_localize(None)
         onoff["timestamp"] = onoff.index
         onoff.to_csv("/home/berland/heatoptplots/waterheater-" + isonowhour + ".csv")
+
+    async def estimate_savings(self, prices_df=None, starttemp=70):
+        """Savings must be estimated without reference to current temperature
+        and needs only to be run for every price change (i.e. every hour)"""
+        if prices_df is None:
+            prices_df = await self.pers.tibber.get_prices()
+
+        logger.info("Building graph for 24h savings estimation")
+        # starttemp should be above the minimum temperature, as the
+        # temperature is often higher than minimum, as we are able to
+        # "cache" temperature. In situations with falling prices, this could
+        # still overestimate the savings (?)
+        graph = self.future_temp_cost_graph(
+            starttemp=starttemp,
+            prices_df=prices_df,
+            vacation=False,
+            starttime=None,
+            maxhours=36,
+            mintemp=40,
+            maxtemp=84,
+        )
+        # There is a "tempdeviation" parameter in the graph which
+        # is the deviation from the starttemp at every node. Minimizing
+        # on this is the same as running with thermostat control.
+
+        # The thermostat mode cost can also be estimated directly from
+        # the usage data probably, without any reference to the graph.
+
+        opt_results = analyze_graph(graph, starttemp=starttemp, endtemp=starttemp)
+
+        logger.info(f"Reference optimized cost is {opt_results['opt_cost']:.3f} NOK")
+        logger.info(f"Thermostat cost is {opt_results['no_opt_cost']:.3f} NOK")
+        logger.info(
+            f"24-hour saving from Dijkstra: {opt_results['savings24h']:.2f} NOK"
+        )
+        await self.pers.openhab.set_item(
+            SAVINGS24H_ITEM, str(opt_results["savings24h"])
+        )
 
     def future_temp_cost_graph(
         self,
@@ -187,7 +217,7 @@ class WaterHeater:
             ) - self.diffusionloss(self.meanwatertemp, t_delta)
             for temp in temps[tstamp]:
                 # This is Explicit Euler solution of the underlying
-                # differential equation:
+                # differential equation, predicting future temperature:
                 no_heater_temp = round(
                     temp - temploss - self.diffusionloss(temp, t_delta), ROUND
                 )
@@ -203,7 +233,7 @@ class WaterHeater:
                         (next_tstamp, no_heater_temp),
                         cost=0,
                         kwh=0,
-                        abstempchange=abs(no_heater_temp - temp),
+                        tempdeviation=abs(no_heater_temp - starttemp),
                     )
 
                 heater_on_temp = round(
@@ -223,7 +253,7 @@ class WaterHeater:
                         (next_tstamp, heater_on_temp),
                         cost=cost,
                         kwh=kwh,
-                        abstempchange=abs(heater_on_temp - temp),
+                        tempdeviation=abs(heater_on_temp - starttemp),
                     )
 
         logger.info(
@@ -255,9 +285,6 @@ class WaterHeater:
 
 
 def plot_graph(graph, ax=None, show=False):
-    import matplotlib.patches as mpatches
-    import matplotlib.dates as md
-
     if ax is None:
         fig, ax = pyplot.subplots()
 
@@ -269,15 +296,7 @@ def plot_graph(graph, ax=None, show=False):
                     {"index": edge_1[0], "temp": edge_1[1]},
                 ]
             ).plot(x="index", y="temp", ax=ax, legend=False)
-            # pyplot.annotate(
-            #    str(data["cost"]),
-            #    xy=(
-            #        edge_0[0] + (edge_1[0] - edge_0[0]) / 2,
-            #        edge_0[1] + (edge_1[1] - edge_0[1]) / 2,
-            #    ),
-            # )
     nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"])
-    # edges_df = pd.DataFrame(data=graph.edges)
 
     nodes_df.plot.scatter(x="index", y="temp", ax=ax)
 
@@ -501,16 +520,35 @@ def path_kwh(graph, path):
     return [graph.edges[path[i], path[i + 1]]["kwh"] for i in range(len(path) - 1)]
 
 
+def shortest_paths(graph, k=5, starttemp=60, endtemp=60):
+    """Return the k shortest paths. Runtime is K*N**3, too much
+    for practical usage"""
+    startnode = find_node(graph, datetime.datetime.now(), starttemp)
+    endnode = find_node(graph, datetime.datetime.now() + pd.Timedelta("48h"), endtemp)
+    # Path generator:
+    return list(
+        itertools.islice(
+            networkx.shortest_simple_paths(
+                graph, source=startnode, target=endnode, weight="cost"
+            ),
+            k,
+        )
+    )
+
+
 def analyze_graph(graph, starttemp=60, endtemp=60):
+    """Find shortest path, and do some extra calculations for estimating
+    savings. The savings must be interpreted carefully, and is
+    probably only correct if start and endtemp is equal"""
+
     startnode = find_node(graph, datetime.datetime.now(), starttemp)
     endnode = find_node(graph, datetime.datetime.now() + pd.Timedelta("48h"), endtemp)
     path = networkx.shortest_path(
         graph, source=startnode, target=endnode, weight="cost"
     )
     no_opt_path = networkx.shortest_path(
-        graph, source=startnode, target=endnode, weight="abstempchange"
+        graph, source=startnode, target=endnode, weight="tempdeviation"
     )
-    onoff = path_onoff(path)
     opt_cost = sum(path_costs(graph, path))
     no_opt_cost = sum(path_costs(graph, no_opt_path))
     kwh = sum(path_kwh(graph, path))
@@ -528,10 +566,17 @@ def analyze_graph(graph, starttemp=60, endtemp=60):
 
 
 async def controller(pers):
+    # This is the production code path
     await pers.waterheater.controller()
 
 
+async def estimate_savings(pers):
+    # This is the production code path
+    await pers.waterheater.estimate_savings()
+
+
 async def main():
+    # This is typically used for interactive testing.
     pers = pyrotun.persist.PyrotunPersistence()
     # Make the weekly water usage profile, and persist it:
     await pers.ainit(["tibber", "waterheater", "influxdb", "openhab"])
@@ -551,17 +596,17 @@ async def main():
         logger.warning("Water temperature below minimum, should force on")
         await pers.aclose()
         return
-    opt_results = analyze_graph(graph, starttemp=starttemp, endtemp=starttemp)
+    endtemp = 60
+    opt_results = analyze_graph(graph, starttemp=starttemp, endtemp=endtemp)
     # Use plus/minus 2 degrees and 8 minute accuracy to estimate the do-nothing
     # scenario.
     logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
     logger.info(f"KWh is {opt_results['kwh']:.2f}")
-    logger.info(f"Non-optimized cost is {opt_results['no_opt_cost']:.3f} NOK")
-    logger.info(f"24-hour saving from Dijkstra: {opt_results['savings24h']:.2f} NOK")
+
+    await pers.waterheater.estimate_savings(prices_df)
     fig, ax = pyplot.subplots()
     plot_graph(graph, ax=ax, show=False)
     plot_path(opt_results["opt_path"], ax=ax, show=False)
-    plot_path(opt_results["no_opt_path"], ax=ax, show=False, color="blue", linewidth=1)
     ax2 = ax.twinx()
     prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
     prices_df["mintemp"] = (

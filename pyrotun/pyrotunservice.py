@@ -73,6 +73,12 @@ async def waterheater_controller():
 
 
 @aiocron.crontab(EVERY_HOUR)
+async def estimate_savings():
+    logger.info(" ** Waterheater 24h saving estimation")
+    await pyrotun.waterheater.estimate_savings(PERS)
+
+
+@aiocron.crontab(EVERY_HOUR)
 async def yrmelding():
     logger.info(" ** Yrmelding")
     await pyrotun.yrmelding.main(PERS)
