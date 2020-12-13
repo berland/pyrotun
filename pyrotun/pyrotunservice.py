@@ -37,6 +37,7 @@ EVERY_5_MINUTE = "*/5 * * * *"
 EVERY_8_MINUTE = "*/8 * * * *"
 EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
+EVERY_DAY = "0 0 * * *"
 
 PERS = None
 
@@ -74,6 +75,8 @@ async def waterheater_controller():
 
 @aiocron.crontab(EVERY_HOUR)
 async def estimate_savings():
+    # 3 minutes after every hour
+    await asyncio.sleep(60*3)
     logger.info(" ** Waterheater 24h saving estimation")
     await pyrotun.waterheater.estimate_savings(PERS)
 
