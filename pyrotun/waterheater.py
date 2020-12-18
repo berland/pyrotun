@@ -108,6 +108,8 @@ class WaterHeater:
         )
         onoff.index = onoff.index.tz_localize(None)
         onoff["timestamp"] = onoff.index
+        firston = onoff[onoff["onoff"] == 1].head(1).index.values[0]
+        logger.info("Will turn heater on at %s", firston)
         onoff.to_csv("/home/berland/heatoptplots/waterheater-" + isonowhour + ".csv")
 
     async def estimate_savings(self, prices_df=None, starttemp=70):
@@ -508,12 +510,13 @@ def path_costs(graph, path):
 
 def path_onoff(path):
     """Compute a pandas series with 1 or 0 whether the heater
-    should be on or off along a path"""
+    should be on or off along a path (computed assuming
+    that if temperature increases, heater must be on)"""
     timestamps = [node[0] for node in path][:-1]  # skip the last one
     temps = [node[1] for node in path]
     onoff = pd.Series(temps).diff().shift(-1).dropna()
     onoff.index = timestamps
-    return (onoff > 0).astype(int)
+    return onoff.astype(int)
 
 
 def path_kwh(graph, path):
@@ -602,6 +605,11 @@ async def main():
     # scenario.
     logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
     logger.info(f"KWh is {opt_results['kwh']:.2f}")
+    onoff = path_onoff(opt_results["opt_path"])
+
+    # utc times:
+    first_on_timestamp = onoff[onoff == 1].head(1).index.values[0]
+    logger.info("Will turn heater on at %s", first_on_timestamp)
 
     await pers.waterheater.estimate_savings(prices_df)
     fig, ax = pyplot.subplots()
