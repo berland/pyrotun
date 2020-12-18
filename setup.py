@@ -13,6 +13,8 @@ REQUIREMENTS = [
     "asyncio",
     "asyncio_mqtt",
     "dotenv",
+    "geopy",
+    "gpxpy",
     "holidays",
     "isodate",
     "lxml",

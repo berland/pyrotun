@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from dateutil import parser
+import dateutil
 import asyncio
 import json
 import time
@@ -9,6 +9,9 @@ import isodate
 import pandas as pd
 import watchgod
 import dotenv
+import gpxpy
+from geopy import distance
+import argparse
 
 import pyrotun
 import pyrotun.persist
@@ -22,6 +25,43 @@ EXERCISE_DIR = Path.home() / "polar_dump"
 DONE_FILE = "done"
 
 URL = os.getenv("EXERCISE_URL")
+
+
+def gpx2df(gpxfile):
+    gpx = gpxpy.parse(Path(gpxfile).read_text())
+    data = gpx.tracks[0].segments[0].points
+    gpx_df = pd.DataFrame(
+        [
+            {
+                "lat": point.latitude,
+                "lon": point.longitude,
+                "elev": point.elevation,
+                "datetime": point.time,
+            }
+            for point in data
+        ]
+    )
+
+    return gpx_df
+
+
+def diffgpxdf(gpxdf):
+    ddf = pd.concat(
+        [
+            gpxdf.rename(lambda x: x + "1", axis=1),
+            gpxdf.shift(-1).rename(lambda x: x + "2", axis=1),
+        ],
+        axis=1,
+    ).dropna()
+    ddf["dist"] = ddf.apply(
+        lambda row: distance.distance(
+            (row["lat1"], row["lon1"]), (row["lat2"], row["lon2"])
+        ).m,
+        axis=1,
+    )
+    ddf["t_delta"] = (ddf["datetime2"] - ddf["datetime1"]).dt.total_seconds()
+    ddf["moving"] = (ddf["dist"] / ddf["t_delta"]) > 0.8
+    return ddf
 
 
 def timedeltaformatter(t_delta):
@@ -43,7 +83,7 @@ assert timedeltaformatter(60 * 60) == "1:00"
 
 
 def make_http_post_data(dirname):
-    exercise_datetime = parser.isoparse(dirname.name)
+    exercise_datetime = dateutil.parser.isoparse(dirname.name)
     exercise_summary = json.loads((Path(dirname) / "exercise_summary").read_text())
     heart_rate_zones = json.loads((Path(dirname) / "heart_rate_zones").read_text())
     zonedata_df = pd.DataFrame(heart_rate_zones["zone"])
@@ -60,6 +100,12 @@ def make_http_post_data(dirname):
     threezones_df = zonedata_df.groupby("threezones").sum()
     threezones_df["hh:mm"] = threezones_df["in-zone"].apply(timedeltaformatter)
 
+    gpxdf = gpx2df(Path(dirname) / "gpx")
+    ddf = diffgpxdf(gpxdf)
+    dist = sum(ddf["dist"])
+    move_time = sum(ddf[ddf.moving].t_delta)
+    moving_speed = prettyprintseconds(move_time / (dist / 1000.0))
+
     map_sport_info = {"RUNNING": "Løp"}
 
     details = ""
@@ -73,10 +119,10 @@ def make_http_post_data(dirname):
             logger.warning("Skipping too short exercise %s", dirname)
             return
     if "duration" in exercise_summary and "distance" in exercise_summary:
-        speed_sec_pr_km = duration / distance
-        speed_min_pr_km = prettyprintseconds(speed_sec_pr_km)
-        details += f"{speed_min_pr_km} min/km. "
-
+        # speed_sec_pr_km = duration / distance
+        # speed_min_pr_km = prettyprintseconds(speed_sec_pr_km)
+        details += f"{moving_speed} min/km. "
+        details += f"Tid: {prettyprintseconds(move_time)}. "
 
     if "heart-rate" in exercise_summary:
         avg_beat = exercise_summary["heart-rate"]["average"]
@@ -99,25 +145,24 @@ def make_http_post_data(dirname):
     return post_data
 
 
-async def process_dir(dirname, pers, dryrun=False):
+async def process_dir(dirname, pers=None, dryrun=False, force=False):
     dirname = Path(dirname)
     try:
-        parser.isoparse(dirname.name)
+        dateutil.parser.isoparse(dirname.name)
     except ValueError:
         logger.warning("Skipping strange-looking directory %s", str(dirname))
         return
-    if (
-        (dirname / "exercise_summary").is_file()
-        and (dirname / "heart_rate_zones").is_file()
-        and not (dirname / DONE_FILE).is_file()
-    ):
-        postdata = make_http_post_data(dirname)
+    if (dirname / "exercise_summary").is_file() and (
+        dirname / "heart_rate_zones"
+    ).is_file():
+        if force or not (dirname / DONE_FILE).is_file():
+            postdata = make_http_post_data(dirname)
 
         if postdata is None:
             # Warning already emitted.
             return
 
-        if not dryrun:
+        if not dryrun and pers is not None:
             logger.info("Submitting exercise data %s", str(postdata))
             await pers.websession.post(url=os.getenv("EXERCISE_URL"), data=postdata)
             Path(dirname / DONE_FILE).touch()
@@ -153,5 +198,23 @@ async def main(pers=None, dryrun=False):
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(dryrun=True))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--analyze", type=str, help="GPX file to analyze")
+    parser.add_argument("--processdir", type=str, help="Dry run a directory")
+    args = parser.parse_args()
+
+    if args.analyze:
+        gpxdf = gpx2df(args.analyze)
+        ddf = diffgpxdf(gpxdf)
+        print(ddf.head())
+        dist = sum(ddf["dist"])
+        print(f"Distance {dist}")
+        move_time = sum(ddf[ddf.moving].t_delta)
+        print(f"Moving time: {prettyprintseconds(move_time)}")
+        speed = prettyprintseconds(move_time / (dist / 1000.0))
+        print(f"Avg speed {speed}")
+    if args.processdir:
+        asyncio.run(process_dir(args.processdir, dryrun=True, force=True))
+    else:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main(dryrun=True))
