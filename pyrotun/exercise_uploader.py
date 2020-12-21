@@ -106,7 +106,7 @@ def make_http_post_data(dirname):
     move_time = sum(ddf[ddf.moving].t_delta)
     moving_speed = prettyprintseconds(move_time / (dist / 1000.0))
 
-    map_sport_info = {"RUNNING": "Løp"}
+    map_sport_info = {"RUNNING": "Løp", "HIKING": "Fjelltur"}
 
     details = ""
     if "distance" in exercise_summary:
