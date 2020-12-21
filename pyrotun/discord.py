@@ -35,8 +35,9 @@ async def main(pers=None, gather=False):
         return [task]
 
 async def push_many_to_discord(messages, pers):
-    """Loop over an async generator that provides messages to push
-    to Discord"""
+    """Loop over an async generator that provides messages from mqtt
+    to push to Discord"""
+    logger.info("Ready to publish from mqtt to Discord")
     async for message in messages:
         await push_to_discord(message.payload.decode(), pers)
 
