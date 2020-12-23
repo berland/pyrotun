@@ -191,6 +191,7 @@ async def main(pers=None, dryrun=False):
 
     logger.info("Starting watching %s for exercises", EXERCISE_DIR)
     async for changes in watchgod.awatch(EXERCISE_DIR):
+        logger.info("Detected filesystem change: %s", str(changes))
         dirnames = set([Path(change[1]).parent for change in changes])
         # dirnames are timestamps
         for dirname in dirnames:
