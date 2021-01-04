@@ -100,13 +100,19 @@ def make_http_post_data(dirname):
     threezones_df = zonedata_df.groupby("threezones").sum()
     threezones_df["hh:mm"] = threezones_df["in-zone"].apply(timedeltaformatter)
 
-    gpxdf = gpx2df(Path(dirname) / "gpx")
-    ddf = diffgpxdf(gpxdf)
-    dist = sum(ddf["dist"])
-    move_time = sum(ddf[ddf.moving].t_delta)
-    moving_speed = prettyprintseconds(move_time / (dist / 1000.0))
+    gpxfile = Path(dirname) / "gpx"
+    if gpxfile.is_file():
+        gpxdf = gpx2df(Path(dirname) / "gpx")
+        ddf = diffgpxdf(gpxdf)
+        dist = sum(ddf["dist"])
+        move_time = sum(ddf[ddf.moving].t_delta)
+        moving_speed = prettyprintseconds(move_time / (dist / 1000.0))
 
-    map_sport_info = {"RUNNING": "Løp", "HIKING": "Fjelltur"}
+    map_sport_info = {
+        "RUNNING": "Løp",
+        "HIKING": "Fjelltur",
+        "INDOOR_CYCLING": "Sykkelrulle",
+    }
 
     details = ""
     if "distance" in exercise_summary:
@@ -119,10 +125,9 @@ def make_http_post_data(dirname):
             logger.warning("Skipping too short exercise %s", dirname)
             return
     if "duration" in exercise_summary and "distance" in exercise_summary:
-        # speed_sec_pr_km = duration / distance
-        # speed_min_pr_km = prettyprintseconds(speed_sec_pr_km)
-        details += f"{moving_speed} min/km. "
-        details += f"Tid: {prettyprintseconds(move_time)}. "
+        if gpxfile.is_file():
+            details += f"{moving_speed} min/km. "
+            details += f"Tid: {prettyprintseconds(move_time)}. "
 
     if "heart-rate" in exercise_summary:
         avg_beat = exercise_summary["heart-rate"]["average"]
@@ -147,6 +152,7 @@ def make_http_post_data(dirname):
 
 async def process_dir(dirname, pers=None, dryrun=False, force=False):
     dirname = Path(dirname)
+    logger.info("in process_dir()")
     try:
         dateutil.parser.isoparse(dirname.name)
     except ValueError:
@@ -155,11 +161,13 @@ async def process_dir(dirname, pers=None, dryrun=False, force=False):
     if (dirname / "exercise_summary").is_file() and (
         dirname / "heart_rate_zones"
     ).is_file():
+        logger.info("passed initial test")
+        postdata = None
         if force or not (dirname / DONE_FILE).is_file():
+            logger.info("making post data")
             postdata = make_http_post_data(dirname)
-
+            logger.info("postdata is %s", str(postdata))
         if postdata is None:
-            # Warning already emitted.
             return
 
         if not dryrun and pers is not None:
@@ -193,8 +201,10 @@ async def main(pers=None, dryrun=False):
     async for changes in watchgod.awatch(EXERCISE_DIR):
         logger.info("Detected filesystem change: %s", str(changes))
         dirnames = set([Path(change[1]).parent for change in changes])
+        logger.info("Will process directories %s", str(dirnames))
         # dirnames are timestamps
         for dirname in dirnames:
+            logger.info("Processing dir %s", str(dirname))
             await process_dir(dirname, pers, dryrun)
 
 
