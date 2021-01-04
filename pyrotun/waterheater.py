@@ -604,7 +604,7 @@ async def main():
         logger.warning("Water temperature below minimum, should force on")
         await pers.aclose()
         return
-    endtemp = 60
+    endtemp = 50
     opt_results = analyze_graph(graph, starttemp=starttemp, endtemp=endtemp)
     # Use plus/minus 2 degrees and 8 minute accuracy to estimate the do-nothing
     # scenario.
@@ -613,8 +613,11 @@ async def main():
     onoff = path_onoff(opt_results["opt_path"])
 
     # utc times:
-    first_on_timestamp = onoff[onoff == 1].head(1).index.values[0]
-    logger.info("Will turn heater on at %s", first_on_timestamp)
+    if onoff[onoff == 1].empty:
+        logger.warning("Not turning on waterheater in foreseeable future")
+    else:
+        first_on_timestamp = onoff[onoff == 1].head(1).index.values[0]
+        logger.info("Will turn heater on at %s", first_on_timestamp)
 
     await pers.waterheater.estimate_savings(prices_df)
     fig, ax = pyplot.subplots()
