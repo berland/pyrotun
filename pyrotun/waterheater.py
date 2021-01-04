@@ -108,9 +108,14 @@ class WaterHeater:
         )
         onoff.index = onoff.index.tz_localize(None)
         onoff["timestamp"] = onoff.index
-        firston = onoff[onoff["onoff"] == 1].head(1).index.values[0]
-        logger.info("Will turn heater on at %s", firston)
         onoff.to_csv("/home/berland/heatoptplots/waterheater-" + isonowhour + ".csv")
+
+        # Log when we will turn on:
+        if not onoff[onoff["onoff"] == 1].empty:
+            firston = onoff[onoff["onoff"] == 1].head(1).index.values[0]
+            logger.info("Will turn heater on at %s", firston)
+        else:
+            logger.warning("Not planning to turn on waterheater, hot enough?")
 
     async def estimate_savings(self, prices_df=None, starttemp=70):
         """Savings must be estimated without reference to current temperature

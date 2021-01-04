@@ -97,7 +97,7 @@ async def main(pers):
     # Beregner en alternativ virkningsgrad (som kan bli over 1 tror jeg,
     # ihvertfall med ettervarmer på)
     temp_virkningsgradopp = round(
-        (temps["tilluft"] - temps["inntak"]) / (temps["fraluft"] - temps["inntak"]), 3
+        (temps["tilluft"] - temps["inntak"]) / (temps["fraluft"] - temps["inntak"]), 2
     )
     enthalpy_efficiency = round(
         (enthalpies["fraluft"] - enthalpies["avkast"])
@@ -105,7 +105,7 @@ async def main(pers):
         3,
     )
     moisture_efficiency = round(
-        (mixs["fraluft"] - mixs["avkast"]) / (mixs["fraluft"] - mixs["inntak"]), 3
+        (mixs["fraluft"] - mixs["avkast"]) / (mixs["fraluft"] - mixs["inntak"]), 2
     )
 
     await pers.openhab.set_item(
