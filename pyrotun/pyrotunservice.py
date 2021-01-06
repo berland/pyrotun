@@ -76,7 +76,7 @@ async def waterheater_controller():
 @aiocron.crontab(EVERY_HOUR)
 async def estimate_savings():
     # 3 minutes after every hour
-    await asyncio.sleep(60*3)
+    await asyncio.sleep(60 * 3)
     logger.info(" ** Waterheater 24h saving estimation")
     await pyrotun.waterheater.estimate_savings(PERS)
 
@@ -98,6 +98,12 @@ async def polar_dump_now():
     """Blocking(!)"""
     logger.info(" ** Polar dumper")
     pyrotun.polar_dump.main()
+
+
+@aiocron.crontab(EVERY_HOUR)
+async def spikes():
+    logger.info(" ** Dataspike remover")
+    pyrotun.dataspike_remover.main(PERS, readonly=False)
 
 
 async def at_startup(pers):

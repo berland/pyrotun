@@ -31,7 +31,7 @@ async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True):
 
     for measurement in measurements:
         meas_data = await pers.influxdb.dframe_query(
-            f"SELECT * FROM {measurement} where time > now() - 24h"
+            f"SELECT * FROM {measurement} where time > now() - 48h"
         )
         # The dframe has 1 colummn named 'value', and
         # indexed by datetime in UTC
