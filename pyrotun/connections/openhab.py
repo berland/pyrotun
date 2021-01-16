@@ -54,8 +54,17 @@ class OpenHABConnection:
             return
         if log:
             logger.info("OpenHAB: Setting %s to %s", item_name, str(new_state))
+
         async with self.websession.post(
             self.openhab_url + "/items/" + str(item_name), data=str(new_state)
+        ) as resp:
+            if resp.status != 200:
+                logger.error(resp)
+
+        # Spare OpenHAB instance for a transition period:
+        extra_host = self.openhab_url.replace("serv", "serve").replace("8090", "8080")
+        async with self.websession.post(
+            extra_host + "/items/" + str(item_name), data=str(new_state)
         ) as resp:
             if resp.status != 200:
                 logger.error(resp)
