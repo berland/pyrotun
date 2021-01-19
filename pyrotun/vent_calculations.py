@@ -2,7 +2,6 @@ import metpy.calc as mcalc
 from metpy.units import units
 
 import pyrotun
-from pyrotun.connections import openhab
 
 logger = pyrotun.getLogger(__name__)
 
@@ -86,9 +85,12 @@ async def main(pers):
     logger.debug("enthalpies: %s", enthalpies)
     logger.debug("mixs: %s", mixs)
 
-    # temp_virkningsgrad = round((temps['tilluft'] - temps['inntak'])/(temps['fraluft'] - temps['avkast']), 3)
-    # https://www.sintef.no/globalassets/project/annex32/oppvarmingssystemer_tra6182_20061.pdf  ligning 5.1
-    # og : https://www.engineeringtoolbox.com/heat-recovery-efficiency-d_201.html
+    # temp_virkningsgrad = round((temps['tilluft'] - temps['inntak'])
+    #                      /(temps['fraluft'] - temps['avkast']), 3)
+    # https://www.sintef.no/globalassets/project/annex32/
+    #                       oppvarmingssystemer_tra6182_20061.pdf  ligning 5.1
+    # og : https://www.engineeringtoolbox.com/
+    #                         heat-recovery-efficiency-d_201.html
 
     temp_virkningsgrad = round(
         (temps["fraluft"] - temps["avkast"]) / (temps["fraluft"] - temps["inntak"]), 3
@@ -114,7 +116,7 @@ async def main(pers):
     await pers.openhab.set_item(
         "Ventilasjon_virkningsgrad_temperaturoppvarming",
         temp_virkningsgradopp,
-        log=True,
+        log="change",
     )
     await pers.openhab.set_item(
         "Ventilasjon_virkningsgrad_entalpi", enthalpy_efficiency, log=False
@@ -125,12 +127,14 @@ async def main(pers):
 
     fuktproduksjon = round((mixs["fraluft"] - mixs["tilluft"]) * 1000, 3)
     fuktfrahusnetto = round((mixs["avkast"] - mixs["inntak"]) * 1000, 3)
-    fuktfravarmeveksler = round((mixs["tilluft"] - mixs["inntak"]) * 1000, 3)
+    fuktfravarmeveksler = round((mixs["tilluft"] - mixs["inntak"]) * 1000, 2)
     await pers.openhab.set_item("Fuktproduksjon_hus", fuktproduksjon, log=False)
     await pers.openhab.set_item("Ventilasjon_hustorking", fuktfrahusnetto)
 
     await pers.openhab.set_item(
-        "Ventilasjon_fuktvekslingsmengde", fuktfravarmeveksler, log=True
+        "Ventilasjon_fuktvekslingsmengde",
+        fuktfravarmeveksler,
+        log="change",
     )
 
 
