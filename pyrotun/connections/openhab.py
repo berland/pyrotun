@@ -52,9 +52,17 @@ class OpenHABConnection:
         if self.readonly:
             logger.info("OpenHAB: Would have set %s to %s", item_name, str(new_state))
             return
-        if log:
+        if log is True:
             logger.info("OpenHAB: Setting %s to %s", item_name, str(new_state))
-
+        if log == "change":
+            current_state = await self.get_item(item_name)
+            if str(current_state) != str(new_state):
+                logger.info(
+                    "OpenHAB: Changing %s from %s to %s",
+                    item_name,
+                    str(current_state),
+                    str(new_state),
+                )
         async with self.websession.post(
             self.openhab_url + "/items/" + str(item_name), data=str(new_state)
         ) as resp:
