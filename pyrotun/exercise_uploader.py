@@ -112,6 +112,8 @@ def make_http_post_data(dirname):
         "RUNNING": "Løp",
         "HIKING": "Fjelltur",
         "INDOOR_CYCLING": "Sykkelrulle",
+        "BACKCOUNTRY_SKIING": "Skitur",
+        "CROSS-COUNTRY_SKIING": "Langrenn",
     }
 
     details = ""
