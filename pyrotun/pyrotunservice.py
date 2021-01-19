@@ -100,7 +100,7 @@ async def polar_dump_now():
     pyrotun.polar_dump.main()
 
 
-@aiocron.crontab(EVERY_HOUR)
+@aiocron.crontab(EVERY_15_MINUTE)
 async def spikes():
     logger.info(" ** Dataspike remover")
     await pyrotun.dataspike_remover.main(PERS, readonly=False)
