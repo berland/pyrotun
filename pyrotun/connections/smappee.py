@@ -4,6 +4,7 @@ import pytz
 
 import pandas as pd
 import smappy
+import requests
 
 import pyrotun
 
@@ -47,9 +48,14 @@ class SmappeeConnection:
         earlier = now - datetime.timedelta(minutes=minutes)
         # How to test if connection is active?
 
-        dframe = self.mysmappee.get_consumption_dataframe(
-            self.locationid, earlier, now, aggregation
-        )
+        try:
+            dframe = self.mysmappee.get_consumption_dataframe(
+                self.locationid, earlier, now, aggregation
+            )
+        except requests.exceptions.HTTPError:
+            logger.error("Smappee cloud did not respond")
+            return pd.DataFrame()
+
         if dframe.empty:
             self.authenticate()
             dframe = self.mysmappee.get_consumption_dataframe(
@@ -65,6 +71,8 @@ class SmappeeConnection:
         # Need to go more than 5 minutes back in time, otherwise we
         # risk getting nothing in return.
         lastrow = self.get_recent_df(minutes=15).tail(1)
+        if lastrow.empty:
+            return None
         avgwatt = (60 / 5) * float(lastrow["consumption"].values)
         return avgwatt
 
@@ -108,5 +116,5 @@ class SmappeeConnection:
         """
         dframe = self.get_daily_df(aggregation="5min")
         if dframe.empty:
-            return 0
+            return None
         return round(dframe["consumption"].sum() / 1000, 2)

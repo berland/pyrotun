@@ -38,6 +38,7 @@ EVERY_8_MINUTE = "*/8 * * * *"
 EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
 EVERY_DAY = "0 0 * * *"
+EVERY_MIDNIGHT = EVERY_DAY
 
 PERS = None
 
@@ -50,9 +51,13 @@ async def vent_calc():
 
 @aiocron.crontab(EVERY_5_MINUTE)
 async def pollsmappe():
-    # Todo use the same connection instead of reauth.
     logger.info(" ** Pollsmappee")
     await pyrotun.pollsmappee.main(PERS)
+
+
+@aiocron.crontab(EVERY_MIDNIGHT)
+async def reset_daily_cum():
+    await PERS.openhab.set_item("Smappee_day_cumulative", 0)
 
 
 @aiocron.crontab(EVERY_HOUR)
