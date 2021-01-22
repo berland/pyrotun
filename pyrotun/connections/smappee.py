@@ -107,25 +107,6 @@ class SmappeeConnection:
             float
         """
         dframe = self.get_daily_df(aggregation="5min")
-
-        # aggregation_5min = 1
-        # self.mysmappee.re_authenticate()
-        # tz = pytz.timezone(os.getenv("TIMEZONE"))
-        # now = datetime.datetime.now().astimezone(tz)
-        # midnight = datetime.datetime.combine(
-        #    datetime.date.today(), datetime.time.min
-        # ).astimezone(tz)
-        #
-        ##        dframe = self.mysmappee.get_consumption_dataframe(
-        #            self.locationid, midnight, now, aggregation_5min
-        #        )
-        #        if dframe.empty:
-        #            logger.error("Empty smappee dataframe in get_recent_df()")
-        #            return
-
-        #        dframe.index = dframe.index.tz_convert(tz)
-
-        # always_on_cum = round(dframe["alwaysOn"].sum() / 1000, 2)
-
-        # consumption is in Wh, and pr. the timedelta in the index.
+        if dframe.empty:
+            return 0
         return round(dframe["consumption"].sum() / 1000, 2)
