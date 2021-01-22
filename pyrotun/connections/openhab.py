@@ -69,13 +69,19 @@ class OpenHABConnection:
             if resp.status != 200:
                 logger.error(resp)
 
-        # Spare OpenHAB instance for a transition period:
-        extra_host = self.openhab_url.replace("serv", "serve").replace("8090", "8080")
-        async with self.websession.post(
-            extra_host + "/items/" + str(item_name), data=str(new_state)
-        ) as resp:
-            if resp.status != 200:
-                logger.error(resp)
+        try:
+            # Spare OpenHAB instance for a transition period:
+            extra_host = self.openhab_url.replace("serv", "serve").replace(
+                "8090", "8080"
+            )
+            async with self.websession.post(
+                extra_host + "/items/" + str(item_name), data=str(new_state)
+            ) as resp:
+                if resp.status != 200:
+                    logger.error(resp)
+        except OSError:
+            logger.warning("Secondary OpenHAB instance not responding")
+            pass
 
     def sync_get_item(self, item_name):
         return self.client.get_item(item_name).state
