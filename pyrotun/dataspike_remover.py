@@ -16,7 +16,7 @@ async def main(pers=None, readonly=True):
     await remove_spikes(pers, mindev=7, stddevs=3, readonly=readonly)
 
 
-async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True):
+async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True, hours=48):
     """
 
     Args:
@@ -31,7 +31,7 @@ async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True):
 
     for measurement in measurements:
         meas_data = await pers.influxdb.dframe_query(
-            f"SELECT * FROM {measurement} where time > now() - 48h"
+            f"SELECT * FROM {measurement} where time > now() - {hours}h"
         )
         # The dframe has 1 colummn named 'value', and
         # indexed by datetime in UTC
@@ -111,6 +111,7 @@ def filter_measurements(measurements):
     ]
 
     req_startswith_list = [
+        # "Sno",
         "Sensor_",
         "Solhoyde",
         "InneTemperatur",
