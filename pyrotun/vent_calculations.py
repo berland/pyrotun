@@ -62,6 +62,11 @@ async def main(pers):
 
     pressure = float(await pers.openhab.get_item("Netatmo_stue_trykk"))
 
+    testitem = await pers.openhab.get_item("Sensor_inntak_temperatur")
+    if testitem == "UNDEF":
+        logger.error("Sensor_inntak_temperatur UNDEF, giving up")
+        return
+
     for sensor in SENSORS:
         temps[sensor] = float(
             await pers.openhab.get_item("Sensor_" + sensor + "_temperatur")
