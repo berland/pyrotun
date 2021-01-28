@@ -12,7 +12,7 @@ REQUIREMENTS = [
     "astral",
     "asyncio",
     "asyncio_mqtt",
-    "dotenv",
+    "python-dotenv",
     "geopy",
     "gpxpy",
     "holidays",
