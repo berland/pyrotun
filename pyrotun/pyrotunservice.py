@@ -21,8 +21,10 @@ import pyrotun.discord
 import pyrotun.exercise_uploader
 import pyrotun.dataspike_remover
 import pyrotun.polar_dump
+import pyrotun.pollsectoralarm
 
 import pyrotun.connections.smappee
+import pyrotun.connections.sectoralarm
 import pyrotun.connections.openhab
 import pyrotun.connections.mqtt
 import pyrotun.connections.tibber
@@ -41,6 +43,12 @@ EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
 
 PERS = None
+
+
+@aiocron.crontab(EVERY_15_SECOND)
+async def poll_sectoralarm():
+    logger.info(" ** Polling sectoralarm")
+    await pyrotun.pollsectoralarm.main(PERS)
 
 
 @aiocron.crontab(EVERY_15_SECOND)

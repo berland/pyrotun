@@ -18,6 +18,7 @@ import math
 from datetime import datetime, date, time
 import pytz
 import argparse
+from pathlib import Path
 
 import pylunar
 import pandas
@@ -83,6 +84,8 @@ class shadow(object):
         assert LONGITUDE is not None
         assert os.getenv("LOCAL_CITY")
         assert os.getenv("TIMEZONE")
+
+        assert Path(FILENAME).parent.is_dir()
 
         self.city = astral.LocationInfo(
             "HOME", os.getenv("LOCAL_CITY"), os.getenv("TIMEZOME"), LATITUDE, LONGITUDE
