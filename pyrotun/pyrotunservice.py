@@ -82,8 +82,15 @@ async def polltibber():
 
 @aiocron.crontab(EVERY_8_MINUTE)
 async def waterheater_controller():
+    await asyncio.sleep(30)  # No need to overlap with bathfloor
     logger.info(" ** Waterheater controller")
     await pyrotun.waterheater.controller(PERS)
+
+
+@aiocron.crontab(EVERY_8_MINUTE)
+async def bathfloor_controller():
+    logger.info(" ** Bathfloor controller")
+    await pyrotun.bathfloor.main(PERS)
 
 
 @aiocron.crontab(EVERY_HOUR)
