@@ -13,6 +13,7 @@ logger = pyrotun.getLogger(__name__)
 
 class SectorAlarmConnection:
     """Setup and maintain a connection to SectorAlarm web API"""
+
     def __init__(self):
 
         self.authenticated = None
@@ -53,6 +54,11 @@ class SectorAlarmConnection:
     async def history_df(self):
         """Return a dataframe for the arm/lock history"""
         hist = await self.asyncsector.get_history()
+        if hist is None:
+            # Something bad has happened, maybe logged out?
+            self.authenticated = False
+            await self.authenticate()
+            hist = await self.asyncsector.get_history()
         hist_df = pd.DataFrame(hist["LogDetails"])
 
         def fix_time(sectoralarm_datestr):

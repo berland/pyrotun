@@ -26,7 +26,10 @@ async def main(
     dryrun=False,
     plot=False,
     sensor_item="Termostat_Bad_Oppe_SensorGulv",
-    thermostat_item="Termostat_Bad_Oppe_SetpointHeating",
+    thermostat_items=[
+        "Termostat_Bad_Oppe_SetpointHeating",
+        "Termostat_Bad_Kjeller_SetpointHeating",
+    ],
     wattage=600,
     maxtemp=30,
 ):
@@ -42,10 +45,19 @@ async def main(
     currenttemp = await pers.openhab.get_item(sensor_item, datatype=float)
     vacation = await pers.openhab.get_item(VACATION_ITEM, datatype=bool)
 
+    if not (12 < currenttemp < 40):
+        logger.error("Currenttemp was %s, can't be right, giving up" % str(currenttemp))
+        # Backup temperature:
+        for thermostat_item in thermostat_items:
+            await pers.openhab.set_item(thermostat_item, "24", log=True)
+        return
+
     bathfloor = HeatReservoir(
         sensor_item,
-        thermostat_item,
+        thermostat_items[0],
         wattage=wattage,
+        inc_rate=5,  # Degrees pr.  hour
+        dec_rate=-0.3,  # Degrees pr. hour
     )
     graph = bathfloor.future_temp_cost_graph(
         starttemp=currenttemp,
@@ -57,8 +69,9 @@ async def main(
 
     if not graph:
         logger.warning("Temperature below minimum, should force on")
-        if not dryrun:
-            await pers.openhab.set_item(thermostat_item, "25")
+        for thermostat_item in thermostat_items:
+            if not dryrun:
+                await pers.openhab.set_item(thermostat_item, "25")
         return
 
     endtemp = 25
@@ -70,9 +83,10 @@ async def main(
     thermostat_values = path_thermostat_values(opt_results["opt_path"])
 
     if not dryrun:
-        await pers.openhab.set_item(
-            thermostat_item, str(thermostat_values.values[0]), log=True
-        )
+        for thermostat_item in thermostat_items:
+            await pers.openhab.set_item(
+                thermostat_item, str(thermostat_values.values[0]), log=True
+            )
     first_on_timestamp = onoff[onoff == 1].head(1).index.values[0]
     logger.info("Will turn bathfloor on at %s", first_on_timestamp)
 
@@ -102,8 +116,8 @@ class HeatReservoir:
         sensor_item,
         thermostat_item,
         wattage,
-        inc_rate=5,
-        dec_rate=-0.5,
+        inc_rate=5,  # Degrees pr.  hour
+        dec_rate=-0.3,  # Degrees pr. hour
         maxtemp=30,
     ):
         self.sensor_item = sensor_item

@@ -20,7 +20,7 @@ def getLogger(name="pyrotun"):
 
 
 def setup_logger(name="pyrotun"):
-    shortname =  name[:8]
+    shortname = name[:8]
     formatter = logging.Formatter(
         fmt="%(asctime)s " + f"{shortname:<8s}" + " %(levelname)-6s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",

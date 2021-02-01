@@ -580,11 +580,13 @@ class shadow(object):
 
         return svg
 
+
 async def amain(filename=None):
     svg = shadow().generateSVG()
     with open(filename, "w") as f_handle:
         f_handle.write(svg)
     logger.info("Written SVG to %s", filename)
+
 
 def main(filename=None):
     parser = argparse.ArgumentParser()

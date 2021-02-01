@@ -16,6 +16,7 @@ import pyrotun.yrmelding
 import pyrotun.pollsmappee
 import pyrotun.polltibber
 import pyrotun.houseshadow
+import pyrotun.bathfloor
 import pyrotun.vent_calculations
 import pyrotun.discord
 import pyrotun.exercise_uploader
@@ -138,6 +139,7 @@ async def at_startup(pers):
     tasks.extend(await pyrotun.discord.main(pers, gather=False))
     tasks.append(asyncio.create_task(pyrotun.exercise_uploader.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
+    tasks.append(pyrotun.bathfloor.main(pers, dryrun=False))
     tasks.append(pyrotun.waterheater.controller(pers))
     tasks.append(pyrotun.yrmelding.main(pers))
     tasks.append(pyrotun.helligdager.main(pers))

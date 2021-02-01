@@ -34,6 +34,7 @@ async def main(pers=None, gather=False):
     else:
         return [task]
 
+
 async def push_many_to_discord(messages, pers):
     """Loop over an async generator that provides messages from mqtt
     to push to Discord"""
