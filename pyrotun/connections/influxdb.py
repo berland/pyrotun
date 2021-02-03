@@ -20,11 +20,25 @@ class InfluxDBConnection:
         )
 
     async def get_series(self, item):
-        resp = await self.client.query("SELECT * FROM " + item)
+        resp = await self.client.query(f"SELECT * FROM {item}")
+        resp.columns = [item]
+        return resp
+
+    async def get_series_grouped(
+        self, item, aggregator="mean", time="1h", condition=""
+    ):
+
+        resp = await self.client.query(
+            (
+                f"SELECT {aggregator}(value) FROM {item} {condition} "
+                f"group by time({time})"
+            )
+        )
+        resp.columns = [item]
         return resp
 
     async def get_lastvalue(self, item):
-        resp = await self.client.query("SELECT last(value) FROM " + item)
+        resp = await self.client.query(f"SELECT last(value) FROM {item}")
         return resp["last"].values[0]
 
     async def get_measurements(self):
