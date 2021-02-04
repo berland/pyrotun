@@ -98,6 +98,18 @@ FLOORS = {
         "maxtemp": 27,
         "backup_setpoint": 20,
     },
+    "Bakgang": {
+        "sensor_item": "Termostat_Bakgang_SensorGulv",
+        "setpoint_item": "Termostat_Bakgang_SetpointHeating",
+        "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
+        "setpoint_base": "temperature",
+        "heating_rate": 3,
+        "cooling_rate": -0.3,
+        "setpoint_force": 2,
+        "wattage": 800,
+        "maxtemp": 30,
+        "backup_setpoint": 15,
+    },
 }
 TIMEDELTA_MINUTES = 10  # minimum is 8 minutes!!
 ROUND = 1
