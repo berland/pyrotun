@@ -172,7 +172,7 @@ async def main(
         graph = heatreservoir_temp_cost_graph(
             starttemp=currenttemp,
             prices_df=prices_df,
-            mintemp=17,
+            mintemp=10,
             maxtemp=FLOORS[floor]["maxtemp"],
             wattage=FLOORS[floor]["wattage"],
             heating_rate=FLOORS[floor]["heating_rate"],
@@ -192,8 +192,7 @@ async def main(
                 )
             continue
 
-        endtemp = 25
-        opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=endtemp)
+        opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=0)
         logger.info(
             f"Cost for floor {floor} is {opt_results['opt_cost']:.2f}, "
             f"KWh is {opt_results['kwh']:.2f}"
@@ -249,7 +248,9 @@ async def main(
             prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
             prices_df["mintemp"] = (
                 prices_df.reset_index()["index"]
-                .apply(temp_requirement, vacation=False, prices=prices_df, delta=delta)
+                .apply(
+                    temp_requirement, vacation=vacation, prices=prices_df, delta=delta
+                )
                 .values
             )
             prices_df.plot(
@@ -264,8 +265,8 @@ async def main(
 def heatreservoir_temp_cost_graph(
     starttemp=60,
     prices_df=None,
-    mintemp=15,
-    maxtemp=30,
+    mintemp=10,
+    maxtemp=35,
     wattage=1000,
     heating_rate=2,
     cooling_rate=0.1,
