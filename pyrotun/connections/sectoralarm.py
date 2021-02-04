@@ -1,5 +1,6 @@
 import os
 import datetime
+import asyncio
 
 import aiohttp
 import pandas as pd
@@ -53,10 +54,15 @@ class SectorAlarmConnection:
 
     async def history_df(self):
         """Return a dataframe for the arm/lock history"""
-        hist = await self.asyncsector.get_history()
+        try:
+            hist = await self.asyncsector.get_history()
+        except aiohttp.client_exceptions.ClientConnectorError:
+            logger.error("Failed to connect to sectoralarm, will retry logging in")
+            hist = None
         if hist is None:
             # Something bad has happened, maybe logged out?
             self.authenticated = False
+            await asyncio.sleep(10)  # Give them some slack..
             await self.authenticate()
             hist = await self.asyncsector.get_history()
         hist_df = pd.DataFrame(hist["LogDetails"])
