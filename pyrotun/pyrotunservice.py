@@ -16,7 +16,7 @@ import pyrotun.yrmelding
 import pyrotun.pollsmappee
 import pyrotun.polltibber
 import pyrotun.houseshadow
-import pyrotun.bathfloor
+import pyrotun.floors
 import pyrotun.vent_calculations
 import pyrotun.discord
 import pyrotun.exercise_uploader
@@ -83,15 +83,15 @@ async def polltibber():
 
 @aiocron.crontab(EVERY_8_MINUTE)
 async def waterheater_controller():
-    await asyncio.sleep(30)  # No need to overlap with bathfloor
+    await asyncio.sleep(60)  # No need to overlap with bathfloor
     logger.info(" ** Waterheater controller")
     await pyrotun.waterheater.controller(PERS)
 
 
 @aiocron.crontab(EVERY_8_MINUTE)
-async def bathfloor_controller():
-    logger.info(" ** Bathfloor controller")
-    await pyrotun.bathfloor.main(PERS)
+async def floors_controller():
+    logger.info(" ** Floor controller")
+    await pyrotun.floors.main(PERS)
 
 
 @aiocron.crontab(EVERY_HOUR)
@@ -139,7 +139,7 @@ async def at_startup(pers):
     tasks.extend(await pyrotun.discord.main(pers, gather=False))
     tasks.append(asyncio.create_task(pyrotun.exercise_uploader.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
-    tasks.append(pyrotun.bathfloor.main(pers, dryrun=False))
+    tasks.append(pyrotun.floors.main(pers))
     tasks.append(pyrotun.waterheater.controller(pers))
     tasks.append(pyrotun.yrmelding.main(pers))
     tasks.append(pyrotun.helligdager.main(pers))
@@ -157,4 +157,5 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(pers.ainit())
     loop.run_until_complete(at_startup(pers))
+    # we probably never get here..
     loop.run_forever()

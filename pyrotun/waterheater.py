@@ -23,7 +23,7 @@ HEATERCONTROLLER_ITEM = "Varmtvannsbereder_bryter"
 SAVINGS24H_ITEM = "Varmtvannsbereder_besparelse"
 VACATION_ITEM = "Ferie"
 
-WATTAGE = 2700
+WATTAGE = 2600
 LITRES = 194
 
 # Heat capacity for water, converted from 4187 J/kg oC

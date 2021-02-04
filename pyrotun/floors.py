@@ -3,6 +3,8 @@ import asyncio
 import networkx
 import datetime
 import itertools
+
+import argparse
 import pytz
 import numpy as np
 import pandas as pd
@@ -19,47 +21,82 @@ FLOORS = {
     "Andre": {
         "sensor_item": "Sensor_Andretak_temperatur",  # "Termostat_Andre_SensorGulv",
         "setpoint_item": "Termostat_Andre_SetpointHeating",
-        "heating_rate": 0.8,  # degrees/hour
+        "setpoint_base": "target",  # means not relative to current temp
+        "heating_rate": 1,  # degrees/hour
         "cooling_rate": -0.8,  # degrees/hour
         "setpoint_force": 8,
         "wattage": 600,
         "maxtemp": 27,
+        "backup_setpoint": 20,
     },
     "Leane": {
         "sensor_item": "Sensor_Leanetak_temperatur",
         "setpoint_item": "Termostat_Leane_SetpointHeating",
-        "heating_rate": 0.8,  # degrees/hour
+        "setpoint_base": "target",
+        "heating_rate": 1,  # degrees/hour
         "cooling_rate": -0.8,  # degrees/hour
         "setpoint_force": 8,
         "wattage": 600,
         "maxtemp": 27,
+        "backup_setpoint": 20,
     },
     "Bad_Oppe": {
         "sensor_item": "Termostat_Bad_Oppe_SensorGulv",
         "setpoint_item": "Termostat_Bad_Oppe_SetpointHeating",
+        "setpoint_base": "temperature",
         "heating_rate": 5,
         "cooling_rate": -0.3,
         "setpoint_force": 1,
         "wattage": 600,
         "maxtemp": 31,
+        "backup_setpoint": 24,
     },
     "Bad_Kjeller": {
         "sensor_item": "Termostat_Bad_Kjeller_SensorGulv",
         "setpoint_item": "Termostat_Bad_Kjeller_SetpointHeating",
+        "setpoint_base": "temperature",
         "heating_rate": 5,
         "cooling_rate": -0.4,
         "setpoint_force": 1,
         "wattage": 1000,
         "maxtemp": 31,
+        "backup_setpoint": 24,
     },
     "Sofastue": {
         "sensor_item": "Termostat_Sofastue_SensorGulv",
         "setpoint_item": "Termostat_Sofastue_SetpointHeating",
+        "setpoint_base": "temperature",
+        "delta": -2,
         "heating_rate": 5,
         "cooling_rate": -0.4,
         "setpoint_force": 1,
         "wattage": 1700,
         "maxtemp": 27,
+        "backup_setpoint": 20,
+    },
+    "Tvstue": {
+        "sensor_item": "Termostat_Tvstue_SensorGulv",
+        "setpoint_item": "Termostat_Tvstue_SetpointHeating",
+        "delta": -2,  # relative to master-temp at 25, adapt to sensor and wish.
+        "setpoint_base": "temperature",
+        "heating_rate": 1,
+        "cooling_rate": -0.4,
+        "setpoint_force": 2,
+        "wattage": 600,
+        "maxtemp": 27,
+        "backup_setpoint": 20,
+    },
+    "Gangoppe": {
+        "sensor_item": "Termostat_Gangoppe_SensorGulv",
+        "setpoint_item": "Termostat_Gangoppe_SetpointHeating",
+        "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
+        "setpoint_base": "temperature",
+        "heating_rate": 0.4,
+        "cooling_rate": -0.4,
+        "setpoint_force": 2,
+        "wattage": 600,
+        "maxtemp": 27,
+        "backup_setpoint": 20,
     },
 }
 TIMEDELTA_MINUTES = 10  # minimum is 8 minutes!!
@@ -74,6 +111,7 @@ async def main(
     pers=None,
     dryrun=False,
     plot=False,
+    floors=None,
 ):
     """Called from service or interactive"""
 
@@ -86,7 +124,12 @@ async def main(
     prices_df = await pers.tibber.get_prices()
     vacation = await pers.openhab.get_item(VACATION_ITEM, datatype=bool)
 
-    for floor in FLOORS:
+    if floors is None:
+        selected_floors = FLOORS.keys()
+    else:
+        selected_floors = floors
+
+    for floor in selected_floors:
         logger.info("Starting optimization for floor %s", floor)
         currenttemp = await pers.openhab.get_item(
             FLOORS[floor]["sensor_item"], datatype=float
@@ -103,9 +146,16 @@ async def main(
             # Backup temperature:
             if not dryrun:
                 await pers.openhab.set_item(
-                    FLOORS[floor]["setpoint_item"], str(BACKUPSETPOINT), log=True
+                    FLOORS[floor]["setpoint_item"],
+                    str(FLOORS[floor]["backup_setpoint"]),
+                    log=True,
                 )
             continue
+
+        if "delta" in FLOORS[floor]:
+            delta = FLOORS[floor]["delta"]
+        else:
+            delta = 0
 
         graph = heatreservoir_temp_cost_graph(
             starttemp=currenttemp,
@@ -116,13 +166,17 @@ async def main(
             heating_rate=FLOORS[floor]["heating_rate"],
             cooling_rate=FLOORS[floor]["cooling_rate"],
             vacation=vacation,
+            delta=delta,
         )
 
         if not graph:
             logger.warning("Temperature below minimum, should force on")
             if not dryrun:
+                min_temp = temp_requirement(
+                    datetime.datetime.now(), vacation=vacation, prices=None, delta=delta
+                )
                 await pers.openhab.set_item(
-                    FLOORS[floor]["setpoint_item"], "25", log=True
+                    FLOORS[floor]["setpoint_item"], str(min_temp), log=True
                 )
             continue
 
@@ -136,38 +190,54 @@ async def main(
         onoff = path_onoff(opt_results["opt_path"])
         thermostat_values = path_thermostat_values(opt_results["opt_path"])
 
+        # Calculate new setpoint
+        if FLOORS[floor]["setpoint_base"] == "temperature":
+            setpoint_base = thermostat_values.values[0]
+        elif FLOORS[floor]["setpoint_base"] == "target":
+            setpoint_base = temp_requirement(
+                datetime.datetime.now(), vacation=vacation, prices=None, delta=delta
+            )
+        else:
+            logger.error("Wrong configuration for floor %s", floor)
+            setpoint_base = 20
+
+        if onoff[0]:
+            setpoint = setpoint_base + FLOORS[floor]["setpoint_force"]
+        else:
+            setpoint = setpoint_base - FLOORS[floor]["setpoint_force"]
+
         if not dryrun:
-            if onoff[0]:
-                await pers.openhab.set_item(
-                    FLOORS[floor]["setpoint_item"],
-                    str(thermostat_values.values[0] + FLOORS[floor]["setpoint_force"]),
-                    log=True,
-                )
-            else:
-                await pers.openhab.set_item(
-                    FLOORS[floor]["setpoint_item"],
-                    str(thermostat_values.values[0] - FLOORS[floor]["setpoint_force"]),
-                    log=True,
-                )
-        first_on_timestamp = onoff[onoff == 1].head(1).index.values[0]
-        tz = pytz.timezone(os.getenv("TIMEZONE"))
-        logger.info(
-            "Will turn floor %s on at %s",
-            floor,
-            # first_on_timestamp,
-            np.datetime_as_string(first_on_timestamp, unit="m", timezone=tz)
-            # pd.Timestamp(first_on_timestamp).tz_localize(tz),
-        )
+            await pers.openhab.set_item(
+                FLOORS[floor]["setpoint_item"],
+                str(setpoint),
+                log=True,
+            )
+        try:
+            first_on_timestamp = onoff[onoff == 1].head(1).index.values[0]
+            tz = pytz.timezone(os.getenv("TIMEZONE"))
+            logger.info(
+                "Will turn floor %s on at %s",
+                floor,
+                # first_on_timestamp,
+                np.datetime_as_string(first_on_timestamp, unit="m", timezone=tz)
+                # pd.Timestamp(first_on_timestamp).tz_localize(tz),
+            )
+        except IndexError:
+            logger.info(
+                "Will not turn floor %s on in price-future",
+                floor,
+            )
 
         if plot:
             fig, ax = pyplot.subplots()
             # plot_graph(graph, ax=ax, show=True)  # Plots all nodes in graph.
             plot_path(opt_results["opt_path"], ax=ax, show=False)
+            pyplot.title(floor)
             ax2 = ax.twinx()
             prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
             prices_df["mintemp"] = (
                 prices_df.reset_index()["index"]
-                .apply(temp_requirement, vacation=False, prices=prices_df)
+                .apply(temp_requirement, vacation=False, prices=prices_df, delta=delta)
                 .values
             )
             prices_df.plot(
@@ -190,6 +260,7 @@ def heatreservoir_temp_cost_graph(
     vacation=False,
     starttime=None,
     maxhours=36,
+    delta=0,
 ):
     """Build the networkx Directed 2D ~lattice  Graph, with
     datetime on the x-axis and water-temperatur on the y-axis.
@@ -248,7 +319,9 @@ def heatreservoir_temp_cost_graph(
             assert cooling_rate < 0
             no_heater_temp = temp + cooling_rate * t_delta_hours
             min_temp = max(
-                temp_requirement(tstamp, vacation=vacation, prices=prices_df),
+                temp_requirement(
+                    tstamp, vacation=vacation, prices=prices_df, delta=delta
+                ),
                 mintemp,
             )
             if no_heater_temp > min_temp:
@@ -335,14 +408,14 @@ def find_node(graph, when, temp):
     return (row["index"], row["temp"])
 
 
-def temp_requirement(timestamp, vacation=False, prices=None):
+def temp_requirement(timestamp, vacation=False, prices=None, delta=0):
     hour = timestamp.hour
 
     if vacation:
-        return 15
+        return 15 + delta
     if hour < 6 or hour > 22:
-        return 18
-    return 25
+        return 18 + delta
+    return 25 + delta
 
 
 def path_costs(graph, path):
@@ -423,7 +496,23 @@ def analyze_graph(graph, starttemp=60, endtemp=60):
     }
 
 
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--set", action="store_true", help="Actually submit setpoint to OpenHAB"
+    )
+    parser.add_argument("--plot", action="store_true", help="Make plots")
+    parser.add_argument("--floors", nargs="*", help="Floornames")
+    return parser
+
+
 if __name__ == "__main__":
     # Interactive testing:
     dotenv.load_dotenv()
-    asyncio.run(main(pers=None, dryrun=True, plot=True))
+
+    parser = get_parser()
+    args = parser.parse_args()
+
+    asyncio.run(
+        main(pers=None, dryrun=not args.set, plot=args.plot, floors=args.floors)
+    )
