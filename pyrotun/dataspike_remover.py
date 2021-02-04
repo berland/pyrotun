@@ -32,7 +32,6 @@ async def truncate(pers, truncators, readonly=True, hours=48):
     for measurement in measurements:
         for truncator in truncators:
             if fnmatch.fnmatch(measurement, truncator):
-                print(measurement)
                 if "min" in truncators[truncator]:
                     query = (
                         f"SELECT value FROM {measurement} "
@@ -42,7 +41,6 @@ async def truncate(pers, truncators, readonly=True, hours=48):
                     to_truncate = await pers.influxdb.dframe_query(query)
                     if isinstance(to_truncate, pd.DataFrame):
                         for point in to_truncate.iterrows():
-                            print(f"value was {point[1]}")
                             await delete_point(
                                 pers, measurement, point[0], readonly=readonly
                             )
@@ -55,7 +53,6 @@ async def truncate(pers, truncators, readonly=True, hours=48):
                     to_truncate = await pers.influxdb.dframe_query(query)
                     if isinstance(to_truncate, pd.DataFrame):
                         for point in to_truncate.iterrows():
-                            print(f"value was {point[1]}")
                             await delete_point(
                                 pers, measurement, point[0], readonly=readonly
                             )
