@@ -1,12 +1,17 @@
 #!/bin/env python
 import asyncio
 import dotenv
+import fnmatch
 import argparse
+
+import pandas as pd
 
 import pyrotun
 import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
+
+TRUNCATORS = {"Termostat_*_SetpointHeating": {"min": 3, "max": 40}}
 
 
 async def main(pers=None, readonly=True, hours=48):
@@ -15,7 +20,42 @@ async def main(pers=None, readonly=True, hours=48):
         pers = pyrotun.persist.PyrotunPersistence()
         await pers.ainit(["influxdb"])
 
-    await remove_spikes(pers, mindev=7, stddevs=3, readonly=readonly, hours=48)
+    await truncate(pers, TRUNCATORS, readonly=readonly, hours=hours)
+    await remove_spikes(pers, mindev=7, stddevs=3, readonly=readonly, hours=hours)
+
+
+async def truncate(pers, truncators, readonly=True, hours=48):
+    measurements = await pers.influxdb.get_measurements()
+    for measurement in measurements:
+        for truncator in truncators:
+            if fnmatch.fnmatch(measurement, truncator):
+                print(measurement)
+                if "min" in truncators[truncator]:
+                    query = (
+                        f"SELECT value FROM {measurement} "
+                        f"where time > now() - {hours}h "
+                        f"and value < {truncators[truncator]['min']}"
+                    )
+                    to_truncate = await pers.influxdb.dframe_query(query)
+                    if isinstance(to_truncate, pd.DataFrame):
+                        for point in to_truncate.iterrows():
+                            print(f"value was {point[1]}")
+                            await delete_point(
+                                pers, measurement, point[0], readonly=readonly
+                            )
+                if "max" in truncators[truncator]:
+                    query = (
+                        f"SELECT value FROM {measurement} "
+                        f"where time > now() - {hours}h "
+                        f"and value > {truncators[truncator]['max']}"
+                    )
+                    to_truncate = await pers.influxdb.dframe_query(query)
+                    if isinstance(to_truncate, pd.DataFrame):
+                        for point in to_truncate.iterrows():
+                            print(f"value was {point[1]}")
+                            await delete_point(
+                                pers, measurement, point[0], readonly=readonly
+                            )
 
 
 async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True, hours=48):
@@ -74,19 +114,24 @@ async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True, hours=48):
         #    .index.astype(np.int64)[-1]
         # )
         # logger.info("Suggesting to delete from " + measurement + " " + str(spike))
-        deletestatement = (
-            "Delete from "
-            + measurement
-            + " where time='"
-            + str(spike.index[0]).replace("+00:00", "")
-            + "'"
-        )
-        logger.info(deletestatement)
+
         iloc = series.index.get_loc(spike.index[0])
         logger.info(series.iloc[iloc - 1 : iloc + 2])
+        await delete_point(pers, measurement, spike.index[0], readonly=readonly)
 
-        if not readonly:
-            await pers.influxdb.dframe_query(deletestatement)
+
+async def delete_point(pers, measurement, timestamp, readonly=False):
+    deletestatement = (
+        "DELETE FROM  "
+        + measurement
+        + " WHERE time='"
+        + str(timestamp).replace("+00:00", "")
+        + "'"
+    )
+    logger.info(deletestatement)
+
+    if not readonly:
+        await pers.influxdb.dframe_query(deletestatement)
 
 
 def filter_measurements(measurements):
