@@ -23,7 +23,7 @@ FLOORS = {
         "setpoint_item": "Termostat_Andre_SetpointHeating",
         "setpoint_base": "target",  # means not relative to current temp
         "heating_rate": 1,  # degrees/hour
-        "cooling_rate": -0.8,  # degrees/hour
+        "cooling_rate": -0.6,  # degrees/hour
         "setpoint_force": 8,
         "wattage": 600,
         "maxtemp": 27,
@@ -34,7 +34,7 @@ FLOORS = {
         "setpoint_item": "Termostat_Leane_SetpointHeating",
         "setpoint_base": "target",
         "heating_rate": 1,  # degrees/hour
-        "cooling_rate": -0.8,  # degrees/hour
+        "cooling_rate": -0.4,  # degrees/hour
         "setpoint_force": 8,
         "wattage": 600,
         "maxtemp": 27,
