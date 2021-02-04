@@ -1,5 +1,7 @@
+#!/bin/env python
 import asyncio
 import dotenv
+import argparse
 
 import pyrotun
 import pyrotun.persist
@@ -7,13 +9,13 @@ import pyrotun.persist
 logger = pyrotun.getLogger(__name__)
 
 
-async def main(pers=None, readonly=True):
+async def main(pers=None, readonly=True, hours=48):
     if pers is None:
         dotenv.load_dotenv()
         pers = pyrotun.persist.PyrotunPersistence()
         await pers.ainit(["influxdb"])
 
-    await remove_spikes(pers, mindev=7, stddevs=3, readonly=readonly)
+    await remove_spikes(pers, mindev=7, stddevs=3, readonly=readonly, hours=48)
 
 
 async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True, hours=48):
@@ -104,6 +106,7 @@ def filter_measurements(measurements):
         "inntak",
     ]
 
+    # Process the skiplist:
     measurements = [
         meas
         for meas in measurements
@@ -118,23 +121,44 @@ def filter_measurements(measurements):
         "Termostat_",
         "Netatmo_ute",
     ]
-
+    # Filter to only those that starts with the above.
     measurements = [
         meas
         for meas in measurements
         if any([meas.startswith(req) for req in req_startswith_list])
     ]
 
+    # Special casing for Termostat_*, filter to only Termostat_*Sensor*:
     measurements = [
         meas
         for meas in measurements
         if not meas.startswith("Termostat_")
         or meas.startswith("Termostat_")
-        and meas.endswith("SensorTemperature")
+        and "Sensor" in meas
     ]
     return measurements
 
 
-if __name__ == "__main__":
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--remove",
+        action="store_true",
+        help="If set, will send removal. If not, read-only-mode",
+    )
+    parser.add_argument(
+        "--hours",
+        type=int,
+        default=48,
+        help="How many hours to look back for, default=48",
+    )
+    return parser
 
-    asyncio.get_event_loop().run_until_complete(main())
+
+if __name__ == "__main__":
+    parser = get_parser()
+    args = parser.parse_args()
+
+    asyncio.get_event_loop().run_until_complete(
+        main(readonly=not args.remove, hours=args.hours)
+    )
