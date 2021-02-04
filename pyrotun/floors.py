@@ -296,21 +296,18 @@ def heatreservoir_temp_cost_graph(
     # round down to 19:45:
     datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
     # Merge prices into the requested datetime:
-    dframe = (
-        pd.concat(
-            [
-                prices_df,
-                pd.DataFrame(index=datetimes),
-            ],
-            axis="index",
-        )
-        .sort_index()
-        .ffill()
-        .bfill()  # (this is hardly necessary)
-        .loc[datetimes]  # slicing to this means we do not compute
-        # correcly around hour shifts
+    dframe = pd.concat(
+        [
+            prices_df,
+            pd.DataFrame(index=datetimes),
+        ],
+        axis="index",
     )
-    dframe = dframe[~dframe.index.duplicated(keep="first")]
+    dframe = dframe.sort_index()
+    # Not sure why last is correct here, but the intention is
+    # to keep the row from prices_df, not the NaN row
+    dframe = dframe[~dframe.index.duplicated(keep="last")]
+    dframe = dframe.ffill().bfill().loc[datetimes]
 
     # Build Graph, starting with current temperature
     graph = networkx.DiGraph()
