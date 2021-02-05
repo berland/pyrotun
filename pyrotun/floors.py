@@ -22,7 +22,8 @@ FLOORS = {
         "sensor_item": "Sensor_Andretak_temperatur",  # "Termostat_Andre_SensorGulv",
         "setpoint_item": "Termostat_Andre_SetpointHeating",
         "setpoint_base": "target",  # means not relative to current temp
-        "heating_rate": 1,  # degrees/hour
+        "delta": -1,
+        "heating_rate": 0.9,  # degrees/hour
         "cooling_rate": -0.6,  # degrees/hour
         "setpoint_force": 8,
         "wattage": 600,
@@ -32,6 +33,7 @@ FLOORS = {
     "Leane": {
         "sensor_item": "Sensor_Leanetak_temperatur",
         "setpoint_item": "Termostat_Leane_SetpointHeating",
+        "delta": -1,
         "setpoint_base": "target",
         "heating_rate": 1,  # degrees/hour
         "cooling_rate": -0.4,  # degrees/hour
@@ -119,12 +121,7 @@ VACATION_ITEM = "Ferie"
 BACKUPSETPOINT = 22
 
 
-async def main(
-    pers=None,
-    dryrun=False,
-    plot=False,
-    floors=None,
-):
+async def main(pers=None, dryrun=False, plot=False, floors=None, freq="10min"):
     """Called from service or interactive"""
 
     closepers = False
@@ -178,6 +175,7 @@ async def main(
             heating_rate=FLOORS[floor]["heating_rate"],
             cooling_rate=FLOORS[floor]["cooling_rate"],
             vacation=vacation,
+            freq=freq,
             delta=delta,
         )
 
@@ -241,7 +239,7 @@ async def main(
 
         if plot:
             fig, ax = pyplot.subplots()
-            # plot_graph(graph, ax=ax, show=True)  # Plots all nodes in graph.
+            plot_graph(graph, ax=ax, show=False)  # Plots all nodes in graph.
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
             ax2 = ax.twinx()
@@ -274,6 +272,7 @@ def heatreservoir_temp_cost_graph(
     starttime=None,
     maxhours=36,
     delta=0,
+    freq="10min",
 ):
     """Build the networkx Directed 2D ~lattice  Graph, with
     datetime on the x-axis and water-temperatur on the y-axis.
@@ -289,7 +288,7 @@ def heatreservoir_temp_cost_graph(
     datetimes = pd.date_range(
         starttime_wholehour,
         prices_df.index.max() + pd.Timedelta(1, unit="hour"),
-        freq=PD_TIMEDELTA,
+        freq=freq,
         tz=prices_df.index.tz,
     )
     # If we are at 19:48 and timedelta is 15 minutes, we should
@@ -376,7 +375,8 @@ def plot_graph(graph, ax=None, show=False):
     if ax is None:
         fig, ax = pyplot.subplots()
 
-    if len(graph.edges) < 1000:
+    if len(graph.edges) < 100000:
+        logger.info("Plotting all graph edges, wait for it..")
         for edge_0, edge_1, data in graph.edges(data=True):
             pd.DataFrame(
                 [
@@ -386,6 +386,7 @@ def plot_graph(graph, ax=None, show=False):
             ).plot(x="index", y="temp", ax=ax, legend=False)
     nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"])
 
+    logger.info("Plotting all graph nodes..")
     nodes_df.plot.scatter(x="index", y="temp", ax=ax)
 
     if show:
@@ -513,6 +514,7 @@ def get_parser():
     )
     parser.add_argument("--plot", action="store_true", help="Make plots")
     parser.add_argument("--floors", nargs="*", help="Floornames")
+    parser.add_argument("--freq", type=str, help="Time frequency, default 10min")
     return parser
 
 
@@ -524,5 +526,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     asyncio.run(
-        main(pers=None, dryrun=not args.set, plot=args.plot, floors=args.floors)
+        main(
+            pers=None,
+            dryrun=not args.set,
+            plot=args.plot,
+            floors=args.floors,
+            freq=args.freq,
+        )
     )
