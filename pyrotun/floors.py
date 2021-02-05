@@ -121,7 +121,9 @@ VACATION_ITEM = "Ferie"
 BACKUPSETPOINT = 22
 
 
-async def main(pers=None, dryrun=False, plot=False, floors=None, freq="10min"):
+async def main(
+    pers=None, dryrun=False, plot=False, floors=None, freq="10min", vacation="auto"
+):
     """Called from service or interactive"""
 
     closepers = False
@@ -131,7 +133,15 @@ async def main(pers=None, dryrun=False, plot=False, floors=None, freq="10min"):
         closepers = True
 
     prices_df = await pers.tibber.get_prices()
-    vacation = await pers.openhab.get_item(VACATION_ITEM, datatype=bool)
+    if not vacation or vacation == "auto":
+        vacation = await pers.openhab.get_item(VACATION_ITEM, datatype=bool)
+    else:
+        if vacation.lower() == "on":
+            vacation = True
+            logger.info("Vacation forced to on")
+        else:
+            logger.info("Vacation forced to off")
+            vacation = False
 
     if floors is None:
         selected_floors = FLOORS.keys()
@@ -180,7 +190,9 @@ async def main(pers=None, dryrun=False, plot=False, floors=None, freq="10min"):
         )
 
         if not graph:
-            logger.warning("Temperature below minimum, should force on")
+            logger.warning(
+                f"Temperature ({currenttemp}) below minimum, should force on"
+            )
             if not dryrun:
                 min_temp = temp_requirement(
                     datetime.datetime.now(), vacation=vacation, prices=None, delta=delta
@@ -239,7 +251,7 @@ async def main(pers=None, dryrun=False, plot=False, floors=None, freq="10min"):
 
         if plot:
             fig, ax = pyplot.subplots()
-            plot_graph(graph, ax=ax, show=False)  # Plots all nodes in graph.
+            # plot_graph(graph, ax=ax, show=False)  # Plots all nodes in graph.
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
             ax2 = ax.twinx()
@@ -258,6 +270,14 @@ async def main(pers=None, dryrun=False, plot=False, floors=None, freq="10min"):
 
     if closepers:
         await pers.aclose()
+
+
+def int_temp(temp):
+    return int(temp * 100)
+
+
+def float_temp(int_temp):
+    return float(int_temp / 100.0)
 
 
 def heatreservoir_temp_cost_graph(
@@ -311,6 +331,8 @@ def heatreservoir_temp_cost_graph(
     # Build Graph, starting with current temperature
     graph = networkx.DiGraph()
 
+    # Temperatures in the graph is always integers, and multiplied up!
+
     # dict of timestamp to list of reachable temperatures:
     temps = {}
     temps[dframe.index[0]] = [starttemp]
@@ -322,6 +344,7 @@ def heatreservoir_temp_cost_graph(
         powerprice = dframe.loc[tstamp]["NOK/KWh"]
         t_delta = next_tstamp - tstamp
         t_delta_hours = float(t_delta.value) / 1e9 / 60 / 60  # from nanoseconds
+        first_tstamp = dframe.index[0]
         for temp in temps[tstamp]:
             # This is Explicit Euler solution of the underlying
             # differential equation, predicting future temperature:
@@ -337,13 +360,14 @@ def heatreservoir_temp_cost_graph(
                 # Add an edge for the no-heater-scenario:
                 temps[next_tstamp].append(no_heater_temp)
                 graph.add_edge(
-                    (tstamp, temp),
-                    (next_tstamp, no_heater_temp),
+                    (tstamp, int_temp(temp)),
+                    (next_tstamp, int_temp(no_heater_temp)),
                     cost=0,
                     kwh=0,
                     tempdeviation=abs(no_heater_temp - starttemp),
                 )
-
+                if tstamp == first_tstamp:
+                    logger.debug(f"cost is zero to go from {temp} to {no_heater_temp}")
             heater_on_temp = round(
                 temp + heating_rate * t_delta_hours,
                 ROUND,
@@ -354,12 +378,17 @@ def heatreservoir_temp_cost_graph(
                 hightemp_penalty = 1
                 # Small penalty for high temps:
                 cost = kwh * hightemp_penalty * powerprice
+                if tstamp == first_tstamp:
+                    logger.debug(f"penalty is {hightemp_penalty}")
+                    logger.debug(
+                        f"cost is {cost} to go from {temp} to {heater_on_temp}"
+                    )
 
                 # Add edge for heater-on:
                 temps[next_tstamp].append(heater_on_temp)
                 graph.add_edge(
-                    (tstamp, temp),
-                    (next_tstamp, heater_on_temp),
+                    (tstamp, int_temp(temp)),
+                    (next_tstamp, int_temp(heater_on_temp)),
                     cost=cost,
                     kwh=kwh,
                     tempdeviation=abs(heater_on_temp - starttemp),
@@ -375,7 +404,7 @@ def plot_graph(graph, ax=None, show=False):
     if ax is None:
         fig, ax = pyplot.subplots()
 
-    if len(graph.edges) < 100000:
+    if len(graph.edges) < 1000:
         logger.info("Plotting all graph edges, wait for it..")
         for edge_0, edge_1, data in graph.edges(data=True):
             pd.DataFrame(
@@ -398,6 +427,8 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
         fig, ax = pyplot.subplots()
 
     path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
+    path_dframe["temp"] = [float_temp(temp) for temp in path_dframe["temp"]]
+    print(path_dframe)
     path_dframe.plot(y="temp", linewidth=linewidth, color=color, ax=ax)
     if show:
         pyplot.show()
@@ -412,6 +443,7 @@ def find_node(graph, when, temp):
         .index.values[0]
     )
     temp_df = nodes_df[nodes_df["index"] == nodes_df.iloc[closest_time_idx]["index"]]
+    logger.debug(str(temp_df.temp.values))
     closest_temp_idx = (
         temp_df.iloc[(temp_df["temp"] - temp).abs().argsort()].head(1).index.values[0]
     )
@@ -449,7 +481,7 @@ def path_thermostat_values(path):
     """Extract a Pandas series of thermostat values (integers) from a
     path with temperatures"""
     timestamps = [node[0] for node in path][:-1]  # skip the last one
-    tempvalues = [node[1] for node in path]
+    tempvalues = [float_temp(node[1]) for node in path]
     # Perturb temperatures, +1 when it should be on, and -1 when off:
     onoff = pd.Series(tempvalues).diff().shift(-1).dropna().apply(np.sign)
     onoff.index = timestamps
@@ -462,11 +494,11 @@ def path_kwh(graph, path):
     return [graph.edges[path[i], path[i + 1]]["kwh"] for i in range(len(path) - 1)]
 
 
-def shortest_paths(graph, k=5, starttemp=60, endtemp=60):
+def shortest_paths(graph, k=5, starttemp=60, endtemp=60, now=datetime.datetime.now()):
     """Return the k shortest paths. Runtime is K*N**3, too much
     for practical usage"""
-    startnode = find_node(graph, datetime.datetime.now(), starttemp)
-    endnode = find_node(graph, datetime.datetime.now() + pd.Timedelta("48h"), endtemp)
+    startnode = find_node(graph, now, int_temp(starttemp))
+    endnode = find_node(graph, now + pd.Timedelta("48h"), int_temp(endtemp))
     # Path generator:
     return list(
         itertools.islice(
@@ -514,7 +546,10 @@ def get_parser():
     )
     parser.add_argument("--plot", action="store_true", help="Make plots")
     parser.add_argument("--floors", nargs="*", help="Floornames")
-    parser.add_argument("--freq", type=str, help="Time frequency, default 10min")
+    parser.add_argument(
+        "--freq", type=str, help="Time frequency, default 10min", default="10min"
+    )
+    parser.add_argument("--vacation", type=str, help="ON or OFF or auto", default="")
     return parser
 
 
@@ -532,5 +567,6 @@ if __name__ == "__main__":
             plot=args.plot,
             floors=args.floors,
             freq=args.freq,
+            vacation=args.vacation,
         )
     )
