@@ -497,7 +497,7 @@ def path_kwh(graph, path):
 def shortest_paths(graph, k=5, starttemp=60, endtemp=60, now=datetime.datetime.now()):
     """Return the k shortest paths. Runtime is K*N**3, too much
     for practical usage"""
-    startnode = find_node(graph, now, int_temp(starttemp))
+    startnode = find_node(graph, now - pd.Timedelta("1h"), int_temp(starttemp))
     endnode = find_node(graph, now + pd.Timedelta("48h"), int_temp(endtemp))
     # Path generator:
     return list(
