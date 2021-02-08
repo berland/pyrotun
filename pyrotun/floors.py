@@ -141,7 +141,6 @@ FLOORS = {
     },
 }
 TIMEDELTA_MINUTES = 10  # minimum is 8 minutes!!
-ROUND = 1
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 VACATION_ITEM = "Ferie"
 
@@ -156,10 +155,12 @@ async def main(
     freq="10min",
     vacation="auto",
     hoursago=0,
+    minutesago=0,
     analyze=False,
 ):
     """Called from service or interactive"""
     assert hoursago >= 0
+    assert minutesago >= 0
 
     closepers = False
     if pers is None:
@@ -193,7 +194,7 @@ async def main(
             pyplot.show()
         return
 
-    if hoursago > 0:
+    if hoursago > 0 or minutesago > 0:
         assert dryrun is True, "Only dryrun when jumping back in history"
 
     prices_df = await pers.tibber.get_prices()
@@ -211,8 +212,13 @@ async def main(
         logger.info("Starting optimization for floor %s", floor)
         if hoursago > 0:
             logger.info("* Jumping back %s hours", str(hoursago))
+        if minutesago > 0:
+            logger.info("* Jumping back %s minutes", str(minutesago))
         currenttemp = await pers.influxdb.get_item(
-            FLOORS[floor]["sensor_item"], datatype=float, ago=hoursago, unit="h"
+            FLOORS[floor]["sensor_item"],
+            datatype=float,
+            ago=hoursago * 60 + minutesago,
+            unit="m",
         )
         logger.debug(f"Current temperature is {currenttemp}")
         if (
@@ -237,7 +243,11 @@ async def main(
         else:
             delta = 0
 
-        starttime = datetime.datetime.now() - datetime.timedelta(hours=hoursago)
+        starttime = (
+            datetime.datetime.now()
+            - datetime.timedelta(hours=hoursago)
+            - datetime.timedelta(minutes=minutesago)
+        )
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         starttime = starttime.astimezone(tz)
         graph = heatreservoir_temp_cost_graph(
@@ -335,8 +345,8 @@ async def main(
             )
 
             # Prices on a secondary y-axis:
-            ax2 = ax.twinx()
-            prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
+            # ax2 = ax.twinx()
+            # prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
             pyplot.show()
 
     if closepers:
@@ -403,7 +413,7 @@ def heatreservoir_temp_cost_graph(
     dframe = dframe.sort_index()
     dframe = dframe.ffill().bfill()
     dframe = dframe[dframe.index >= starttime]
-
+    logger.debug(dframe.head())
     # Build Graph, starting with current temperature
     graph = networkx.DiGraph()
 
@@ -412,6 +422,8 @@ def heatreservoir_temp_cost_graph(
     # dict of timestamp to list of reachable temperatures:
     temps = {}
     temps[dframe.index[0]] = [starttemp]
+    first_tstamp = dframe.index[0]
+    logger.debug(f"First timestamp in graph is {first_tstamp}")
     # Loop over all datetimes, and inject nodes and possible edges
     for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
         temps[next_tstamp] = []
@@ -441,10 +453,9 @@ def heatreservoir_temp_cost_graph(
                     kwh=0,
                     tempdeviation=abs(no_heater_temp - starttemp),
                 )
-            heater_on_temp = round(
-                temp + heating_rate * t_delta_hours,
-                ROUND,
-            )
+                if tstamp == first_tstamp:
+                    logger.debug(f"Adding edge for no-heater to temp {no_heater_temp}")
+            heater_on_temp = temp + heating_rate * t_delta_hours
             if min_temp < heater_on_temp < maxtemp:
                 kwh = wattage / 1000 * t_delta_hours
                 hightemp_penalty = (heater_on_temp - 15) / 20 / 100
@@ -461,6 +472,10 @@ def heatreservoir_temp_cost_graph(
                     kwh=kwh,
                     tempdeviation=abs(heater_on_temp - starttemp),
                 )
+                if tstamp == first_tstamp:
+                    logger.debug(
+                        f"Adding edge for heater-on at cost {cost} to temp {heater_on_temp}"
+                    )
     logger.info(
         f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
     )
@@ -514,6 +529,14 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
 
     path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
     path_dframe["temp"] = [float_temp(temp) for temp in path_dframe["temp"]]
+
+    pyplot.plot(
+        path_dframe.index[0],
+        path_dframe["temp"].values[0],
+        marker="o",
+        markersize=3,
+        color="red",
+    )
 
     # BUG: Circumvent unresolved plotting bug that messes up index in plot:
     path_dframe = path_dframe.iloc[1:]
@@ -645,6 +668,9 @@ def get_parser():
     parser.add_argument("--vacation", type=str, help="ON or OFF or auto", default="")
     parser.add_argument("--analyze", action="store_true", help="Analyze mode")
     parser.add_argument("--hoursago", type=int, help="Step back some hours", default=0)
+    parser.add_argument(
+        "--minutesago", type=int, help="Step back some minutes", default=0
+    )
 
     return parser
 
@@ -665,6 +691,7 @@ if __name__ == "__main__":
             freq=args.freq,
             vacation=args.vacation,
             hoursago=args.hoursago,
+            minutesago=args.minutesago,
             analyze=args.analyze,
         )
     )
