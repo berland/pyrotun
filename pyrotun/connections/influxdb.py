@@ -1,5 +1,4 @@
 import os
-import pytz
 
 from aioinflux import InfluxDBClient
 
@@ -36,6 +35,18 @@ class InfluxDBConnection:
         )
         resp.columns = [item]
         return resp
+
+    async def get_item(self, item, ago=0, unit="h", datatype=None):
+        resp = await self.client.query(
+            f"SELECT last(value) FROM {item} where time < now() - {ago}{unit}"
+        )
+        if datatype == int:
+            return int(resp["last"].values[0])
+        if datatype == float:
+            return float(resp["last"].values[0])
+        if datatype == bool:
+            return int(resp["last"].values[0]) == 1
+        return str(resp["last"].values[0])
 
     async def get_lastvalue(self, item):
         resp = await self.client.query(f"SELECT last(value) FROM {item}")

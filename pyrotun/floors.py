@@ -71,7 +71,7 @@ FLOORS = {
         "delta": -2,
         "heating_rate": 1,
         "cooling_rate": -0.3,
-        "setpoint_force": 1,
+        "setpoint_force": 2,
         "wattage": 1700,
         "maxtemp": 27,
         "backup_setpoint": 20,
@@ -83,7 +83,7 @@ FLOORS = {
         "setpoint_base": "temperature",
         "heating_rate": 1,
         "cooling_rate": -0.3,
-        "setpoint_force": 2,
+        "setpoint_force": 3,
         "wattage": 600,
         "maxtemp": 27,
         "backup_setpoint": 20,
@@ -95,7 +95,7 @@ FLOORS = {
         "setpoint_base": "temperature",
         "heating_rate": 0.4,
         "cooling_rate": -0.2,
-        "setpoint_force": 2,
+        "setpoint_force": 3,
         "wattage": 600,
         "maxtemp": 27,
         "backup_setpoint": 20,
@@ -117,7 +117,7 @@ FLOORS = {
         "setpoint_item": "Termostat_Vaskegang_SetpointHeating",
         "delta": -3,  # relative to master-temp at 25, adapt to sensor and wish.
         "setpoint_base": "temperature",
-        "heating_rate": 2,
+        "heating_rate": 3,
         "cooling_rate": -0.2,
         "setpoint_force": 2,
         "wattage": 800,
@@ -149,9 +149,19 @@ BACKUPSETPOINT = 22
 
 
 async def main(
-    pers=None, dryrun=False, plot=False, floors=None, freq="10min", vacation="auto"
+    pers=None,
+    dryrun=False,
+    plot=False,
+    floors=None,
+    freq="10min",
+    vacation="auto",
+    hoursago=0,
 ):
     """Called from service or interactive"""
+    assert hoursago >= 0
+
+    if hoursago > 0:
+        assert dryrun is True, "Only dryrun when jumping back in history"
 
     closepers = False
     if pers is None:
@@ -177,8 +187,10 @@ async def main(
 
     for floor in selected_floors:
         logger.info("Starting optimization for floor %s", floor)
-        currenttemp = await pers.openhab.get_item(
-            FLOORS[floor]["sensor_item"], datatype=float
+        if hoursago > 0:
+            logger.info("* Jumping back %s hours", str(hoursago))
+        currenttemp = await pers.influxdb.get_item(
+            FLOORS[floor]["sensor_item"], datatype=float, ago=hoursago, unit="h"
         )
 
         if (
@@ -203,7 +215,11 @@ async def main(
         else:
             delta = 0
 
+        starttime = datetime.datetime.now() - datetime.timedelta(hours=hoursago)
+        tz = pytz.timezone(os.getenv("TIMEZONE"))
+        starttime = starttime.astimezone(tz)
         graph = heatreservoir_temp_cost_graph(
+            starttime=starttime,
             starttemp=currenttemp,
             prices_df=prices_df,
             mintemp=10,
@@ -229,7 +245,9 @@ async def main(
                 )
             continue
 
-        opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=0)
+        opt_results = analyze_graph(
+            graph, starttemp=currenttemp, endtemp=0, starttime=starttime
+        )
         logger.info(
             f"Cost for floor {floor} is {opt_results['opt_cost']:.2f}, "
             f"KWh is {opt_results['kwh']:.2f}"
@@ -243,7 +261,10 @@ async def main(
             setpoint_base = thermostat_values.values[0]
         elif FLOORS[floor]["setpoint_base"] == "target":
             setpoint_base = temp_requirement(
-                datetime.datetime.now(), vacation=vacation, prices=None, delta=delta
+                starttime,
+                vacation=vacation,
+                prices=None,
+                delta=delta,
             )
         else:
             logger.error("Wrong configuration for floor %s", floor)
@@ -262,7 +283,6 @@ async def main(
             )
         try:
             first_on_timestamp = onoff[onoff == 1].head(1).index.values[0]
-            tz = pytz.timezone(os.getenv("TIMEZONE"))
             logger.info(
                 "Will turn floor %s on at %s",
                 floor,
@@ -278,7 +298,7 @@ async def main(
 
         if plot:
             fig, ax = pyplot.subplots()
-            # plot_graph(graph, ax=ax, show=False)  # Plots all nodes in graph.
+            # plot_graph(graph, ax=ax, show=True)  # Plots all nodes in graph.
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
             ax2 = ax.twinx()
@@ -341,6 +361,12 @@ def heatreservoir_temp_cost_graph(
     # If we are at 19:48 and timedelta is 15 minutes, we should
     # round down to 19:45:
     datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
+    duplicates = []
+    for tstamp in datetimes:
+        if tstamp in prices_df.index:
+            duplicates.append(tstamp)
+    datetimes = datetimes.drop(duplicates)
+
     # Merge prices into the requested datetime:
     dframe = pd.concat(
         [
@@ -349,11 +375,11 @@ def heatreservoir_temp_cost_graph(
         ],
         axis="index",
     )
+    pd.set_option("display.max_rows", 5000)
     dframe = dframe.sort_index()
     # Not sure why last is correct here, but the intention is
     # to keep the row from prices_df, not the NaN row
-    dframe = dframe[~dframe.index.duplicated(keep="last")]
-    dframe = dframe.ffill().bfill().loc[datetimes]
+    dframe = dframe.ffill().bfill()
 
     # Build Graph, starting with current temperature
     graph = networkx.DiGraph()
@@ -364,6 +390,7 @@ def heatreservoir_temp_cost_graph(
     temps = {}
     temps[dframe.index[0]] = [starttemp]
     # Loop over all datetimes, and inject nodes and possible edges
+
     for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
         temps[next_tstamp] = []
         temps[tstamp] = list(set(temps[tstamp]))
@@ -420,6 +447,19 @@ def heatreservoir_temp_cost_graph(
                     kwh=kwh,
                     tempdeviation=abs(heater_on_temp - starttemp),
                 )
+    # After graph is built, add an extra (dummy) node (at zero cost) collecting all
+    # nodes. This is necessary as we don't know exactly which end-node we should
+    # find the path to, because 23.34 degrees at endpoint might be cheaper to
+    # go to than 23.31, due to the discrete nature of the optimization.
+    min_temp = min(temps[next_tstamp])  # Make this the endpoint node
+    for temp in temps[next_tstamp]:
+        graph.add_edge(
+            (next_tstamp, int_temp(temp)),
+            (next_tstamp + t_delta, int_temp(min_temp)),
+            cost=0,
+            kwh=0,
+            tempdeviation=0,
+        )
 
     logger.info(
         f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
@@ -455,7 +495,6 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
 
     path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
     path_dframe["temp"] = [float_temp(temp) for temp in path_dframe["temp"]]
-    print(path_dframe)
     path_dframe.plot(y="temp", linewidth=linewidth, color=color, ax=ax)
     if show:
         pyplot.show()
@@ -470,7 +509,6 @@ def find_node(graph, when, temp):
         .index.values[0]
     )
     temp_df = nodes_df[nodes_df["index"] == nodes_df.iloc[closest_time_idx]["index"]]
-    logger.debug(str(temp_df.temp.values))
     closest_temp_idx = (
         temp_df.iloc[(temp_df["temp"] - temp).abs().argsort()].head(1).index.values[0]
     )
@@ -537,13 +575,16 @@ def shortest_paths(graph, k=5, starttemp=60, endtemp=60, now=datetime.datetime.n
     )
 
 
-def analyze_graph(graph, starttemp=60, endtemp=60):
+def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
     """Find shortest path, and do some extra calculations for estimating
     savings. The savings must be interpreted carefully, and is
     probably only correct if start and endtemp is equal"""
 
-    startnode = find_node(graph, datetime.datetime.now(), starttemp)
-    endnode = find_node(graph, datetime.datetime.now() + pd.Timedelta("48h"), endtemp)
+    if starttime is None:
+        starttime = datetime.datetime.now()
+
+    startnode = find_node(graph, starttime, starttemp)
+    endnode = find_node(graph, starttime + pd.Timedelta("48h"), endtemp)
     path = networkx.shortest_path(
         graph, source=startnode, target=endnode, weight="cost"
     )
@@ -577,6 +618,7 @@ def get_parser():
         "--freq", type=str, help="Time frequency, default 10min", default="10min"
     )
     parser.add_argument("--vacation", type=str, help="ON or OFF or auto", default="")
+    parser.add_argument("--hoursago", type=int, help="Step back some hours", default=0)
     return parser
 
 
@@ -595,5 +637,6 @@ if __name__ == "__main__":
             floors=args.floors,
             freq=args.freq,
             vacation=args.vacation,
+            hoursago=args.hoursago,
         )
     )
