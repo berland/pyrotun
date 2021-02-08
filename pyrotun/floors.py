@@ -461,6 +461,14 @@ def heatreservoir_temp_cost_graph(
                     kwh=kwh,
                     tempdeviation=abs(heater_on_temp - starttemp),
                 )
+    logger.info(
+        f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
+    )
+
+    # If we currently below accepted temperatures, graph is empty
+    if not graph:
+        return graph
+
     # After graph is built, add an extra (dummy) node (at zero cost) collecting all
     # nodes. This is necessary as we don't know exactly which end-node we should
     # find the path to, because 23.34 degrees at endpoint might be cheaper to
@@ -475,9 +483,6 @@ def heatreservoir_temp_cost_graph(
             tempdeviation=0,
         )
 
-    logger.info(
-        f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
-    )
     return graph
 
 
