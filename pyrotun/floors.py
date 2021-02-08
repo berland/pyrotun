@@ -345,8 +345,8 @@ async def main(
             )
 
             # Prices on a secondary y-axis:
-            # ax2 = ax.twinx()
-            # prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
+            ax2 = ax.twinx()
+            prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
             pyplot.show()
 
     if closepers:
@@ -370,6 +370,7 @@ def heatreservoir_temp_cost_graph(
     heating_rate=2,
     cooling_rate=0.1,
     vacation=False,
+    maxhours=36,
     starttime=None,
     delta=0,
     freq="10min",
@@ -411,9 +412,12 @@ def heatreservoir_temp_cost_graph(
         axis="index",
     )
     dframe = dframe.sort_index()
+
+    dframe = dframe[dframe.index < starttime + pd.Timedelta(maxhours, unit="hour")]
     dframe = dframe.ffill().bfill()
     dframe = dframe[dframe.index >= starttime]
     logger.debug(dframe.head())
+
     # Build Graph, starting with current temperature
     graph = networkx.DiGraph()
 
@@ -474,8 +478,44 @@ def heatreservoir_temp_cost_graph(
                 )
                 if tstamp == first_tstamp:
                     logger.debug(
-                        f"Adding edge for heater-on at cost {cost} to temp {heater_on_temp}"
+                        f"Adding edge for heater-on at cost {cost} to "
+                        f"temp {heater_on_temp}"
                     )
+        # For every temperature node, we need to link up with other nodes
+        # between its corresponding no-heater and heater-temp.
+        for temp in temps[tstamp]:
+            higher_next_temps = [t for t in temps[next_tstamp] if t > temp]
+            higher = sorted(higher_next_temps)
+            if not higher:
+                continue
+            # logger.info(f"Adding extra edge {temp} to {lower_next_temp}")
+            partial_temp_inc = higher[0] - temp
+            full_temp_inc = heating_rate * t_delta_hours
+            kwh = wattage / 1000 * t_delta_hours * (partial_temp_inc / full_temp_inc)
+            cost = kwh * powerprice
+            graph.add_edge(
+                (tstamp, int_temp(temp)),
+                (next_tstamp, int_temp(higher[0])),
+                cost=cost,
+                kwh=kwh,
+                tempdeviation=abs(higher[0] - temp),
+            )
+
+        # We need additional no-heater edges to temperatures similar to no-heater
+        # with zero cost:
+        for temp in temps[tstamp]:
+            lower_next_temps = [t for t in temps[next_tstamp] if t < temp]
+            lower = sorted(lower_next_temps)
+            for lower_next_temp in lower[-3:]:
+                # logger.info(f"Adding extra edge {temp} to {lower_next_temp}")
+                graph.add_edge(
+                    (tstamp, int_temp(temp)),
+                    (next_tstamp, int_temp(lower_next_temp)),
+                    cost=0,
+                    kwh=0,
+                    tempdeviation=0,
+                )
+
     logger.info(
         f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
     )
@@ -505,16 +545,20 @@ def plot_graph(graph, ax=None, show=False):
     if ax is None:
         fig, ax = pyplot.subplots()
 
-    if len(graph.edges) < 1000:
-        logger.info("Plotting all graph edges, wait for it..")
+    if len(graph.edges) < 100000:
+        logger.info("Plotting some graph edges, wait for it..")
+        counter = 0
         for edge_0, edge_1, data in graph.edges(data=True):
+            counter += 1
             pd.DataFrame(
                 [
                     {"index": edge_0[0], "temp": edge_0[1]},
                     {"index": edge_1[0], "temp": edge_1[1]},
                 ]
             ).plot(x="index", y="temp", ax=ax, legend=False)
-    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"])
+            if counter > 100:
+                break
+    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(100)
 
     logger.info("Plotting all graph nodes..")
     nodes_df.plot.scatter(x="index", y="temp", ax=ax)
@@ -530,13 +574,13 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
     path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
     path_dframe["temp"] = [float_temp(temp) for temp in path_dframe["temp"]]
 
-    pyplot.plot(
-        path_dframe.index[0],
-        path_dframe["temp"].values[0],
-        marker="o",
-        markersize=3,
-        color="red",
-    )
+    # pyplot.plot(
+    #    path_dframe.index[0],
+    #    path_dframe["temp"].values[0],
+    #    marker="o",
+    #    markersize=3,
+    #    color="red",
+    # )
 
     # BUG: Circumvent unresolved plotting bug that messes up index in plot:
     path_dframe = path_dframe.iloc[1:]
