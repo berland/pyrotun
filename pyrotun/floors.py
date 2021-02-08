@@ -69,7 +69,7 @@ FLOORS = {
         "setpoint_item": "Termostat_Sofastue_SetpointHeating",
         "setpoint_base": "temperature",
         "delta": -2,
-        "heating_rate": 5,
+        "heating_rate": 1,
         "cooling_rate": -0.3,
         "setpoint_force": 1,
         "wattage": 1700,
@@ -105,7 +105,7 @@ FLOORS = {
         "setpoint_item": "Termostat_Bakgang_SetpointHeating",
         "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
         "setpoint_base": "temperature",
-        "heating_rate": 3,
+        "heating_rate": 2,
         "cooling_rate": -0.1,
         "setpoint_force": 2,
         "wattage": 800,
@@ -117,7 +117,7 @@ FLOORS = {
         "setpoint_item": "Termostat_Vaskegang_SetpointHeating",
         "delta": -3,  # relative to master-temp at 25, adapt to sensor and wish.
         "setpoint_base": "temperature",
-        "heating_rate": 3,
+        "heating_rate": 2,
         "cooling_rate": -0.2,
         "setpoint_force": 2,
         "wattage": 800,
