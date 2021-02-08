@@ -214,7 +214,7 @@ async def main(
         currenttemp = await pers.influxdb.get_item(
             FLOORS[floor]["sensor_item"], datatype=float, ago=hoursago, unit="h"
         )
-
+        logger.debug(f"Current temperature is {currenttemp}")
         if (
             currenttemp is None
             or str(currenttemp) == "UNDEF"
@@ -323,8 +323,6 @@ async def main(
             # plot_graph(graph, ax=ax, show=True)  # Plots all nodes in graph.
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
-            ax2 = ax.twinx()
-            prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
             prices_df["mintemp"] = (
                 prices_df.reset_index()["index"]
                 .apply(
@@ -335,6 +333,10 @@ async def main(
             prices_df.plot(
                 drawstyle="steps-post", ax=ax, y="mintemp", color="blue", alpha=0.4
             )
+
+            # Prices on a secondary y-axis:
+            ax2 = ax.twinx()
+            prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
             pyplot.show()
 
     if closepers:
@@ -359,7 +361,6 @@ def heatreservoir_temp_cost_graph(
     cooling_rate=0.1,
     vacation=False,
     starttime=None,
-    maxhours=36,
     delta=0,
     freq="10min",
 ):
@@ -380,28 +381,28 @@ def heatreservoir_temp_cost_graph(
         freq=freq,
         tz=prices_df.index.tz,
     )
-    # If we are at 19:48 and timedelta is 15 minutes, we should
-    # round down to 19:45:
-    datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
+
+    # Only timestamps after starttime is up for prediction:
+    datetimes = datetimes[datetimes > starttime]
+
+    # Delete timestamps mentioned in prices, for correct merging:
     duplicates = []
     for tstamp in datetimes:
         if tstamp in prices_df.index:
             duplicates.append(tstamp)
     datetimes = datetimes.drop(duplicates)
-
     # Merge prices into the requested datetime:
     dframe = pd.concat(
         [
+            pd.DataFrame(index=pd.DatetimeIndex([starttime])),
             prices_df,
             pd.DataFrame(index=datetimes),
         ],
         axis="index",
     )
-    pd.set_option("display.max_rows", 5000)
     dframe = dframe.sort_index()
-    # Not sure why last is correct here, but the intention is
-    # to keep the row from prices_df, not the NaN row
     dframe = dframe.ffill().bfill()
+    dframe = dframe[dframe.index >= starttime]
 
     # Build Graph, starting with current temperature
     graph = networkx.DiGraph()
@@ -412,7 +413,6 @@ def heatreservoir_temp_cost_graph(
     temps = {}
     temps[dframe.index[0]] = [starttemp]
     # Loop over all datetimes, and inject nodes and possible edges
-
     for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
         temps[next_tstamp] = []
         temps[tstamp] = list(set(temps[tstamp]))
@@ -420,7 +420,6 @@ def heatreservoir_temp_cost_graph(
         powerprice = dframe.loc[tstamp]["NOK/KWh"]
         t_delta = next_tstamp - tstamp
         t_delta_hours = float(t_delta.value) / 1e9 / 60 / 60  # from nanoseconds
-        first_tstamp = dframe.index[0]
         for temp in temps[tstamp]:
             # This is Explicit Euler solution of the underlying
             # differential equation, predicting future temperature:
@@ -442,8 +441,6 @@ def heatreservoir_temp_cost_graph(
                     kwh=0,
                     tempdeviation=abs(no_heater_temp - starttemp),
                 )
-                if tstamp == first_tstamp:
-                    logger.debug(f"cost is zero to go from {temp} to {no_heater_temp}")
             heater_on_temp = round(
                 temp + heating_rate * t_delta_hours,
                 ROUND,
@@ -454,11 +451,6 @@ def heatreservoir_temp_cost_graph(
                 hightemp_penalty = 1
                 # Small penalty for high temps:
                 cost = kwh * hightemp_penalty * powerprice
-                if tstamp == first_tstamp:
-                    logger.debug(f"penalty is {hightemp_penalty}")
-                    logger.debug(
-                        f"cost is {cost} to go from {temp} to {heater_on_temp}"
-                    )
 
                 # Add edge for heater-on:
                 temps[next_tstamp].append(heater_on_temp)
@@ -517,6 +509,10 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
 
     path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
     path_dframe["temp"] = [float_temp(temp) for temp in path_dframe["temp"]]
+
+    # BUG: Circumvent unresolved plotting bug that messes up index in plot:
+    path_dframe = path_dframe.iloc[1:]
+
     path_dframe.plot(y="temp", linewidth=linewidth, color=color, ax=ax)
     if show:
         pyplot.show()
@@ -606,7 +602,9 @@ def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
         starttime = datetime.datetime.now()
 
     startnode = find_node(graph, starttime, starttemp)
+    logger.debug(f"startnode is {startnode}")
     endnode = find_node(graph, starttime + pd.Timedelta("48h"), endtemp)
+    logger.debug(f"endnode is {endnode}")
     path = networkx.shortest_path(
         graph, source=startnode, target=endnode, weight="cost"
     )
