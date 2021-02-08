@@ -124,6 +124,21 @@ FLOORS = {
         "maxtemp": 30,
         "backup_setpoint": 15,
     },
+    "Inngang": {
+        "sensor_item": "Termostat_Inngang_SensorGulv",
+        "setpoint_item": [
+            "Termostat_Inngang_SetpointHeating",
+            "Termostat_Langgang_Nede_SetpointHeating",
+        ],
+        "delta": 0,  # relative to master-temp at 25, adapt to sensor and wish.
+        "setpoint_base": "temperature",
+        "heating_rate": 0.4,
+        "cooling_rate": -0.6,
+        "setpoint_force": 5,
+        "wattage": 600,
+        "maxtemp": 32,
+        "backup_setpoint": 23,
+    },
 }
 TIMEDELTA_MINUTES = 10  # minimum is 8 minutes!!
 ROUND = 1

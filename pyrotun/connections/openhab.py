@@ -48,41 +48,46 @@ class OpenHABConnection:
                 else:
                     return False
 
-    async def set_item(self, item_name, new_state, log=None):
+    async def set_item(self, item_names, new_state, log=None):
         if self.readonly:
-            logger.info("OpenHAB: Would have set %s to %s", item_name, str(new_state))
-            return
-        if log is True:
-            logger.info("OpenHAB: Setting %s to %s", item_name, str(new_state))
-        if log == "change":
-            current_state = await self.get_item(item_name)
-            if str(current_state) != str(new_state):
-                logger.info(
-                    "OpenHAB: Changing %s from %s to %s",
-                    item_name,
-                    str(current_state),
-                    str(new_state),
-                )
-        async with self.websession.post(
-            self.openhab_url + "/items/" + str(item_name), data=str(new_state)
-        ) as resp:
-            if resp.status != 200:
-                logger.error(resp)
-
-        try:
-            # Spare OpenHAB instance for a transition period:
-            extra_host = self.openhab_url.replace("serv", "serve").replace(
-                "8090", "8080"
+            logger.info(
+                "OpenHAB: Would have set %s to %s", str(item_names), str(new_state)
             )
+            return
+        if not isinstance(item_names, list):
+            item_names = [item_names]
+        for item_name in item_names:
+            if log is True:
+                logger.info("OpenHAB: Setting %s to %s", item_name, str(new_state))
+            if log == "change":
+                current_state = await self.get_item(item_name)
+                if str(current_state) != str(new_state):
+                    logger.info(
+                        "OpenHAB: Changing %s from %s to %s",
+                        item_name,
+                        str(current_state),
+                        str(new_state),
+                    )
             async with self.websession.post(
-                extra_host + "/items/" + str(item_name), data=str(new_state)
+                self.openhab_url + "/items/" + str(item_name), data=str(new_state)
             ) as resp:
                 if resp.status != 200:
                     logger.error(resp)
-        except OSError as err:
-            logger.warning("Secondary OpenHAB instance not responding")
-            logger.warning(str(err))
-            pass
+
+            try:
+                # Spare OpenHAB instance for a transition period:
+                extra_host = self.openhab_url.replace("serv", "serve").replace(
+                    "8090", "8080"
+                )
+                async with self.websession.post(
+                    extra_host + "/items/" + str(item_name), data=str(new_state)
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error(resp)
+            except OSError as err:
+                logger.warning("Secondary OpenHAB instance not responding")
+                logger.warning(str(err))
+                pass
 
     def sync_get_item(self, item_name):
         return self.client.get_item(item_name).state

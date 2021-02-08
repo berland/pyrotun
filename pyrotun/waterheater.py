@@ -4,8 +4,10 @@ import networkx
 import datetime
 import itertools
 import pytz
+
 from sklearn import linear_model
 import pandas as pd
+import numpy as np
 from matplotlib import pyplot
 import dotenv
 
@@ -185,22 +187,20 @@ class WaterHeater:
         # If we are at 19:48 and timedelta is 15 minutes, we should
         # round down to 19:45:
         datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
+        datetimes = pd.DatetimeIndex(set(datetimes) - set(prices_df.index))
+
+        # Remove those that are present in price dataframe:
         # Merge prices into the requested datetime:
-        dframe = (
-            pd.concat(
-                [
-                    prices_df,
-                    pd.DataFrame(index=datetimes),
-                ],
-                axis="index",
-            )
-            .sort_index()
-            .ffill()
-            .bfill()  # (this is hardly necessary)
-            .loc[datetimes]  # slicing to this means we do not compute
-            # correcly around hour shifts
+        dframe = pd.concat(
+            [
+                prices_df,
+                pd.DataFrame(index=datetimes),
+            ],
+            axis="index",
         )
-        dframe = dframe[~dframe.index.duplicated(keep="first")]
+        dframe = dframe.sort_index()
+        dframe = dframe.ffill().bfill()
+        print(dframe)
 
         # Build Graph, starting with current temperature
         # temps = np.arange(40, 85, 0.1)
