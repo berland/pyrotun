@@ -156,18 +156,45 @@ async def main(
     freq="10min",
     vacation="auto",
     hoursago=0,
+    analyze=False,
 ):
     """Called from service or interactive"""
     assert hoursago >= 0
-
-    if hoursago > 0:
-        assert dryrun is True, "Only dryrun when jumping back in history"
 
     closepers = False
     if pers is None:
         pers = pyrotun.persist.PyrotunPersistence()
         await pers.ainit(["tibber", "influxdb", "openhab"])
         closepers = True
+
+    if floors is None:
+        selected_floors = FLOORS.keys()
+    else:
+        selected_floors = floors
+
+    if analyze:
+        daysago = 30
+        minutegrouping = 10
+        for floor in selected_floors:
+            query = (
+                f"SELECT difference(mean(value)) "
+                f"FROM {FLOORS[floor]['sensor_item']} "
+                f"where time > now() - {daysago}d "
+                f"group by time({minutegrouping}m)"
+            )
+            logger.info(query)
+            resp = await pers.influxdb.dframe_query(query) * (60 / minutegrouping)
+
+            # Crop away impossible derivatives:
+            resp = resp[resp < 6]
+            resp = resp[resp > -2]
+            resp.hist(bins=30)
+            pyplot.title(floor)
+            pyplot.show()
+        return
+
+    if hoursago > 0:
+        assert dryrun is True, "Only dryrun when jumping back in history"
 
     prices_df = await pers.tibber.get_prices()
     if not vacation or vacation == "auto":
@@ -179,11 +206,6 @@ async def main(
         else:
             logger.info("Vacation forced to off")
             vacation = False
-
-    if floors is None:
-        selected_floors = FLOORS.keys()
-    else:
-        selected_floors = floors
 
     for floor in selected_floors:
         logger.info("Starting optimization for floor %s", floor)
@@ -618,7 +640,9 @@ def get_parser():
         "--freq", type=str, help="Time frequency, default 10min", default="10min"
     )
     parser.add_argument("--vacation", type=str, help="ON or OFF or auto", default="")
+    parser.add_argument("--analyze", action="store_true", help="Analyze mode")
     parser.add_argument("--hoursago", type=int, help="Step back some hours", default=0)
+
     return parser
 
 
@@ -638,5 +662,6 @@ if __name__ == "__main__":
             freq=args.freq,
             vacation=args.vacation,
             hoursago=args.hoursago,
+            analyze=args.analyze,
         )
     )
