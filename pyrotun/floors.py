@@ -468,7 +468,7 @@ def heatreservoir_temp_cost_graph(
             heater_on_temp = temp + heating_rate * t_delta_hours
             if min_temp < heater_on_temp < maxtemp:
                 kwh = wattage / 1000 * t_delta_hours
-                hightemp_penalty = (heater_on_temp - 15) / 20 / 100
+                hightemp_penalty = 1 + (heater_on_temp - 15) / 20 / 100
                 # Small penalty for high temps.
                 # The penalty is critical for the algorithm to be stable,
                 # and favours keeping the temperature as low as possible.
@@ -506,9 +506,10 @@ def heatreservoir_temp_cost_graph(
                 rel_temp_inc = (inter_temp - no_heater_temp) / (
                     heater_on_temp - no_heater_temp
                 )
+                hightemp_penalty = 1 + (inter_temp - 15) / 20 / 100
                 assert 0 < rel_temp_inc < 1
                 rel_kwh = rel_temp_inc * full_kwh
-                cost = rel_kwh * powerprice
+                cost = rel_kwh * hightemp_penalty * powerprice
                 # logger.info(
                 #    f"Adding extra edge {temp} to {inter_temp} at cost {cost}, full cost is {full_kwh*powerprice}"
                 # )
