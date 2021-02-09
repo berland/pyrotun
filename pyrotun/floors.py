@@ -25,7 +25,7 @@ FLOORS = {
         "delta": -1,
         "heating_rate": 0.9,  # degrees/hour
         "cooling_rate": -0.6,  # degrees/hour
-        "setpoint_force": 8,
+        "setpoint_force": 9,
         "wattage": 600,
         "maxtemp": 27,
         "backup_setpoint": 20,
@@ -37,7 +37,7 @@ FLOORS = {
         "setpoint_base": "target",
         "heating_rate": 1,  # degrees/hour
         "cooling_rate": -0.55,  # degrees/hour
-        "setpoint_force": 8,
+        "setpoint_force": 9,
         "wattage": 600,
         "maxtemp": 27,
         "backup_setpoint": 20,
@@ -93,7 +93,7 @@ FLOORS = {
         "setpoint_item": "Termostat_Gangoppe_SetpointHeating",
         "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
         "setpoint_base": "temperature",
-        "heating_rate": 0.4,
+        "heating_rate": 0.3,
         "cooling_rate": -0.2,
         "setpoint_force": 3,
         "wattage": 600,
