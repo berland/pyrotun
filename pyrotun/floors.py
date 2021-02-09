@@ -119,7 +119,7 @@ FLOORS = {
         "setpoint_base": "temperature",
         "heating_rate": 3,
         "cooling_rate": -0.2,
-        "setpoint_force": 2,
+        "setpoint_force": 8,
         "wattage": 800,
         "maxtemp": 30,
         "backup_setpoint": 15,
@@ -304,8 +304,10 @@ async def main(
 
         if onoff[0]:
             setpoint = setpoint_base + FLOORS[floor]["setpoint_force"]
+            logger.info("Turning floor %s ON now", floor)
         else:
             setpoint = setpoint_base - FLOORS[floor]["setpoint_force"]
+            logger.info("Turning floor %s OFF now", floor)
 
         if not dryrun:
             await pers.openhab.set_item(
@@ -329,8 +331,8 @@ async def main(
             )
 
         if plot:
+            plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
             fig, ax = pyplot.subplots()
-            # plot_graph(graph, ax=ax, show=True)  # Plots all nodes in graph.
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
             prices_df["mintemp"] = (
@@ -353,12 +355,16 @@ async def main(
         await pers.aclose()
 
 
+TEMPERATURE_RESOLUTION = 10000
+# If the temperature resolution is too low, it will make the decisions
+# unstable for short timespans. It is tempting to keep it low to allow
+# some sort of graph collapse.
 def int_temp(temp):
-    return int(temp * 100)
+    return int(temp * TEMPERATURE_RESOLUTION)
 
 
 def float_temp(int_temp):
-    return float(int_temp / 100.0)
+    return float(int_temp / float(TEMPERATURE_RESOLUTION))
 
 
 def heatreservoir_temp_cost_graph(
@@ -463,8 +469,10 @@ def heatreservoir_temp_cost_graph(
             if min_temp < heater_on_temp < maxtemp:
                 kwh = wattage / 1000 * t_delta_hours
                 hightemp_penalty = (heater_on_temp - 15) / 20 / 100
-                hightemp_penalty = 1
-                # Small penalty for high temps:
+                # Small penalty for high temps.
+                # The penalty is critical for the algorithm to be stable,
+                # and favours keeping the temperature as low as possible.
+                # logger.debug(f"Penalty at {heater_on_temp} is {hightemp_penalty}")
                 cost = kwh * hightemp_penalty * powerprice
 
                 # Add edge for heater-on:
@@ -482,39 +490,50 @@ def heatreservoir_temp_cost_graph(
                         f"temp {heater_on_temp}"
                     )
         # For every temperature node, we need to link up with other nodes
-        # between its corresponding no-heater and heater-temp.
+        # between its corresponding no-heater and heater-temp, as we
+        # should regard these as "reachable" for algorithm stability.
         for temp in temps[tstamp]:
-            higher_next_temps = [t for t in temps[next_tstamp] if t > temp]
-            higher = sorted(higher_next_temps)
-            if not higher:
+            no_heater_temp = temp + cooling_rate * t_delta_hours
+            heater_on_temp = temp + heating_rate * t_delta_hours
+
+            next_temps = [
+                t for t in temps[next_tstamp] if no_heater_temp < t < heater_on_temp
+            ]
+            if not next_temps:
                 continue
-            # logger.info(f"Adding extra edge {temp} to {lower_next_temp}")
-            partial_temp_inc = higher[0] - temp
-            full_temp_inc = heating_rate * t_delta_hours
-            kwh = wattage / 1000 * t_delta_hours * (partial_temp_inc / full_temp_inc)
-            cost = kwh * powerprice
-            graph.add_edge(
-                (tstamp, int_temp(temp)),
-                (next_tstamp, int_temp(higher[0])),
-                cost=cost,
-                kwh=kwh,
-                tempdeviation=abs(higher[0] - temp),
-            )
+            full_kwh = wattage / 1000 * t_delta_hours
+            for inter_temp in next_temps:
+                rel_temp_inc = (inter_temp - no_heater_temp) / (
+                    heater_on_temp - no_heater_temp
+                )
+                assert 0 < rel_temp_inc < 1
+                rel_kwh = rel_temp_inc * full_kwh
+                cost = rel_kwh * powerprice
+                # logger.info(
+                #    f"Adding extra edge {temp} to {inter_temp} at cost {cost}, full cost is {full_kwh*powerprice}"
+                # )
+                graph.add_edge(
+                    (tstamp, int_temp(temp)),
+                    (next_tstamp, int_temp(inter_temp)),
+                    cost=cost,
+                    kwh=kwh,
+                    tempdeviation=abs(inter_temp - temp),
+                )
 
         # We need additional no-heater edges to temperatures similar to no-heater
         # with zero cost:
-        for temp in temps[tstamp]:
-            lower_next_temps = [t for t in temps[next_tstamp] if t < temp]
-            lower = sorted(lower_next_temps)
-            for lower_next_temp in lower[-3:]:
-                # logger.info(f"Adding extra edge {temp} to {lower_next_temp}")
-                graph.add_edge(
-                    (tstamp, int_temp(temp)),
-                    (next_tstamp, int_temp(lower_next_temp)),
-                    cost=0,
-                    kwh=0,
-                    tempdeviation=0,
-                )
+        # for temp in temps[tstamp]:
+        #    lower_next_temps = [t for t in temps[next_tstamp] if t < temp]
+        #    lower = sorted(lower_next_temps)
+        #    for lower_next_temp in lower[-2:]:
+        #        # logger.info(f"Adding extra edge {temp} to {lower_next_temp}")
+        #        graph.add_edge(
+        #            (tstamp, int_temp(temp)),
+        #            (next_tstamp, int_temp(lower_next_temp)),
+        #            cost=0,
+        #            kwh=0,
+        #            tempdeviation=0,
+        #        )
 
     logger.info(
         f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
