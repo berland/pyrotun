@@ -106,7 +106,7 @@ FLOORS = {
         "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
         "setpoint_base": "temperature",
         "heating_rate": 2,
-        "cooling_rate": -0.1,
+        "cooling_rate": -0.36,
         "setpoint_force": 2,
         "wattage": 800,
         "maxtemp": 30,
