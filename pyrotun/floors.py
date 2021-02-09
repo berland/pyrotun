@@ -17,6 +17,11 @@ from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)
 
+TEMPERATURE_RESOLUTION = 10000
+"""If the temperature resolution is too low, it will make the decisions
+unstable for short timespans. It is tempting to keep it low to allow
+some sort of graph collapse."""
+
 FLOORS = {
     "Andre": {
         "sensor_item": "Sensor_Andretak_temperatur",  # "Termostat_Andre_SensorGulv",
@@ -57,8 +62,8 @@ FLOORS = {
         "sensor_item": "Termostat_Bad_Kjeller_SensorGulv",
         "setpoint_item": "Termostat_Bad_Kjeller_SetpointHeating",
         "setpoint_base": "temperature",
-        "heating_rate": 5,
-        "cooling_rate": -0.3,
+        "heating_rate": 4,
+        "cooling_rate": -0.4,
         "setpoint_force": 1,
         "wattage": 1000,
         "maxtemp": 31,
@@ -118,7 +123,7 @@ FLOORS = {
         "delta": -3,  # relative to master-temp at 25, adapt to sensor and wish.
         "setpoint_base": "temperature",
         "heating_rate": 3,
-        "cooling_rate": -0.2,
+        "cooling_rate": -0.3,
         "setpoint_force": 8,
         "wattage": 800,
         "maxtemp": 30,
@@ -147,6 +152,32 @@ VACATION_ITEM = "Ferie"
 BACKUPSETPOINT = 22
 
 
+async def analyze_history(pers, selected_floors):
+    daysago = 30
+    minutegrouping = 10
+    for floor in selected_floors:
+        logger.info("Analyzing heating and cooling rates for floor %s", floor)
+        query = (
+            f"SELECT difference(mean(value)) "
+            f"FROM {FLOORS[floor]['sensor_item']} "
+            f"where time > now() - {daysago}d "
+            f"group by time({minutegrouping}m) "
+            "fill(linear) "
+        )
+        logger.info(query)
+        resp = await pers.influxdb.dframe_query(query) * (60 / minutegrouping)
+
+        # Crop away impossible derivatives:
+        resp = resp[resp < 6]
+        resp = resp[resp > -2]
+        resp.hist(bins=30)
+        pyplot.title(floor)
+        pyplot.axvline(x=FLOORS[floor]["heating_rate"], color="red", linewidth=2)
+        pyplot.axvline(x=0, color="black", linewidth=2)
+        pyplot.axvline(x=FLOORS[floor]["cooling_rate"], color="red", linewidth=2)
+        pyplot.show()
+
+
 async def main(
     pers=None,
     dryrun=False,
@@ -173,29 +204,14 @@ async def main(
     else:
         selected_floors = floors
 
-    if analyze:
-        daysago = 30
-        minutegrouping = 10
-        for floor in selected_floors:
-            query = (
-                f"SELECT difference(mean(value)) "
-                f"FROM {FLOORS[floor]['sensor_item']} "
-                f"where time > now() - {daysago}d "
-                f"group by time({minutegrouping}m)"
-            )
-            logger.info(query)
-            resp = await pers.influxdb.dframe_query(query) * (60 / minutegrouping)
-
-            # Crop away impossible derivatives:
-            resp = resp[resp < 6]
-            resp = resp[resp > -2]
-            resp.hist(bins=30)
-            pyplot.title(floor)
-            pyplot.show()
-        return
-
     if hoursago > 0 or minutesago > 0:
         assert dryrun is True, "Only dryrun when jumping back in history"
+
+    if analyze:
+        await analyze_history(pers, selected_floors)
+        if closepers:
+            await pers.aclose()
+        return
 
     prices_df = await pers.tibber.get_prices()
     if not vacation or vacation == "auto":
@@ -331,7 +347,7 @@ async def main(
             )
 
         if plot:
-            plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
+            # plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
             fig, ax = pyplot.subplots()
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
@@ -355,10 +371,6 @@ async def main(
         await pers.aclose()
 
 
-TEMPERATURE_RESOLUTION = 10000
-# If the temperature resolution is too low, it will make the decisions
-# unstable for short timespans. It is tempting to keep it low to allow
-# some sort of graph collapse.
 def int_temp(temp):
     return int(temp * TEMPERATURE_RESOLUTION)
 
@@ -511,7 +523,8 @@ def heatreservoir_temp_cost_graph(
                 rel_kwh = rel_temp_inc * full_kwh
                 cost = rel_kwh * hightemp_penalty * powerprice
                 # logger.info(
-                #    f"Adding extra edge {temp} to {inter_temp} at cost {cost}, full cost is {full_kwh*powerprice}"
+                #    f"Adding extra edge {temp} to {inter_temp} at cost {cost}, "
+                #    "full cost is {full_kwh*powerprice}"
                 # )
                 graph.add_edge(
                     (tstamp, int_temp(temp)),
