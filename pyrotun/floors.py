@@ -117,6 +117,18 @@ FLOORS = {
         "maxtemp": 30,
         "backup_setpoint": 15,
     },
+    "Vaskerom": {
+        "sensor_item": "Termostat_Vaskerom_SensorGulv",
+        "setpoint_item": "Termostat_Vaskerom_SetpointHeating",
+        "delta": -2,  # relative to master-temp at 25, adapt to sensor and wish.
+        "setpoint_base": "temperature",
+        "heating_rate": 1,
+        "cooling_rate": -0.36,
+        "setpoint_force": 2,
+        "wattage": 800,
+        "maxtemp": 30,
+        "backup_setpoint": 15,
+    },
     "Vaskegang": {
         "sensor_item": "Termostat_Vaskegang_SensorTemperature",
         "setpoint_item": "Termostat_Vaskegang_SetpointHeating",
@@ -124,6 +136,18 @@ FLOORS = {
         "setpoint_base": "temperature",
         "heating_rate": 3,
         "cooling_rate": -0.3,
+        "setpoint_force": 8,
+        "wattage": 800,
+        "maxtemp": 30,
+        "backup_setpoint": 15,
+    },
+    "Syrom": {
+        "sensor_item": "Termostat_Syrom_SensorGulv",
+        "setpoint_item": "Termostat_Syrom_SetpointHeating",
+        "delta": -4,  # relative to master-temp at 25, adapt to sensor and wish.
+        "setpoint_base": "temperature",
+        "heating_rate": 1,
+        "cooling_rate": -0.4,
         "setpoint_force": 8,
         "wattage": 800,
         "maxtemp": 30,
@@ -347,7 +371,7 @@ async def main(
             logger.info(
                 "Will turn floor %s on at %s",
                 floor,
-                np.datetime_as_string(first_on_timestamp, unit="m", timezone=tz)
+                np.datetime_as_string(first_on_timestamp, unit="m", timezone=tz),
             )
         except IndexError:
             logger.info(
