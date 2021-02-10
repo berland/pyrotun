@@ -259,13 +259,24 @@ async def main(
         else:
             delta = 0
 
+        tz = pytz.timezone(os.getenv("TIMEZONE"))
         starttime = (
             datetime.datetime.now()
             - datetime.timedelta(hours=hoursago)
             - datetime.timedelta(minutes=minutesago)
-        )
-        tz = pytz.timezone(os.getenv("TIMEZONE"))
-        starttime = starttime.astimezone(tz)
+        ).astimezone(tz)
+
+        # Refactoring suggestion:
+        # result = optimize_floor(floor, starttime, starttemp, prices_df, vacation, freq,
+        #                         future_temp_callback=None, min_temp_callback=None)
+        # Example returned:
+        # result = {"now": True,
+        #           "next_on": datetime.datetime, if now is True, then this could be in the past.
+        #           "cost": 2.1,  # NOK
+        #           "kwh":  3.3 # KWh
+        #  }
+        # * Function should be testable
+        # * Function should be usable for estimating savings.
         graph = heatreservoir_temp_cost_graph(
             starttime=starttime,
             starttemp=currenttemp,
@@ -336,9 +347,7 @@ async def main(
             logger.info(
                 "Will turn floor %s on at %s",
                 floor,
-                # first_on_timestamp,
                 np.datetime_as_string(first_on_timestamp, unit="m", timezone=tz)
-                # pd.Timestamp(first_on_timestamp).tz_localize(tz),
             )
         except IndexError:
             logger.info(
@@ -457,6 +466,15 @@ def heatreservoir_temp_cost_graph(
         for temp in temps[tstamp]:
             # This is Explicit Euler solution of the underlying
             # differential equation, predicting future temperature:
+
+            #  future_temps_callback(temp, t_delta_hours, powerprice,
+            #           wattage, cooling_rate, heating_rate)
+            # Returns list of dict:
+            # [  {"temp": 23.1, "cost": 0, "kwh": 0},
+            #    {"temp": 25.1, "cost": 2, "kwh": 1}]
+            # This function can also be called for a list of future temperatures,
+            # then it will compute andthe cost of going there.
+
             assert cooling_rate < 0
             no_heater_temp = temp + cooling_rate * t_delta_hours
             min_temp = max(
