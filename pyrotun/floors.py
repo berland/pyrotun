@@ -55,7 +55,7 @@ FLOORS = {
         "cooling_rate": -0.4,
         "setpoint_force": 1,
         "wattage": 600,
-        "maxtemp": 31,
+        "maxtemp": 33,
         "backup_setpoint": 24,
     },
     "Bad_Kjeller": {
@@ -66,7 +66,7 @@ FLOORS = {
         "cooling_rate": -0.4,
         "setpoint_force": 1,
         "wattage": 1000,
-        "maxtemp": 31,
+        "maxtemp": 33,
         "backup_setpoint": 24,
     },
     "Sofastue": {
@@ -86,7 +86,7 @@ FLOORS = {
         "setpoint_item": "Termostat_Tvstue_SetpointHeating",
         "delta": -2,  # relative to master-temp at 25, adapt to sensor and wish.
         "setpoint_base": "target",
-        "heating_rate": 1,
+        "heating_rate": 0.6,
         "cooling_rate": -0.3,
         "setpoint_force": 3,
         "wattage": 600,
