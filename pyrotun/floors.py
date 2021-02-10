@@ -26,7 +26,7 @@ FLOORS = {
     "Andre": {
         "sensor_item": "Sensor_Andretak_temperatur",  # "Termostat_Andre_SensorGulv",
         "setpoint_item": "Termostat_Andre_SetpointHeating",
-        "setpoint_base": "target",  # means not relative to current temp
+        "setpoint_base": "target",  # means not relative to current temp, use for air sensors.
         "delta": -1,
         "heating_rate": 0.9,  # degrees/hour
         "cooling_rate": -0.6,  # degrees/hour
@@ -85,7 +85,7 @@ FLOORS = {
         "sensor_item": "Termostat_Tvstue_SensorGulv",
         "setpoint_item": "Termostat_Tvstue_SetpointHeating",
         "delta": -2,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
+        "setpoint_base": "target",
         "heating_rate": 1,
         "cooling_rate": -0.3,
         "setpoint_force": 3,
@@ -97,7 +97,7 @@ FLOORS = {
         "sensor_item": "Termostat_Gangoppe_SensorGulv",
         "setpoint_item": "Termostat_Gangoppe_SetpointHeating",
         "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
+        "setpoint_base": "target",
         "heating_rate": 0.3,
         "cooling_rate": -0.2,
         "setpoint_force": 3,
@@ -109,10 +109,10 @@ FLOORS = {
         "sensor_item": "Termostat_Bakgang_SensorGulv",
         "setpoint_item": "Termostat_Bakgang_SetpointHeating",
         "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
+        "setpoint_base": "target",
         "heating_rate": 2,
         "cooling_rate": -0.36,
-        "setpoint_force": 2,
+        "setpoint_force": 3,
         "wattage": 800,
         "maxtemp": 30,
         "backup_setpoint": 15,
@@ -121,10 +121,10 @@ FLOORS = {
         "sensor_item": "Termostat_Vaskerom_SensorGulv",
         "setpoint_item": "Termostat_Vaskerom_SetpointHeating",
         "delta": -2,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
+        "setpoint_base": "target",
         "heating_rate": 1,
         "cooling_rate": -0.36,
-        "setpoint_force": 2,
+        "setpoint_force": 9,
         "wattage": 800,
         "maxtemp": 30,
         "backup_setpoint": 15,
@@ -133,7 +133,7 @@ FLOORS = {
         "sensor_item": "Termostat_Vaskegang_SensorTemperature",
         "setpoint_item": "Termostat_Vaskegang_SetpointHeating",
         "delta": -3,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
+        "setpoint_base": "target",
         "heating_rate": 3,
         "cooling_rate": -0.3,
         "setpoint_force": 8,
@@ -145,7 +145,7 @@ FLOORS = {
         "sensor_item": "Termostat_Syrom_SensorGulv",
         "setpoint_item": "Termostat_Syrom_SetpointHeating",
         "delta": -4,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
+        "setpoint_base": "target",
         "heating_rate": 1,
         "cooling_rate": -0.4,
         "setpoint_force": 8,
