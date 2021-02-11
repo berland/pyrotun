@@ -32,7 +32,7 @@ FLOORS = {
         "cooling_rate": -0.6,  # degrees/hour
         "setpoint_force": 9,
         "wattage": 600,
-        "maxtemp": 27,
+        "maxtemp": 26,
         "backup_setpoint": 20,
     },
     "Leane": {
@@ -44,7 +44,7 @@ FLOORS = {
         "cooling_rate": -0.55,  # degrees/hour
         "setpoint_force": 9,
         "wattage": 600,
-        "maxtemp": 27,
+        "maxtemp": 26,
         "backup_setpoint": 20,
     },
     "Bad_Oppe": {
@@ -78,7 +78,7 @@ FLOORS = {
         "cooling_rate": -0.3,
         "setpoint_force": 2,
         "wattage": 1700,
-        "maxtemp": 27,
+        "maxtemp": 26,  # actual measurements are +1
         "backup_setpoint": 20,
     },
     "Tvstue": {
