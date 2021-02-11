@@ -3,6 +3,7 @@ import asyncio
 import networkx
 import datetime
 import itertools
+import random
 
 import argparse
 import pytz
@@ -382,7 +383,7 @@ async def main(
             )
 
         if plot:
-            plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
+            # plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
             fig, ax = pyplot.subplots()
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
@@ -560,13 +561,19 @@ def heatreservoir_temp_cost_graph(
             no_heater_temp = temp + cooling_rate * t_delta_hours
             heater_on_temp = temp + heating_rate * t_delta_hours
 
-            next_temps = [
+
+            inter_temps = [
                 t for t in temps[next_tstamp] if no_heater_temp < t < heater_on_temp
             ]
-            if not next_temps:
+            if not inter_temps:
                 continue
+            if len(inter_temps) > 5:
+                # When we are "far" out in the graph, we don't need
+                # every possible choice. It is the first three or
+                # four steps that matter for stability
+                inter_temps = random.sample(inter_temps, 5)
             full_kwh = wattage / 1000 * t_delta_hours
-            for inter_temp in next_temps:
+            for inter_temp in inter_temps:
                 rel_temp_inc = (inter_temp - no_heater_temp) / (
                     heater_on_temp - no_heater_temp
                 )
@@ -585,21 +592,6 @@ def heatreservoir_temp_cost_graph(
                     kwh=kwh,
                     tempdeviation=abs(inter_temp - temp),
                 )
-
-        # We need additional no-heater edges to temperatures similar to no-heater
-        # with zero cost:
-        # for temp in temps[tstamp]:
-        #    lower_next_temps = [t for t in temps[next_tstamp] if t < temp]
-        #    lower = sorted(lower_next_temps)
-        #    for lower_next_temp in lower[-2:]:
-        #        # logger.info(f"Adding extra edge {temp} to {lower_next_temp}")
-        #        graph.add_edge(
-        #            (tstamp, int_temp(temp)),
-        #            (next_tstamp, int_temp(lower_next_temp)),
-        #            cost=0,
-        #            kwh=0,
-        #            tempdeviation=0,
-        #        )
 
     logger.info(
         f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
