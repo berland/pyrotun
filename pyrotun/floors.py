@@ -324,7 +324,9 @@ async def main(
                     datetime.datetime.now(), vacation=vacation, prices=None, delta=delta
                 )
                 await pers.openhab.set_item(
-                    FLOORS[floor]["setpoint_item"], str(min_temp), log=True
+                    FLOORS[floor]["setpoint_item"],
+                    str(min_temp + FLOORS[floor]["setpoint_force"]),
+                    log=True,
                 )
             continue
 
