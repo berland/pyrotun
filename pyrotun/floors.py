@@ -130,7 +130,7 @@ FLOORS = {
         "backup_setpoint": 15,
     },
     "Vaskegang": {
-        "sensor_item": "Termostat_Vaskegang_SensorTemperature",
+        "sensor_item": "Sensor_Vaskegang_gulv_temperatur",
         "setpoint_item": "Termostat_Vaskegang_SetpointHeating",
         "delta": -3,  # relative to master-temp at 25, adapt to sensor and wish.
         "setpoint_base": "target",
