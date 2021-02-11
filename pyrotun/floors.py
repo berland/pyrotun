@@ -17,7 +17,7 @@ from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)
 
-TEMPERATURE_RESOLUTION = 10000
+TEMPERATURE_RESOLUTION = 1000
 """If the temperature resolution is too low, it will make the decisions
 unstable for short timespans. It is tempting to keep it low to allow
 some sort of graph collapse."""
@@ -382,7 +382,7 @@ async def main(
             )
 
         if plot:
-            # plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
+            plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
             fig, ax = pyplot.subplots()
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
@@ -484,11 +484,19 @@ def heatreservoir_temp_cost_graph(
     # Loop over all datetimes, and inject nodes and possible edges
     for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
         temps[next_tstamp] = []
-        temps[tstamp] = list(set(temps[tstamp]))
-        temps[tstamp].sort()
+
+        # Collapse similar temperatures:
+        int_temps = list(set([int_temp(temp) for temp in temps[tstamp]]))
+        int_temps.sort()
+        temps[tstamp] = [float_temp(inttemp) for inttemp in int_temps]
+
         powerprice = dframe.loc[tstamp]["NOK/KWh"]
         t_delta = next_tstamp - tstamp
         t_delta_hours = float(t_delta.value) / 1e9 / 60 / 60  # from nanoseconds
+
+        logger.debug(
+            " (graph building at %s, %d temps)", str(tstamp), len(temps[tstamp])
+        )
         for temp in temps[tstamp]:
             # This is Explicit Euler solution of the underlying
             # differential equation, predicting future temperature:
@@ -622,20 +630,20 @@ def plot_graph(graph, ax=None, show=False):
     if ax is None:
         fig, ax = pyplot.subplots()
 
-    if len(graph.edges) < 100000:
-        logger.info("Plotting some graph edges, wait for it..")
-        counter = 0
-        for edge_0, edge_1, data in graph.edges(data=True):
-            counter += 1
-            pd.DataFrame(
-                [
-                    {"index": edge_0[0], "temp": edge_0[1]},
-                    {"index": edge_1[0], "temp": edge_1[1]},
-                ]
-            ).plot(x="index", y="temp", ax=ax, legend=False)
-            if counter > 100:
-                break
-    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(100)
+    logger.info("Plotting some graph edges, wait for it..")
+    counter = 0
+    maxnodes = 200
+    for edge_0, edge_1, data in graph.edges(data=True):
+        counter += 1
+        pd.DataFrame(
+            [
+                {"index": edge_0[0], "temp": edge_0[1]},
+                {"index": edge_1[0], "temp": edge_1[1]},
+            ]
+        ).plot(x="index", y="temp", ax=ax, legend=False)
+        if counter > maxnodes:
+            break
+    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(maxnodes)
 
     logger.info("Plotting all graph nodes..")
     nodes_df.plot.scatter(x="index", y="temp", ax=ax)
