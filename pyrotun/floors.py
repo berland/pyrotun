@@ -43,7 +43,6 @@ FLOORS = {
     }
 }
 
-# Path("floors.yml").write_text(yaml.dump(FLOORS))
 TIMEDELTA_MINUTES = 10  # minimum is 8 minutes!!
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 VACATION_ITEM = "Ferie"
@@ -92,9 +91,11 @@ async def main(
     assert hoursago >= 0
     assert minutesago >= 0
 
-    if Path(FLOORSFILE).exists():
+    if (Path(__file__).parent / FLOORSFILE).exists():
         logger.info("Loading floor configuration from %s", FLOORSFILE)
-        FLOORS = yaml.safe_load(Path(FLOORSFILE).read_text())
+        FLOORS = yaml.safe_load((Path(__file__).parent / FLOORSFILE).read_text())
+    else:
+        logger.warning("Did not find yml file with floor configuration, dummy run")
 
     closepers = False
     if pers is None:
@@ -161,6 +162,19 @@ async def main(
             delta = FLOORS[floor]["delta"]
         else:
             delta = 0
+
+        if currenttemp > FLOORS[floor]["maxtemp"]:
+            logger.info("Floor is above allowed maxtemp, turning OFF")
+            if not dryrun:
+                min_temp = temp_requirement(
+                    datetime.datetime.now(), vacation=vacation, prices=None, delta=delta
+                )
+                await pers.openhab.set_item(
+                    FLOORS[floor]["setpoint_item"],
+                    str(min_temp - FLOORS[floor]["setpoint_force"]),
+                    log=True,
+                )
+            continue
 
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         starttime = (
