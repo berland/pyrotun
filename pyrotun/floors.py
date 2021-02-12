@@ -43,7 +43,7 @@ FLOORS = {
     }
 }
 
-TIMEDELTA_MINUTES = 10  # minimum is 8 minutes!!
+TIMEDELTA_MINUTES = 60  # minimum is 8 minutes!!
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 VACATION_ITEM = "Ferie"
 
@@ -226,6 +226,7 @@ async def main(
         if plot:
             plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
 
+        logger.debug("Finding shortest path in the graph for %s", floor)
         opt_results = analyze_graph(
             graph, starttemp=currenttemp, endtemp=0, starttime=starttime
         )
@@ -428,6 +429,7 @@ def heatreservoir_temp_cost_graph(
             if min_temp < heater_on_temp < maxtemp:
                 kwh = wattage / 1000 * t_delta_hours
                 hightemp_penalty = 1 + (heater_on_temp - 15) / 20 / 100
+                print(f"penalty {hightemp_penalty:.5f} going to x{heater_on_temp:.3f}")
                 # Small penalty for high temps.
                 # The penalty is critical for the algorithm to be stable,
                 # and favours keeping the temperature as low as possible.
@@ -471,6 +473,7 @@ def heatreservoir_temp_cost_graph(
                     heater_on_temp - no_heater_temp
                 )
                 hightemp_penalty = 1 + (inter_temp - 15) / 20 / 100
+                print(f"penalty {hightemp_penalty:.5f} going to {inter_temp:.3f}")
                 assert 0 < rel_temp_inc < 1
                 rel_kwh = rel_temp_inc * full_kwh
                 cost = rel_kwh * hightemp_penalty * powerprice
@@ -517,7 +520,7 @@ def plot_graph(graph, ax=None, show=False):
 
     logger.info("Plotting some graph edges, wait for it..")
     counter = 0
-    maxnodes = 200
+    maxnodes = 400
     for edge_0, edge_1, data in graph.edges(data=True):
         counter += 1
         pd.DataFrame(
@@ -526,6 +529,8 @@ def plot_graph(graph, ax=None, show=False):
                 {"index": edge_1[0], "temp": edge_1[1]},
             ]
         ).plot(x="index", y="temp", ax=ax, legend=False)
+        mid_time = edge_0[0] + (edge_1[0] - edge_0[0]) / 2
+        pyplot.text(mid_time, (edge_0[1] + edge_1[1]) / 2, str(round(data["cost"], 4)))
         if counter > maxnodes:
             break
     nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(maxnodes)
@@ -619,21 +624,6 @@ def path_kwh(graph, path):
     return [graph.edges[path[i], path[i + 1]]["kwh"] for i in range(len(path) - 1)]
 
 
-def shortest_paths(graph, k=5, starttemp=60, endtemp=60, now=datetime.datetime.now()):
-    """Return the k shortest paths. Runtime is K*N**3, too much
-    for practical usage"""
-    startnode = find_node(graph, now - pd.Timedelta("1h"), int_temp(starttemp))
-    endnode = find_node(graph, now + pd.Timedelta("48h"), int_temp(endtemp))
-    # Path generator:
-    return list(
-        itertools.islice(
-            networkx.shortest_simple_paths(
-                graph, source=startnode, target=endnode, weight="cost"
-            ),
-            k,
-        )
-    )
-
 
 def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
     """Find shortest path, and do some extra calculations for estimating
@@ -648,24 +638,15 @@ def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
     endnode = find_node(graph, starttime + pd.Timedelta("48h"), endtemp)
     logger.debug(f"endnode is {endnode}")
     path = networkx.shortest_path(
-        graph, source=startnode, target=endnode, weight="cost"
-    )
-    no_opt_path = networkx.shortest_path(
-        graph, source=startnode, target=endnode, weight="tempdeviation"
+        graph, source=endnode, target=startnode, weight="cost"
     )
     opt_cost = sum(path_costs(graph, path))
-    no_opt_cost = sum(path_costs(graph, no_opt_path))
     kwh = sum(path_kwh(graph, path))
-    savings = no_opt_cost - opt_cost
     timespan = (endnode[0] - startnode[0]).value / 1e9 / 60 / 60  # from nanoseconds
-    savings24h = savings / float(timespan) * 24.0
     return {
         "opt_cost": opt_cost,
-        "no_opt_cost": no_opt_cost,
-        "savings24h": savings24h,
         "kwh": kwh,
         "opt_path": path,
-        "no_opt_path": no_opt_path,
     }
 
 
