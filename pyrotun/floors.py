@@ -4,6 +4,8 @@ import networkx
 import datetime
 import itertools
 import random
+import yaml
+from pathlib import Path
 
 import argparse
 import pytz
@@ -18,158 +20,30 @@ from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)
 
-TEMPERATURE_RESOLUTION = 1000
+TEMPERATURE_RESOLUTION = 10000
 """If the temperature resolution is too low, it will make the decisions
 unstable for short timespans. It is tempting to keep it low to allow
 some sort of graph collapse."""
 
+
+FLOORSFILE = "floors.yml"
+# If the above file exists, it will overwrite the FLOORS variable.
 FLOORS = {
-    "Andre": {
-        "sensor_item": "Sensor_Andretak_temperatur",  # "Termostat_Andre_SensorGulv",
-        "setpoint_item": "Termostat_Andre_SetpointHeating",
-        "setpoint_base": "target",  # means not relative to current temp, use for air sensors.
-        "delta": -1,
-        "heating_rate": 0.9,  # degrees/hour
-        "cooling_rate": -0.6,  # degrees/hour
-        "setpoint_force": 9,
-        "wattage": 600,
-        "maxtemp": 26,
-        "backup_setpoint": 20,
-    },
-    "Leane": {
-        "sensor_item": "Sensor_Leanetak_temperatur",
-        "setpoint_item": "Termostat_Leane_SetpointHeating",
-        "delta": -1,
-        "setpoint_base": "target",
-        "heating_rate": 1,  # degrees/hour
-        "cooling_rate": -0.55,  # degrees/hour
-        "setpoint_force": 9,
-        "wattage": 600,
-        "maxtemp": 26,
-        "backup_setpoint": 20,
-    },
-    "Bad_Oppe": {
-        "sensor_item": "Termostat_Bad_Oppe_SensorGulv",
-        "setpoint_item": "Termostat_Bad_Oppe_SetpointHeating",
-        "setpoint_base": "temperature",
+    # This serves as an example:
+    "Bad": {
+        "sensor_item": "Termostat_Bad_SensorGulv",
+        "setpoint_item": "Termostat_Bad_SetpointHeating",
+        "setpoint_base": "temperature",  # or "target"
         "heating_rate": 5,
         "cooling_rate": -0.4,
         "setpoint_force": 1,
         "wattage": 600,
         "maxtemp": 33,
         "backup_setpoint": 24,
-    },
-    "Bad_Kjeller": {
-        "sensor_item": "Termostat_Bad_Kjeller_SensorGulv",
-        "setpoint_item": "Termostat_Bad_Kjeller_SetpointHeating",
-        "setpoint_base": "temperature",
-        "heating_rate": 4,
-        "cooling_rate": -0.4,
-        "setpoint_force": 1,
-        "wattage": 1000,
-        "maxtemp": 33,
-        "backup_setpoint": 24,
-    },
-    "Sofastue": {
-        "sensor_item": "Termostat_Sofastue_SensorGulv",
-        "setpoint_item": "Termostat_Sofastue_SetpointHeating",
-        "setpoint_base": "temperature",
-        "delta": -2,
-        "heating_rate": 1,
-        "cooling_rate": -0.3,
-        "setpoint_force": 2,
-        "wattage": 1700,
-        "maxtemp": 26,  # actual measurements are +1
-        "backup_setpoint": 20,
-    },
-    "Tvstue": {
-        "sensor_item": "Termostat_Tvstue_SensorGulv",
-        "setpoint_item": "Termostat_Tvstue_SetpointHeating",
-        "delta": -2,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
-        "heating_rate": 0.6,
-        "cooling_rate": -0.3,
-        "setpoint_force": 3,
-        "wattage": 600,
-        "maxtemp": 27,
-        "backup_setpoint": 20,
-    },
-    "Gangoppe": {
-        "sensor_item": "Termostat_Gangoppe_SensorGulv",
-        "setpoint_item": "Termostat_Gangoppe_SetpointHeating",
-        "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
-        "heating_rate": 0.3,
-        "cooling_rate": -0.2,
-        "setpoint_force": 4,
-        "wattage": 600,
-        "maxtemp": 27,
-        "backup_setpoint": 20,
-    },
-    "Bakgang": {
-        "sensor_item": "Termostat_Bakgang_SensorGulv",
-        "setpoint_item": "Termostat_Bakgang_SetpointHeating",
-        "delta": -5,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
-        "heating_rate": 2,
-        "cooling_rate": -0.36,
-        "setpoint_force": 3,
-        "wattage": 800,
-        "maxtemp": 30,
-        "backup_setpoint": 15,
-    },
-    "Vaskerom": {
-        "sensor_item": "Termostat_Vaskerom_SensorGulv",
-        "setpoint_item": "Termostat_Vaskerom_SetpointHeating",
-        "delta": -2,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "target",
-        "heating_rate": 1,
-        "cooling_rate": -0.36,
-        "setpoint_force": 9,
-        "wattage": 800,
-        "maxtemp": 30,
-        "backup_setpoint": 15,
-    },
-    "Vaskegang": {
-        "sensor_item": "Sensor_Vaskegang_gulv_temperatur",
-        "setpoint_item": "Termostat_Vaskegang_SetpointHeating",
-        "delta": -3,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "target",
-        "heating_rate": 3,
-        "cooling_rate": -0.3,
-        "setpoint_force": 8,
-        "wattage": 800,
-        "maxtemp": 30,
-        "backup_setpoint": 15,
-    },
-    "Syrom": {
-        "sensor_item": "Termostat_Syrom_SensorGulv",
-        "setpoint_item": "Termostat_Syrom_SetpointHeating",
-        "delta": -4,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "target",
-        "heating_rate": 1,
-        "cooling_rate": -0.4,
-        "setpoint_force": 8,
-        "wattage": 800,
-        "maxtemp": 30,
-        "backup_setpoint": 15,
-    },
-    "Inngang": {
-        "sensor_item": "Termostat_Inngang_SensorGulv",
-        "setpoint_item": [
-            "Termostat_Inngang_SetpointHeating",
-            "Termostat_Langgang_Nede_SetpointHeating",
-        ],
-        "delta": 0,  # relative to master-temp at 25, adapt to sensor and wish.
-        "setpoint_base": "temperature",
-        "heating_rate": 0.4,
-        "cooling_rate": -0.6,
-        "setpoint_force": 6,
-        "wattage": 600,
-        "maxtemp": 32,
-        "backup_setpoint": 23,
-    },
+    }
 }
+
+# Path("floors.yml").write_text(yaml.dump(FLOORS))
 TIMEDELTA_MINUTES = 10  # minimum is 8 minutes!!
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 VACATION_ITEM = "Ferie"
@@ -217,6 +91,10 @@ async def main(
     """Called from service or interactive"""
     assert hoursago >= 0
     assert minutesago >= 0
+
+    if Path(FLOORSFILE).exists():
+        logger.info("Loading floor configuration from %s", FLOORSFILE)
+        FLOORS = yaml.safe_load(Path(FLOORSFILE).read_text())
 
     closepers = False
     if pers is None:
@@ -331,6 +209,9 @@ async def main(
                 )
             continue
 
+        if plot:
+            plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
+
         opt_results = analyze_graph(
             graph, starttemp=currenttemp, endtemp=0, starttime=starttime
         )
@@ -383,7 +264,6 @@ async def main(
             )
 
         if plot:
-            # plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
             fig, ax = pyplot.subplots()
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
@@ -561,17 +441,16 @@ def heatreservoir_temp_cost_graph(
             no_heater_temp = temp + cooling_rate * t_delta_hours
             heater_on_temp = temp + heating_rate * t_delta_hours
 
-
             inter_temps = [
                 t for t in temps[next_tstamp] if no_heater_temp < t < heater_on_temp
             ]
             if not inter_temps:
                 continue
-            if len(inter_temps) > 5:
+            if len(inter_temps) > 7:
                 # When we are "far" out in the graph, we don't need
                 # every possible choice. It is the first three or
                 # four steps that matter for stability
-                inter_temps = random.sample(inter_temps, 5)
+                inter_temps = random.sample(inter_temps, 7)
             full_kwh = wattage / 1000 * t_delta_hours
             for inter_temp in inter_temps:
                 rel_temp_inc = (inter_temp - no_heater_temp) / (
