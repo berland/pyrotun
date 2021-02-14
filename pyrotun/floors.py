@@ -2,7 +2,6 @@ import os
 import asyncio
 import networkx
 import datetime
-import itertools
 import random
 import yaml
 from pathlib import Path
@@ -80,6 +79,7 @@ async def main(
     pers=None,
     dryrun=False,
     plot=False,
+    plotnodes=False,
     floors=None,
     freq="10min",
     vacation="auto",
@@ -191,6 +191,9 @@ async def main(
         #           "next_on": datetime.datetime, if now is True, then this could be in the past.
         #           "cost": 2.1,  # NOK
         #           "kwh":  3.3 # KWh
+        #           "path": path
+        #           "on_in_minutes":  float
+        #           "off_in_Minutes": float
         #  }
         # * Function should be testable
         # * Function should be usable for estimating savings.
@@ -223,7 +226,7 @@ async def main(
                 )
             continue
 
-        if plot:
+        if plotnodes:
             plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
 
         logger.debug("Finding shortest path in the graph for %s", floor)
@@ -364,7 +367,7 @@ def heatreservoir_temp_cost_graph(
 
     dframe = dframe[dframe.index < starttime + pd.Timedelta(maxhours, unit="hour")]
     dframe = dframe.ffill().bfill()
-    dframe = dframe[dframe.index >= starttime]
+    dframe = dframe[dframe.index > starttime]
     logger.debug(dframe.head())
 
     # Build Graph, starting with current temperature
@@ -381,10 +384,8 @@ def heatreservoir_temp_cost_graph(
     for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
         temps[next_tstamp] = []
 
-        # Collapse similar temperatures:
-        int_temps = list(set([int_temp(temp) for temp in temps[tstamp]]))
-        int_temps.sort()
-        temps[tstamp] = [float_temp(inttemp) for inttemp in int_temps]
+        # Collapse similar temperatures
+        temps[tstamp] = list(set(temps[tstamp]))
 
         powerprice = dframe.loc[tstamp]["NOK/KWh"]
         t_delta = next_tstamp - tstamp
@@ -406,7 +407,7 @@ def heatreservoir_temp_cost_graph(
             # then it will compute andthe cost of going there.
 
             assert cooling_rate < 0
-            no_heater_temp = temp + cooling_rate * t_delta_hours
+            no_heater_temp = float_temp(int_temp(temp + cooling_rate * t_delta_hours))
             min_temp = max(
                 temp_requirement(
                     tstamp, vacation=vacation, prices=prices_df, delta=delta
@@ -425,16 +426,12 @@ def heatreservoir_temp_cost_graph(
                 )
                 if tstamp == first_tstamp:
                     logger.debug(f"Adding edge for no-heater to temp {no_heater_temp}")
-            heater_on_temp = temp + heating_rate * t_delta_hours
+            heater_on_temp = float_temp(int_temp(temp + heating_rate * t_delta_hours))
             if min_temp < heater_on_temp < maxtemp:
                 kwh = wattage / 1000 * t_delta_hours
-                hightemp_penalty = 1 + (heater_on_temp - 15) / 20 / 100
-                print(f"penalty {hightemp_penalty:.5f} going to x{heater_on_temp:.3f}")
-                # Small penalty for high temps.
-                # The penalty is critical for the algorithm to be stable,
-                # and favours keeping the temperature as low as possible.
-                # logger.debug(f"Penalty at {heater_on_temp} is {hightemp_penalty}")
-                cost = kwh * hightemp_penalty * powerprice
+                cost = kwh * powerprice + hightemp_penalty(
+                    heater_on_temp, powerprice, t_delta_hours
+                )  # Unit NOK
 
                 # Add edge for heater-on:
                 temps[next_tstamp].append(heater_on_temp)
@@ -472,11 +469,11 @@ def heatreservoir_temp_cost_graph(
                 rel_temp_inc = (inter_temp - no_heater_temp) / (
                     heater_on_temp - no_heater_temp
                 )
-                hightemp_penalty = 1 + (inter_temp - 15) / 20 / 100
-                print(f"penalty {hightemp_penalty:.5f} going to {inter_temp:.3f}")
                 assert 0 < rel_temp_inc < 1
                 rel_kwh = rel_temp_inc * full_kwh
-                cost = rel_kwh * hightemp_penalty * powerprice
+                cost = rel_kwh * powerprice + hightemp_penalty(
+                    inter_temp, powerprice, t_delta_hours
+                )
                 # logger.info(
                 #    f"Adding extra edge {temp} to {inter_temp} at cost {cost}, "
                 #    "full cost is {full_kwh*powerprice}"
@@ -514,6 +511,16 @@ def heatreservoir_temp_cost_graph(
     return graph
 
 
+def hightemp_penalty(temp, powerprice, t_delta_hours):
+    # Add cost of 160W pr degree, spread on all heaters, say 10, so 16 watt pr degree.
+    # Positive values for all values > 15 degrees.
+
+    # Important to not return a positive number to have a stable algoritm.
+    overshoot_temp = max(temp - 15, 0.001)
+    extra_kwh = overshoot_temp * 16 / 1000
+    return powerprice * extra_kwh * t_delta_hours
+
+
 def plot_graph(graph, ax=None, show=False):
     if ax is None:
         fig, ax = pyplot.subplots()
@@ -530,7 +537,7 @@ def plot_graph(graph, ax=None, show=False):
             ]
         ).plot(x="index", y="temp", ax=ax, legend=False)
         mid_time = edge_0[0] + (edge_1[0] - edge_0[0]) / 2
-        pyplot.text(mid_time, (edge_0[1] + edge_1[1]) / 2, str(round(data["cost"], 4)))
+        pyplot.text(mid_time, (edge_0[1] + edge_1[1]) / 2, str(round(data["cost"], 5)))
         if counter > maxnodes:
             break
     nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(maxnodes)
@@ -624,7 +631,6 @@ def path_kwh(graph, path):
     return [graph.edges[path[i], path[i + 1]]["kwh"] for i in range(len(path) - 1)]
 
 
-
 def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
     """Find shortest path, and do some extra calculations for estimating
     savings. The savings must be interpreted carefully, and is
@@ -638,7 +644,7 @@ def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
     endnode = find_node(graph, starttime + pd.Timedelta("48h"), endtemp)
     logger.debug(f"endnode is {endnode}")
     path = networkx.shortest_path(
-        graph, source=endnode, target=startnode, weight="cost"
+        graph, source=startnode, target=endnode, weight="cost"
     )
     opt_cost = sum(path_costs(graph, path))
     kwh = sum(path_kwh(graph, path))
@@ -656,6 +662,7 @@ def get_parser():
         "--set", action="store_true", help="Actually submit setpoint to OpenHAB"
     )
     parser.add_argument("--plot", action="store_true", help="Make plots")
+    parser.add_argument("--plotnodes", action="store_true", help="Make node plots")
     parser.add_argument("--floors", nargs="*", help="Floornames")
     parser.add_argument(
         "--freq", type=str, help="Time frequency, default 10min", default="10min"
@@ -682,6 +689,7 @@ if __name__ == "__main__":
             pers=None,
             dryrun=not args.set,
             plot=args.plot,
+            plotnodes=args.plotnodes,
             floors=args.floors,
             freq=args.freq,
             vacation=args.vacation,
