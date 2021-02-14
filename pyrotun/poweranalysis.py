@@ -2,6 +2,7 @@ import os
 import argparse
 import asyncio
 import pytz
+import datetime
 
 from matplotlib import pyplot
 import pandas as pd
@@ -38,7 +39,21 @@ async def non_heating_powerusage(influx):
     # The cumulative series is perhaps regularly reset to zero.
 
 
-async def estimate_savings(pers, daycount, norway_daily_profile):
+async def estimate_savings_yesterday(pers, dryrun):
+    yesterday = datetime.date.today() - datetime.timedelta(hours=24)
+
+    norway_daily_profile = pd.read_csv("daypowerprofile.csv", comment="#")
+
+    results = await estimate_savings(pers, 2, norway_daily_profile, plot=False)
+    if not dryrun:
+        await pers.openhab.set_item(
+            "PowercostSavingsYesterday",
+            float(results.loc[yesterday]["savings"]),
+            log=True,
+        )
+
+
+async def estimate_savings(pers, daycount, norway_daily_profile, plot=False):
     """Calculate the savings from pre-heating house from Dijkstra
     optimization compared to a an average Norwegian 24h power usage profile"""
     tz = pytz.timezone(os.getenv("TIMEZONE"))
@@ -86,19 +101,23 @@ async def estimate_savings(pers, daycount, norway_daily_profile):
         )
     res = pd.DataFrame(results).set_index("date")
     print(res)
+    print(res.index.dtype)
     print("Total savings: " + str(res["savings"].sum()))
-    res.plot(y="savings")
-    pyplot.show()
+    if plot:
+        res.plot(y="savings")
+        pyplot.show()
+    return res
 
 
 async def main(pers=None):
     closepers = False
     if pers is None:
         pers = pyrotun.persist.PyrotunPersistence()
-        await pers.ainit(["influxdb"])
+        await pers.ainit(["influxdb", "openhab"])
         closepers = True
 
     norway_daily_profile = pd.read_csv("daypowerprofile.csv", comment="#")
+    # await estimate_savings_yesterday(pers, dryrun=False)
     await estimate_savings(pers, 30, norway_daily_profile)
 
     if closepers:

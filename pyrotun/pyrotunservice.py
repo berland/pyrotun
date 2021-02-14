@@ -81,6 +81,12 @@ async def polltibber():
     await pyrotun.polltibber.main(PERS)
 
 
+@aiocron.crontab(EVERY_MIDNIGHT)
+async def calc_power_savings_yesterday():
+    logger.info(" ** Calculating power cost savings yesterday")
+    await pyrotun.poweranalysis.estimate_savings_yesterday(PERS)
+
+
 @aiocron.crontab(EVERY_8_MINUTE)
 async def waterheater_controller():
     await asyncio.sleep(60)  # No need to overlap with bathfloor
