@@ -1,0 +1,132 @@
+Andre:
+  backup_setpoint: 20.0
+  cooling_rate: -0.4
+  delta: -1.0
+  heating_rate: 1.1
+  maxtemp: 26.0
+  sensor_item: Sensor_Andre_gulv_temperatur
+  setpoint_base: target
+  setpoint_force: 9.0
+  setpoint_item: Termostat_Andre_SetpointHeating
+  wattage: 600.0
+Bad_Kjeller:
+  backup_setpoint: 24
+  cooling_rate: -0.7
+  heating_rate: 4
+  maxtemp: 33
+  sensor_item: Termostat_Bad_Kjeller_SensorGulv
+  setpoint_base: temperature
+  setpoint_force: 1
+  setpoint_item: Termostat_Bad_Kjeller_SetpointHeating
+  wattage: 1000
+Bad_Oppe:
+  backup_setpoint: 24.0
+  cooling_rate: -0.6
+  heating_rate: 5.0
+  maxtemp: 33.0
+  sensor_item: Termostat_Bad_Oppe_SensorGulv
+  setpoint_base: temperature
+  setpoint_force: 1.0
+  setpoint_item: Termostat_Bad_Oppe_SetpointHeating
+  wattage: 600.0
+Bakgang:
+  backup_setpoint: 15
+  cooling_rate: -0.4
+  delta: -5
+  heating_rate: 2
+  maxtemp: 30
+  sensor_item: Termostat_Bakgang_SensorGulv
+  setpoint_base: temperature
+  setpoint_force: 3
+  setpoint_item: Termostat_Bakgang_SetpointHeating
+  wattage: 800
+Gangoppe:
+  backup_setpoint: 20
+  cooling_rate: -0.2
+  delta: -5
+  heating_rate: 0.3
+  maxtemp: 27
+  sensor_item: Termostat_Gangoppe_SensorGulv
+  setpoint_base: temperature
+  setpoint_force: 4
+  setpoint_item: Termostat_Gangoppe_SetpointHeating
+  wattage: 600
+Inngang:
+  backup_setpoint: 23
+  cooling_rate: -0.6
+  delta: 0
+  heating_rate: 0.5
+  maxtemp: 32
+  sensor_item: Termostat_Inngang_SensorGulv
+  setpoint_base: temperature
+  setpoint_force: 6
+  setpoint_item:
+  - Termostat_Inngang_SetpointHeating
+  - Termostat_Langgang_Nede_SetpointHeating
+  wattage: 600
+Leane:
+  backup_setpoint: 20
+  cooling_rate: -0.4
+  delta: -1
+  heating_rate: 1
+  maxtemp: 26
+  sensor_item: Sensor_Leane_gulv_temperatur
+  setpoint_base: target
+  setpoint_force: 9
+  setpoint_item: Termostat_Leane_SetpointHeating
+  wattage: 600
+Sofastue:
+  backup_setpoint: 20
+  cooling_rate: -0.3
+  delta: -2
+  heating_rate: 1
+  maxtemp: 26
+  sensor_item: Termostat_Sofastue_SensorGulv
+  setpoint_base: temperature
+  setpoint_force: 2
+  setpoint_item: Termostat_Sofastue_SetpointHeating
+  wattage: 1700
+Syrom:
+  backup_setpoint: 15
+  cooling_rate: -0.3
+  delta: -6
+  heating_rate: 0.5
+  maxtemp: 30
+  sensor_item: Termostat_Syrom_SensorGulv
+  setpoint_base: target
+  setpoint_force: 8
+  setpoint_item: Termostat_Syrom_SetpointHeating
+  wattage: 800
+Tvstue:
+  backup_setpoint: 20
+  cooling_rate: -0.6
+  delta: -2
+  heating_rate: 0.9
+  maxtemp: 27
+  sensor_item: Termostat_Tvstue_SensorGulv
+  setpoint_base: temperature
+  setpoint_force: 3
+  setpoint_item: Termostat_Tvstue_SetpointHeating
+  wattage: 600
+Vaskegang:
+  backup_setpoint: 15
+  cooling_rate: -0.3
+  delta: -6
+  heating_rate: 1
+  maxtemp: 30
+  sensor_item: Sensor_Vaskegang_gulv_temperatur
+  setpoint_base: target
+  setpoint_force: 8
+  setpoint_item: Termostat_Vaskegang_SetpointHeating
+  wattage: 800
+Vaskerom:
+  backup_setpoint: 15
+  cooling_rate: -0.36
+  delta: -2
+  heating_rate: 1
+  maxtemp: 30
+  sensor_item: Termostat_Vaskerom_SensorGulv
+  setpoint_base: target
+  setpoint_force: 9
+  setpoint_item: Termostat_Vaskerom_SetpointHeating
+  wattage: 800
