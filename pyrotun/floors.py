@@ -50,8 +50,13 @@ BACKUPSETPOINT = 22
 
 
 async def analyze_history(pers, selected_floors):
-    daysago = 30
+    daysago = 7
     minutegrouping = 10
+    if (Path(__file__).parent / FLOORSFILE).exists():
+        logger.info("Loading floor configuration from %s", FLOORSFILE)
+        FLOORS = yaml.safe_load((Path(__file__).parent / FLOORSFILE).read_text())
+    else:
+        logger.warning("Did not find yml file with floor configuration, dummy run")
     for floor in selected_floors:
         logger.info("Analyzing heating and cooling rates for floor %s", floor)
         query = (
@@ -451,8 +456,8 @@ def heatreservoir_temp_cost_graph(
         # between its corresponding no-heater and heater-temp, as we
         # should regard these as "reachable" for algorithm stability.
         for temp in temps[tstamp]:
-            no_heater_temp = temp + cooling_rate * t_delta_hours
-            heater_on_temp = temp + heating_rate * t_delta_hours
+            no_heater_temp = float_temp(int_temp(temp + cooling_rate * t_delta_hours))
+            heater_on_temp = float_temp(int_temp(temp + heating_rate * t_delta_hours))
 
             inter_temps = [
                 t for t in temps[next_tstamp] if no_heater_temp < t < heater_on_temp
@@ -474,10 +479,10 @@ def heatreservoir_temp_cost_graph(
                 cost = rel_kwh * powerprice + hightemp_penalty(
                     inter_temp, powerprice, t_delta_hours
                 )
-                # logger.info(
+                #logger.info(
                 #    f"Adding extra edge {temp} to {inter_temp} at cost {cost}, "
                 #    "full cost is {full_kwh*powerprice}"
-                # )
+                #)
                 graph.add_edge(
                     (tstamp, int_temp(temp)),
                     (next_tstamp, int_temp(inter_temp)),
