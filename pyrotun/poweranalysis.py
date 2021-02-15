@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import pytz
 import datetime
+from pathlib import Path
 
 from matplotlib import pyplot
 import pandas as pd
@@ -42,9 +43,7 @@ async def non_heating_powerusage(influx):
 async def estimate_savings_yesterday(pers, dryrun):
     yesterday = datetime.date.today() - datetime.timedelta(hours=24)
 
-    norway_daily_profile = pd.read_csv("daypowerprofile.csv", comment="#")
-
-    results = await estimate_savings(pers, 2, norway_daily_profile, plot=False)
+    results = await estimate_savings(pers, 2, get_daily_profile(), plot=False)
     if not dryrun:
         await pers.openhab.set_item(
             "PowercostSavingsYesterday",
@@ -116,12 +115,15 @@ async def main(pers=None):
         await pers.ainit(["influxdb", "openhab"])
         closepers = True
 
-    norway_daily_profile = pd.read_csv("daypowerprofile.csv", comment="#")
     # await estimate_savings_yesterday(pers, dryrun=False)
-    await estimate_savings(pers, 30, norway_daily_profile)
+    await estimate_savings(pers, 30, get_daily_profile())
 
     if closepers:
         await pers.aclose()
+
+
+def get_daily_profile():
+    return pd.read_csv(Path(__file__).parent / "daypowerprofile.csv", comment="#")
 
 
 def get_parser():
