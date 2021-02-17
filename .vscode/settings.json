@@ -4,5 +4,10 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "python.formatting.provider": "black"
+    "python.formatting.provider": "black",
+    "vim": {
+        "enableNeovim": true,
+        "neovimPath": "/usr/bin/nvim",
+        "disableAnnoyingNeovimMessage": false,
+      }
 }
