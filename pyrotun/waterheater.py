@@ -5,6 +5,7 @@ import os
 from typing import Tuple
 
 import dotenv
+import matplotlib.dates as mdates
 import networkx
 import pandas as pd
 import pytz
@@ -18,7 +19,7 @@ from pyrotun.connections import localpowerprice
 logger = pyrotun.getLogger(__name__)
 
 TIMEDELTA_MINUTES = 8  # minimum is 8 minutes!!
-ROUND = 1
+ROUND = 1  # Number of decimals in temperature accuracy for unique nodes
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 SENSOR_ITEM = "Varmtvannsbereder_temperatur"
 HEATERCONTROLLER_ITEM = "Varmtvannsbereder_bryter"
@@ -198,25 +199,36 @@ class WaterHeater:
             freq=PD_TIMEDELTA,
             tz=prices_df.index.tz,
         )
+
+        # Only timestamps after starttime is up for prediction:
+        datetimes = datetimes[datetimes > starttime]
+
+        # Delete timestamps mentioned in prices, for correct merging:
+        duplicates = []
+        for tstamp in datetimes:
+            if tstamp in prices_df.index:
+                duplicates.append(tstamp)
+        datetimes = datetimes.drop(duplicates)
+
         # If we are at 19:48 and timedelta is 15 minutes, we should
         # round down to 19:45:
-        datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
+        # datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
         # Merge prices into the requested datetime:
-        dframe = (
-            pd.concat(
-                [
-                    prices_df,
-                    pd.DataFrame(index=datetimes),
-                ],
-                axis="index",
-            )
-            .sort_index()
-            .ffill()
-            .bfill()  # (this is hardly necessary)
-            .loc[datetimes]  # slicing to this means we do not compute
-            # correcly around hour shifts
+        dframe = pd.concat(
+            [
+                pd.DataFrame(index=pd.DatetimeIndex([starttime])),
+                prices_df,
+                pd.DataFrame(index=datetimes),
+            ],
+            axis="index",
         )
-        dframe = dframe[~dframe.index.duplicated(keep="first")]
+        dframe = dframe.sort_index()
+
+        dframe = dframe[dframe.index < starttime + pd.Timedelta(maxhours, unit="hour")]
+
+        dframe = dframe.ffill().bfill()
+        dframe = dframe[dframe.index > starttime]
+        logger.debug(dframe.head())
 
         # Build Graph, starting with current temperature
         # temps = np.arange(40, 85, 0.1)
@@ -321,7 +333,9 @@ def plot_graph(graph, ax=None, show=False):
             ).plot(x="index", y="temp", ax=ax, legend=False)
     nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"])
 
-    nodes_df.plot.scatter(x="index", y="temp", ax=ax)
+    time_values = nodes_df["index"].dt.to_pydatetime()
+    temp_values = nodes_df["temp"].values
+    ax.plot_date(time_values, temp_values)
 
     if show:
         pyplot.show()
@@ -331,8 +345,13 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
     if ax is None:
         fig, ax = pyplot.subplots()
 
-    path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
-    path_dframe.plot(y="temp", linewidth=linewidth, color=color, ax=ax)
+    path_dframe = pd.DataFrame(path, columns=["index", "temp"])
+    print(path_dframe.head())
+    time_coords = path_dframe["index"].dt.tz_localize(None).dt.to_pydatetime()
+    temp_values = path_dframe["temp"].values
+    ax.plot_date(
+        time_coords, temp_values, fmt="", marker=None, linewidth=linewidth, color=color
+    )
     if show:
         pyplot.show()
 
@@ -645,7 +664,10 @@ async def main():
     await pers.waterheater.estimate_savings(prices_df)
 
     fig, ax = pyplot.subplots()
-    plot_graph(graph, ax=ax, show=False)
+
+    # This plots every node involved in computation:
+    # plot_graph(graph, ax=ax, show=False)
+
     plot_path(opt_results["opt_path"], ax=ax, show=False)
     prices_df["mintemp"] = (
         prices_df.reset_index()["index"]
@@ -653,6 +675,8 @@ async def main():
         .values
     )
     prices_df.plot(drawstyle="steps-post", ax=ax, y="mintemp", color="blue", alpha=0.4)
+    fig.autofmt_xdate()
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%a %H:%M"))
 
     # Yesterdays temperatures shifted forward by 24h:
     hist_temps = await pers.influxdb.get_series(
@@ -664,18 +688,16 @@ async def main():
     hist_temps.index = hist_temps.index.tz_convert("Europe/Oslo") + datetime.timedelta(
         hours=24
     )
-    # ax.plot(
-    #   hist_temps.index,
-    #   hist_temps[SENSOR_ITEM],
-    #    color="green",
-    #    label="direct",
-    #    alpha=0.7,
-    # )
+    ax.plot(
+        hist_temps.index,
+        hist_temps[SENSOR_ITEM],
+        color="green",
+        label="direct",
+        alpha=0.7,
+    )
 
     ax2 = ax.twinx()
-    prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
-
-    # ax.set_xlim(left=prices_df.index.min(), right=prices_df.index.max())
+    ax2.step(prices_df.index, prices_df["NOK/KWh"].values, where="post", alpha=0.2)
     pyplot.show()
     await pers.aclose()
 

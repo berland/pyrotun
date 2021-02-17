@@ -23,7 +23,7 @@ logger = pyrotun.getLogger(__name__)
 # Positive number means colder house:
 COLDER_FOR_POWERSAVING = 3
 
-TEMPERATURE_RESOLUTION = 10000
+TEMPERATURE_RESOLUTION = 10
 """If the temperature resolution is too low, it will make the decisions
 unstable for short timespans. It is tempting to keep it low to allow
 some sort of graph collapse."""
@@ -345,17 +345,20 @@ async def main(
                 since=datetime.datetime.now() - datetime.timedelta(hours=48),
             )
             # Smoothen curve:
-            hist_temps = hist_temps.resample("15min").mean().interpolate(method="time")
-            hist_temps.index = hist_temps.index.tz_convert(
-                "Europe/Oslo"
-            ) + datetime.timedelta(hours=24)
-            ax.plot(
-                hist_temps.index,
-                hist_temps[FLOORS[floor]["sensor_item"]],
-                color="green",
-                label="direct",
-                alpha=0.7,
-            )
+            if not hist_temps.empty:
+                hist_temps = (
+                    hist_temps.resample("15min").mean().interpolate(method="time")
+                )
+                hist_temps.index = hist_temps.index.tz_convert(
+                    "Europe/Oslo"
+                ) + datetime.timedelta(hours=24)
+                ax.plot(
+                    hist_temps.index,
+                    hist_temps[FLOORS[floor]["sensor_item"]],
+                    color="green",
+                    label="direct",
+                    alpha=0.7,
+                )
 
             prices_df["mintemp"] = (
                 prices_df.reset_index()["index"]
@@ -381,6 +384,150 @@ async def main(
 
     if closepers:
         await pers.aclose()
+
+
+def prediction_dframe(starttime, prices, min_temp, max_temp, freq="10min", maxhours=36):
+    """Spread prices on a time-series of the requested frequency into
+    the future"""
+    if starttime is None:
+        tz = pytz.timezone(os.getenv("TIMEZONE"))
+        starttime = datetime.datetime.now().astimezone(tz)
+
+    starttime_wholehour = starttime.replace(minute=0, second=0, microsecond=0)
+    datetimes = pd.date_range(
+        starttime_wholehour,
+        prices.index.max() + pd.Timedelta(1, unit="hour"),
+        freq=freq,
+        tz=prices.index.tz,
+    )
+
+    # Only timestamps after starttime is up for prediction:
+    datetimes = datetimes[datetimes > starttime - pd.Timedelta(freq)]
+
+    # Delete timestamps mentioned in prices, for correct merging:
+    duplicates = []
+    for tstamp in datetimes:
+        if tstamp in prices.index:
+            duplicates.append(tstamp)
+    datetimes = datetimes.drop(duplicates)
+
+    # Merge prices into the requested datetime:
+    dframe = pd.concat(
+        [
+            pd.DataFrame(index=pd.DatetimeIndex([starttime])),
+            prices,
+            pd.DataFrame(index=datetimes),
+        ],
+        axis="index",
+    )
+    dframe.columns = ["NOK/KWh"]
+    dframe = dframe.sort_index()
+    dframe["min_temp"] = min_temp
+    dframe["max_temp"] = max_temp
+    dframe = dframe[dframe.index < starttime + pd.Timedelta(maxhours, unit="hour")]
+    # Constant extrapolation of prices:
+    dframe = dframe.ffill().bfill()
+    dframe = dframe[dframe.index > starttime]
+    logger.debug("prediction_dframe")
+    # print(dframe.head())
+    return dframe
+
+
+def optimize_heatreservoir(
+    starttime=None,
+    starttemp=20,
+    prices=None,  # pd.Series
+    min_temp=None,  # pd.Series
+    max_temp=None,  # pd.Series
+    maxhours=36,
+    temp_predictor=None,  # function handle
+    freq="10min",  # pd.date_range frequency
+    temp_resolution=10000,
+):
+    """Build a networkx Directed 2D ~lattice Graph, with
+    datetime on the x-axis and temperatures on the y-axis.
+
+    Edges from nodes determined by (time, temp) has an associated
+    cost in NOK and energy need in kwh
+
+    Returns a dict.
+         result = {"now": True,
+                   "next_on": datetime.datetime, if now is True, then this
+                              could be in the past.
+                   "cost": 2.1,  # NOK
+                   "kwh":  3.3 # KWh
+                   "path": path # Cheapest path to lowest and latest temperature.
+                   "on_in_minutes":  float
+                   "off_in_Minutes": float
+          }
+    """
+    # Get a series with prices at the datetimes we want to optimize at:
+    pred_dframe = prediction_dframe(
+        starttime, prices, min_temp, max_temp, freq, maxhours
+    )
+
+    logger.info("Building graph for future floor temperatures")
+
+    # Build Graph, starting with current temperature
+    graph = networkx.DiGraph()
+    temps = {}  # timestamps are keys, values are lists of scaled integer temps.
+
+    # Initial point/node:
+    temps[pred_dframe.index[0]] = [int_temp(starttemp)]
+
+    # We allow only constant timesteps:
+    assert (
+        len(set(pd.Series(pred_dframe.index).diff()[1:])) == 1
+    ), "Only constant timestemps allowed"
+    t_delta_hours = (
+        float((pred_dframe.index[1] - pred_dframe.index[0]).value) / 1e9 / 60 / 60
+    )  # convert from nanoseconds to hours.
+
+    # Loop over time:
+    for tstamp, next_tstamp in zip(pred_dframe.index, pred_dframe.index[1:]):
+        # print(tstamp)
+        temps[next_tstamp] = []
+
+        min_temp = 19
+        max_temp = 27
+        # Loop over available temperature nodes until now:
+        for temp in temps[tstamp]:
+            # print(f"At {tstamp} with temp {temp}")
+            # print(temp_predictor(float_temp(temp), tstamp, t_delta_hours))
+            for pred in temp_predictor(float_temp(temp), tstamp, t_delta_hours):
+                if min_temp < pred["temp"] < max_temp:
+                    graph.add_edge(
+                        (tstamp, temp),
+                        (next_tstamp, int_temp(pred["temp"])),
+                        cost=pred["kwh"] * pred_dframe.loc[tstamp, "NOK/KWh"],
+                        kwh=pred["kwh"],
+                    )
+                    temps[next_tstamp].append(int_temp(pred["temp"]))
+            # Collapse next temperatures according to resolution
+            temps[next_tstamp] = list(set(temps[next_tstamp]))
+            # print(f"Next temperatures are {temps[next_tstamp]}")
+
+    # Build result dictionary:
+    result = {
+        "graph": graph,
+        "path": cheapest_path(graph, pred_dframe.index[0]),
+    }
+    result["cost"] = path_costs(graph, result["path"])
+    result["onoff"] = path_onoff(result["path"])
+    if result["onoff"].max() > 0:
+        result["on_at"] = result["onoff"][result["onoff"] == 1].index.values[0]
+    else:
+        result["on_at"] = None
+    result["on_now"] = result["onoff"].values[0] == 1
+    return result
+
+
+def cheapest_path(graph, starttime):
+    startnode = find_node(graph, starttime, 0)
+    endnode = find_node(graph, starttime + pd.Timedelta(hours=72), 0)
+    return networkx.shortest_path(
+        graph, source=startnode, target=endnode, weight="cost"
+    )
 
 
 def int_temp(temp):
@@ -454,7 +601,7 @@ async def heatreservoir_temp_cost_graph(
     # Build Graph, starting with current temperature
     graph = networkx.DiGraph()
 
-    # Temperatures in the graph is always integers, and multiplied up!
+    # Temperatures in the graph are always integers, and for that reason scaled up.
 
     # dict of timestamp to list of reachable temperatures:
     temps = {}
@@ -478,7 +625,6 @@ async def heatreservoir_temp_cost_graph(
             " (graph building at %s, %d temps)", str(tstamp), len(temps[tstamp])
         )
         for temp in temps[tstamp]:
-
             # This is Explicit Euler solution of the underlying
             # differential equation, predicting future temperature:
 
@@ -668,7 +814,7 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
 
 def find_node(graph, when, temp):
     nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"])
-    when = pd.Timestamp(when.astimezone(nodes_df["index"].dt.tz))
+    # when = pd.Timestamp(when).astimezone(nodes_df["index"].dt.tz))
     closest_time_idx = (
         nodes_df.iloc[(nodes_df["index"] - when).abs().argsort()]
         .head(1)

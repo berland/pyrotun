@@ -2,13 +2,13 @@ import datetime
 import os
 from typing import Optional, Union
 
+import numpy as np
 import pandas as pd
 from aioinflux import InfluxDBClient
 
 
 class InfluxDBConnection:
     def __init__(self, host=""):
-
         if host:
             self.host = host
         else:
@@ -39,7 +39,7 @@ class InfluxDBConnection:
         query = f"SELECT * FROM {item} {sincestr} {upuntilstr}"
         resp = await self.client.query(query)
         if isinstance(resp, dict) and not resp:
-            return pd.Series()
+            return pd.Series(dtype=np.float64)
         if isinstance(resp, pd.DataFrame) and resp.empty:
             return pd.Series()
         assert isinstance(resp, pd.DataFrame)
@@ -53,7 +53,6 @@ class InfluxDBConnection:
     async def get_series_grouped(
         self, item, aggregator="mean", time="1h", condition=""
     ) -> pd.DataFrame:
-
         resp = await self.client.query(
             (
                 f"SELECT {aggregator}(value) FROM {item} {condition} "
