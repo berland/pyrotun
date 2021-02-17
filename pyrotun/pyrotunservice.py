@@ -84,7 +84,7 @@ async def polltibber():
 @aiocron.crontab(EVERY_MIDNIGHT)
 async def calc_power_savings_yesterday():
     logger.info(" ** Calculating power cost savings yesterday")
-    await pyrotun.poweranalysis.estimate_savings_yesterday(PERS)
+    await pyrotun.poweranalysis.estimate_savings_yesterday(PERS, dryrun=False)
 
 
 @aiocron.crontab(EVERY_8_MINUTE)
