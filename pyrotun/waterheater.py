@@ -182,25 +182,36 @@ class WaterHeater:
             freq=PD_TIMEDELTA,
             tz=prices_df.index.tz,
         )
+
+        # Only timestamps after starttime is up for prediction:
+        datetimes = datetimes[datetimes > starttime]
+
+        # Delete timestamps mentioned in prices, for correct merging:
+        duplicates = []
+        for tstamp in datetimes:
+            if tstamp in prices_df.index:
+                duplicates.append(tstamp)
+        datetimes = datetimes.drop(duplicates)
+
         # If we are at 19:48 and timedelta is 15 minutes, we should
         # round down to 19:45:
-        datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
+        # datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
         # Merge prices into the requested datetime:
-        dframe = (
-            pd.concat(
-                [
-                    prices_df,
-                    pd.DataFrame(index=datetimes),
-                ],
-                axis="index",
-            )
-            .sort_index()
-            .ffill()
-            .bfill()  # (this is hardly necessary)
-            .loc[datetimes]  # slicing to this means we do not compute
-            # correcly around hour shifts
+        dframe = pd.concat(
+            [
+                pd.DataFrame(index=pd.DatetimeIndex([starttime])),
+                prices_df,
+                pd.DataFrame(index=datetimes),
+            ],
+            axis="index",
         )
-        dframe = dframe[~dframe.index.duplicated(keep="first")]
+        dframe = dframe.sort_index()
+
+        dframe = dframe[dframe.index < starttime + pd.Timedelta(maxhours, unit="hour")]
+
+        dframe = dframe.ffill().bfill()
+        dframe = dframe[dframe.index > starttime]
+        logger.debug(dframe.head())
 
         # Build Graph, starting with current temperature
         # temps = np.arange(40, 85, 0.1)
@@ -316,6 +327,8 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
         fig, ax = pyplot.subplots()
 
     path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
+    print(path_dframe.head())
+    print(path_dframe.index.dtype)
     path_dframe.plot(y="temp", linewidth=linewidth, color=color, ax=ax)
     if show:
         pyplot.show()
@@ -621,16 +634,18 @@ async def main():
 
     await pers.waterheater.estimate_savings(prices_df)
     fig, ax = pyplot.subplots()
-    plot_graph(graph, ax=ax, show=False)
-    plot_path(opt_results["opt_path"], ax=ax, show=False)
     ax2 = ax.twinx()
+    #plot_graph(graph, ax=ax, show=False)
+    plot_path(opt_results["opt_path"], ax=ax, show=False)
     prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
     prices_df["mintemp"] = (
         prices_df.reset_index()["index"]
         .apply(watertemp_requirement, vacation=False, prices=prices_df)
         .values
     )
-    prices_df.plot(drawstyle="steps-post", ax=ax, y="mintemp", color="blue", alpha=0.4)
+    print(prices_df.head())
+    print(prices_df.index.dtype)
+    prices_df.plot(drawstyle="steps-post", ax=ax2, y="mintemp", color="blue", alpha=0.4)
     pyplot.show()
 
     await pers.aclose()
