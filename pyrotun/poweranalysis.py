@@ -13,6 +13,8 @@ import dotenv
 import pyrotun
 from pyrotun import persist  # noqa
 
+logger = pyrotun.getLogger(__name__)
+
 
 async def make_heatingmodel(influx, target, ambient, powermeasure):
     """Make a linear heating model, for how  much wattage is needed
@@ -44,12 +46,15 @@ async def estimate_savings_yesterday(pers, dryrun):
     yesterday = datetime.date.today() - datetime.timedelta(hours=24)
 
     results = await estimate_savings(pers, 2, get_daily_profile(), plot=False)
+    savings = results.loc[yesterday]["savings"]
     if not dryrun:
         await pers.openhab.set_item(
             "PowercostSavingsYesterday",
-            float(results.loc[yesterday]["savings"]),
+            float(savings),
             log=True,
         )
+    else:
+        logger.info("(dryrun) Power savings yesterday %s", str(savings))
 
 
 async def estimate_savings(pers, daycount, norway_daily_profile, plot=False):
@@ -99,25 +104,25 @@ async def estimate_savings(pers, daycount, norway_daily_profile, plot=False):
             {"date": date, "cost": cost, "profcost": profcost, "savings": savings}
         )
     res = pd.DataFrame(results).set_index("date")
-    print(res)
-    print(res.index.dtype)
-    print("Total savings: " + str(res["savings"].sum()))
     if plot:
         res.plot(y="savings")
         pyplot.show()
     return res
 
 
-async def main(pers=None):
+async def main(pers=None, days=30, yesterday=False):
     closepers = False
     if pers is None:
         pers = pyrotun.persist.PyrotunPersistence()
         await pers.ainit(["influxdb", "openhab"])
         closepers = True
 
-    # await estimate_savings_yesterday(pers, dryrun=False)
-    await estimate_savings(pers, 30, get_daily_profile())
-
+    if yesterday:
+        await estimate_savings_yesterday(pers, dryrun=False)
+    else:
+        res = await estimate_savings(pers, days, get_daily_profile())
+        print(res)
+        print("Total savings: " + str(res["savings"].sum()))
     if closepers:
         await pers.aclose()
 
@@ -128,6 +133,8 @@ def get_daily_profile():
 
 def get_parser():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--days", type=int, default=30)
+    parser.add_argument("--yesterday", action="store_true")
     return parser
 
 
@@ -135,8 +142,4 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     parser = get_parser()
     args = parser.parse_args()
-    asyncio.run(
-        main(
-            pers=None,
-        )
-    )
+    asyncio.run(main(pers=None, days=args.days, yesterday=args.yesterday))
