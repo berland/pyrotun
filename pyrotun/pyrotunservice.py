@@ -19,6 +19,7 @@ import pyrotun.houseshadow
 import pyrotun.floors
 import pyrotun.vent_calculations
 import pyrotun.discord
+import pyrotun.disruptive
 import pyrotun.exercise_uploader
 import pyrotun.dataspike_remover
 import pyrotun.polar_dump
@@ -143,6 +144,7 @@ async def at_startup(pers):
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
     tasks.extend(await pyrotun.discord.main(pers, gather=False))
+    tasks.extend(await pyrotun.disruptive.main(pers))
     tasks.append(asyncio.create_task(pyrotun.exercise_uploader.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
     tasks.append(pyrotun.floors.main(pers))
