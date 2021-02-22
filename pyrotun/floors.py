@@ -188,20 +188,6 @@ async def main(
             - datetime.timedelta(minutes=minutesago)
         ).astimezone(tz)
 
-        # Refactoring suggestion:
-        # result = optimize_floor(floor, starttime, starttemp, prices_df, vacation, freq,
-        #                         future_temp_callback=None, min_temp_callback=None)
-        # Example returned:
-        # result = {"now": True,
-        #           "next_on": datetime.datetime, if now is True, then this could be in the past.
-        #           "cost": 2.1,  # NOK
-        #           "kwh":  3.3 # KWh
-        #           "path": path
-        #           "on_in_minutes":  float
-        #           "off_in_Minutes": float
-        #  }
-        # * Function should be testable
-        # * Function should be usable for estimating savings.
         graph = heatreservoir_temp_cost_graph(
             starttime=starttime,
             starttemp=currenttemp,
@@ -479,10 +465,10 @@ def heatreservoir_temp_cost_graph(
                 cost = rel_kwh * powerprice + hightemp_penalty(
                     inter_temp, powerprice, t_delta_hours
                 )
-                #logger.info(
+                # logger.info(
                 #    f"Adding extra edge {temp} to {inter_temp} at cost {cost}, "
                 #    "full cost is {full_kwh*powerprice}"
-                #)
+                # )
                 graph.add_edge(
                     (tstamp, int_temp(temp)),
                     (next_tstamp, int_temp(inter_temp)),
@@ -520,9 +506,13 @@ def hightemp_penalty(temp, powerprice, t_delta_hours):
     # Add cost of 160W pr degree, spread on all heaters, say 10, so 16 watt pr degree.
     # Positive values for all values > 15 degrees.
 
+    # Multiply the extra watts by this, as to some degree we are eroding
+    # the job to be done by the heat pump which has a high COP
+    extra_factor = 5
+
     # Important to not return a positive number to have a stable algoritm.
     overshoot_temp = max(temp - 15, 0.001)
-    extra_kwh = overshoot_temp * 16 / 1000
+    extra_kwh = overshoot_temp * 16 * extra_factor / 1000
     return powerprice * extra_kwh * t_delta_hours
 
 
@@ -653,7 +643,7 @@ def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
     )
     opt_cost = sum(path_costs(graph, path))
     kwh = sum(path_kwh(graph, path))
-    timespan = (endnode[0] - startnode[0]).value / 1e9 / 60 / 60  # from nanoseconds
+    # timespan = (endnode[0] - startnode[0]).value / 1e9 / 60 / 60  # from nanoseconds
     return {
         "opt_cost": opt_cost,
         "kwh": kwh,

@@ -1,8 +1,8 @@
 Andre:
   backup_setpoint: 20.0
-  cooling_rate: -0.4
+  cooling_rate: -0.6
   delta: -1.0
-  heating_rate: 1.1
+  heating_rate: 1.5
   maxtemp: 26.0
   sensor_item: Sensor_Andre_gulv_temperatur
   setpoint_base: target
@@ -11,8 +11,8 @@ Andre:
   wattage: 600.0
 Bad_Kjeller:
   backup_setpoint: 24
-  cooling_rate: -0.7
-  heating_rate: 4
+  cooling_rate: -0.8
+  heating_rate: 4.4
   maxtemp: 33
   sensor_item: Termostat_Bad_Kjeller_SensorGulv
   setpoint_base: temperature
@@ -31,21 +31,21 @@ Bad_Oppe:
   wattage: 600.0
 Bakgang:
   backup_setpoint: 15
-  cooling_rate: -0.4
-  delta: -5
+  cooling_rate: -0.7
+  delta: -6
   heating_rate: 2
   maxtemp: 30
-  sensor_item: Termostat_Bakgang_SensorGulv
+  sensor_item: Sensor_Bakganggulv_temperatur # Termostat_Bakgang_SensorGulv
   setpoint_base: temperature
   setpoint_force: 3
   setpoint_item: Termostat_Bakgang_SetpointHeating
   wattage: 800
 Gangoppe:
   backup_setpoint: 20
-  cooling_rate: -0.2
+  cooling_rate: -0.3
   delta: -5
-  heating_rate: 0.3
-  maxtemp: 27
+  heating_rate: 0.4
+  maxtemp: 26
   sensor_item: Termostat_Gangoppe_SensorGulv
   setpoint_base: temperature
   setpoint_force: 4
@@ -53,9 +53,9 @@ Gangoppe:
   wattage: 600
 Inngang:
   backup_setpoint: 23
-  cooling_rate: -0.6
+  cooling_rate: -0.7
   delta: 0
-  heating_rate: 0.5
+  heating_rate: 0.7
   maxtemp: 32
   sensor_item: Termostat_Inngang_SensorGulv
   setpoint_base: temperature
@@ -67,7 +67,7 @@ Inngang:
 Leane:
   backup_setpoint: 20
   cooling_rate: -0.4
-  delta: -1
+  delta: -2
   heating_rate: 1
   maxtemp: 26
   sensor_item: Sensor_Leane_gulv_temperatur
@@ -78,9 +78,9 @@ Leane:
 Sofastue:
   backup_setpoint: 20
   cooling_rate: -0.3
-  delta: -2
+  delta: -4
   heating_rate: 1
-  maxtemp: 26
+  maxtemp: 25
   sensor_item: Termostat_Sofastue_SensorGulv
   setpoint_base: temperature
   setpoint_force: 2
@@ -88,9 +88,9 @@ Sofastue:
   wattage: 1700
 Syrom:
   backup_setpoint: 15
-  cooling_rate: -0.3
+  cooling_rate: -0.1
   delta: -6
-  heating_rate: 0.5
+  heating_rate: 0.4
   maxtemp: 30
   sensor_item: Termostat_Syrom_SensorGulv
   setpoint_base: target
@@ -100,9 +100,9 @@ Syrom:
 Tvstue:
   backup_setpoint: 20
   cooling_rate: -0.6
-  delta: -2
+  delta: -4
   heating_rate: 0.9
-  maxtemp: 27
+  maxtemp: 26
   sensor_item: Termostat_Tvstue_SensorGulv
   setpoint_base: temperature
   setpoint_force: 3
@@ -110,9 +110,9 @@ Tvstue:
   wattage: 600
 Vaskegang:
   backup_setpoint: 15
-  cooling_rate: -0.3
+  cooling_rate: -0.2
   delta: -6
-  heating_rate: 1
+  heating_rate: 0.6
   maxtemp: 30
   sensor_item: Sensor_Vaskegang_gulv_temperatur
   setpoint_base: target
@@ -121,9 +121,9 @@ Vaskegang:
   wattage: 800
 Vaskerom:
   backup_setpoint: 15
-  cooling_rate: -0.36
-  delta: -2
-  heating_rate: 1
+  cooling_rate: -1
+  delta: -3
+  heating_rate: 1.5
   maxtemp: 30
   sensor_item: Termostat_Vaskerom_SensorGulv
   setpoint_base: target
