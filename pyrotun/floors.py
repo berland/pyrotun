@@ -588,7 +588,7 @@ def temp_requirement(timestamp, vacation=False, prices=None, delta=0):
 
     if vacation:
         return 15 + delta
-    if hour < 6 or hour > 22:
+    if hour < 6 or hour > 21:
         return 18 + delta
     return 25 + delta
 
