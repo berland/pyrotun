@@ -15,6 +15,7 @@ import pyrotun.helligdager
 import pyrotun.yrmelding
 import pyrotun.pollsmappee
 import pyrotun.polltibber
+import pyrotun.poweranalysis
 import pyrotun.houseshadow
 import pyrotun.floors
 import pyrotun.vent_calculations
@@ -143,10 +144,19 @@ async def at_startup(pers):
     tasks.append(asyncio.create_task(pyrotun.vent_calculations.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
+
+    # discord.main() returns a list of tasks, the task is an async generator.
     tasks.extend(await pyrotun.discord.main(pers, gather=False))
-    tasks.extend(await pyrotun.disruptive.main(pers))
+
+    # disruptive.main() starts its own executor to run a sync function, but
+    # it will never finish.
+    tasks.append(asyncio.create_task(pyrotun.disruptive.main(pers)))
+
+    # Sets up an async generator:
     tasks.append(asyncio.create_task(pyrotun.exercise_uploader.main(pers)))
+
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
+
     tasks.append(pyrotun.floors.main(pers))
     tasks.append(pyrotun.waterheater.controller(pers))
     tasks.append(pyrotun.yrmelding.main(pers))
