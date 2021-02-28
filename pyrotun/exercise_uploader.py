@@ -90,6 +90,16 @@ def make_http_post_data(dirname):
 
     # Map 5 zones into an alternative categorization:
     threezone_map = {0: "lav", 1: "lav", 2: "moderat", 3: "hoy", 4: "hoy"}
+    if zonedata_df.empty:
+        print("Empty zonedata, assigning exercise duration to low")
+        zonedata_df = pd.DataFrame(
+            [
+                {"index": 1, "in-zone": exercise_summary["duration"]},
+                {"index": 2, "in-zone": "P0M"},
+                {"index": 3, "in-zone": "P0M"},
+            ]
+        )
+        print("Empty zonedata, putting everything to low")
     zonedata_df["threezones"] = zonedata_df["index"].replace(threezone_map)
 
     # Compute times to seconds (from iso deltastrings)
@@ -212,6 +222,9 @@ async def main(pers=None, dryrun=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--submit", action="store_true", help="If we should do real submits"
+    )
     parser.add_argument("--analyze", type=str, help="GPX file to analyze")
     parser.add_argument("--processdir", type=str, help="Dry run a directory")
     args = parser.parse_args()
@@ -227,7 +240,7 @@ if __name__ == "__main__":
         speed = prettyprintseconds(move_time / (dist / 1000.0))
         print(f"Avg speed {speed}")
     if args.processdir:
-        asyncio.run(process_dir(args.processdir, dryrun=True, force=True))
+        asyncio.run(process_dir(args.processdir, dryrun=not args.submit, force=True))
     else:
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(main(dryrun=True))
+        loop.run_until_complete(main(dryrun=not args.submit))
