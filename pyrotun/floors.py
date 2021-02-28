@@ -96,11 +96,22 @@ async def main(
     assert hoursago >= 0
     assert minutesago >= 0
 
-    if (Path(__file__).parent / FLOORSFILE).exists():
-        logger.info("Loading floor configuration from %s", FLOORSFILE)
-        FLOORS = yaml.safe_load((Path(__file__).parent / FLOORSFILE).read_text())
+    floorsfile = Path(__file__).parent / FLOORSFILE
+    if floorsfile.exists():
+        logger.info("Loading floor configuration from %s", str(floorsfile))
+        FLOORS = yaml.safe_load(floorsfile.read_text())
     else:
-        logger.warning("Did not find yml file with floor configuration, dummy run")
+        # If pyrotun is installed into site_packags, floors.yml might
+        # not have followed. Try looking relative to cwd (set by systemd)
+        floorsfile = Path("pyrotun") / FLOORSFILE
+        if floorsfile.exists():
+            logger.info("Loading floor configuration from %s", str(floorsfile))
+            FLOORS = yaml.safe_load(floorsfile.read_text())
+        else:
+            logger.error(
+                f"Did not find yml file {str(floorsfile)} "
+                "with floor configuration, dummy run"
+            )
 
     closepers = False
     if pers is None:
@@ -386,6 +397,7 @@ def heatreservoir_temp_cost_graph(
             " (graph building at %s, %d temps)", str(tstamp), len(temps[tstamp])
         )
         for temp in temps[tstamp]:
+
             # This is Explicit Euler solution of the underlying
             # differential equation, predicting future temperature:
 
