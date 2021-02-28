@@ -1,7 +1,7 @@
 Andre:
   backup_setpoint: 20.0
   cooling_rate: -0.6
-  delta: -1.0
+  delta: -2.0
   heating_rate: 1.5
   maxtemp: 26.0
   sensor_item: Sensor_Andre_gulv_temperatur
@@ -13,6 +13,7 @@ Bad_Kjeller:
   backup_setpoint: 24
   cooling_rate: -0.8
   heating_rate: 4.4
+  delta: -1
   maxtemp: 33
   sensor_item: Termostat_Bad_Kjeller_SensorGulv
   setpoint_base: temperature
@@ -32,7 +33,7 @@ Bad_Oppe:
 Bakgang:
   backup_setpoint: 15
   cooling_rate: -0.7
-  delta: -6
+  delta: -7
   heating_rate: 2
   maxtemp: 30
   sensor_item: Sensor_Bakganggulv_temperatur # Termostat_Bakgang_SensorGulv
@@ -54,7 +55,7 @@ Gangoppe:
 Inngang:
   backup_setpoint: 23
   cooling_rate: -0.7
-  delta: 0
+  delta: -1
   heating_rate: 0.7
   maxtemp: 32
   sensor_item: Termostat_Inngang_SensorGulv
@@ -67,7 +68,7 @@ Inngang:
 Leane:
   backup_setpoint: 20
   cooling_rate: -0.4
-  delta: -2
+  delta: -3
   heating_rate: 1
   maxtemp: 26
   sensor_item: Sensor_Leane_gulv_temperatur
@@ -122,7 +123,7 @@ Vaskegang:
 Vaskerom:
   backup_setpoint: 15
   cooling_rate: -1
-  delta: -3
+  delta: -4
   heating_rate: 1.5
   maxtemp: 30
   sensor_item: Termostat_Vaskerom_SensorGulv
