@@ -159,27 +159,40 @@ def optimize(
         next_temps_raw = sorted(list(set(next_temps_raw)))
         print(f"next_temps:  {next_temps_raw}")
         # Group
-        grouped_next_temps = sorted(list(
-            set(
-                [next_temps_raw[0]]
-                + list(grouper(next_temps_raw, 0.1 * TEMPERATURE_RESOLUTION))
+        if len(next_temps_raw) > 10:
+            grouped_next_temps = sorted(
+                list(
+                    set(
+                        [next_temps_raw[0]]
+                        + list(grouper(next_temps_raw, 0.5 * TEMPERATURE_RESOLUTION))
+                    )
+                )
             )
-        ))
-        print(f"Grouped: {grouped_next_temps}")
+            print(f"Grouped: {grouped_next_temps}")
+            # Add fake edges for all collapsed nodes:
+            for temp in next_temps_raw:
+                if temp not in grouped_next_temps:
+                    v = np.array(grouped_next_temps)
+                    higher_grouped_temp = v[v > temp][0]
+                    kwh = cost_from_predictor(
+                        temp_predictor, temp, higher_grouped_temp, t_delta_hours, tstamp
+                    )
+                    # kwh is None if the higher_grouped_temp is not reachable from temp.
+                    if kwh is not None:
+                        print(f"ADDING FAKE EDGE {temp} {higher_grouped_temp}  {kwh}")
+                        graph.add_edge(
+                            (next_tstamp, temp),
+                            (next_tstamp, higher_grouped_temp),
+                            cost=kwh * pred_dframe.loc[tstamp, "NOK/KWh"],
+                            kwh=kwh,
+                        )
+                    else:
+                        print(f"NOT  REACHABLE {temp} {higher_grouped_temp}  {kwh}")
 
-        # Add fake edges for all collapsed nodes:
-        for temp in next_temps_raw:
-            if temp not in grouped_next_temps:
-                v = np.array(grouped_next_temps)
-                higher_grouped_temp  = v[v > temp][0]
-                graph.add_edge(
-                        (next_tstamp, temp),
-                        (next_tstamp, higher_grouped_temp),
-                        cost=0,
-                        kwh=0)
-
-        temps[next_tstamp] = grouped_next_temps
-        # print(f"Next temperatures are {temps[next_tstamp]}")
+            temps[next_tstamp] = grouped_next_temps
+        else:
+            temps[next_tstamp] = next_temps_raw
+        print(f"Next temperatures are {temps[next_tstamp]}")
     # print(temps)
     # Build result dictionary:
     # print(graph.nodes)
@@ -218,6 +231,24 @@ def optimize(
         result.update(never_dict)
 
     return result
+
+
+def cost_from_predictor(
+    predictor, temp1, temp2, t_delta_hours, tstamp=datetime.datetime.now()
+):
+    """Given a temperature predictor, predict the cost of going
+    to a specific temperature within the predicted span"""
+    prediction = predictor(temp1, tstamp, t_delta_hours)
+    temps = [pred["temp"] for pred in prediction]
+    kwhs = [pred["kwh"] for pred in prediction]
+
+    t_point  = (temp2 - min(temps)) / (max(temps) - min(temps))
+    if -0.2 <= t_point <= 1.2:  # allow 20% extrapolation
+        # Linear interpolation for kwh cost:
+        return (
+            t_point * (max(kwhs) - min(kwhs))
+        )
+    return None
 
 
 def cheapest_path(graph, starttime):
@@ -406,7 +437,6 @@ def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
 def grouper(iterable, distance=1):
     """Group a list of numbers into buckets with a certain minimal internal
     distance, and return the maximum of the numbers in a group"""
-    # Assert sorted.
     prev = None
     group = []
     for item in iterable:

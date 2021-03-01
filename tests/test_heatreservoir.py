@@ -1,11 +1,11 @@
 import pytz
 import datetime
 import pandas as pd
+import numpy as np
 
 import pytest
 
 from pyrotun import heatreservoir
-
 
 def test_prediction_dframe():
     prices = pd.DataFrame(
@@ -154,6 +154,18 @@ def test_two_hour_tspan(price1, price2, starttemp, freq, on_now):
     assert result["on_now"] == on_now
 
 
+def test_cost_from_predictor():
+    def temp_predictor(temp, tstamp, t_delta_hours):
+        return [
+            {"temp": temp + 1 * t_delta_hours, "kwh": 0.5 * t_delta_hours},
+            {"temp": temp - 0.1 * t_delta_hours, "kwh": 0},
+        ]
+
+    assert heatreservoir.cost_from_predictor(temp_predictor, 20, 19.9, 1) == 0.0
+    assert np.isclose(heatreservoir.cost_from_predictor(temp_predictor, 20, 20.1, 1),  1 / 11)
+    assert heatreservoir.cost_from_predictor(temp_predictor, 20, 21, 1) == 0.5
+
+
 @pytest.mark.parametrize(
     "price_low, price_high, starttemp, coolingrate, freq, on_in_minutes",
     [
@@ -287,6 +299,7 @@ def test_incomplete_graph():
     )
     assert result["on_now"] is True
 
+
 def test_max_temp():
     """Test that we don't spike in temperature when a spike path and
     an oscillating path has the same cost. There should be some tiny
@@ -339,7 +352,10 @@ def test_waterheater():
             # heat loss
             outtake = 2
         return [
-            {"temp": temp + (8 - outtake - (temp-20)/20) * t_delta_hours, "kwh": 0.5 * t_delta_hours},
+            {
+                "temp": temp + (8 - outtake - (temp - 20) / 20) * t_delta_hours,
+                "kwh": 0.5 * t_delta_hours,
+            },
             {"temp": temp - outtake * t_delta_hours, "kwh": 0},
         ]
 
