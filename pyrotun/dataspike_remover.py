@@ -12,7 +12,7 @@ import pyrotun.persist
 logger = pyrotun.getLogger(__name__)
 
 TRUNCATORS = {
-    "Termostat_*_SetpointHeating": {"min": 3, "max": 40},
+    "Termostat_*_SetpointHeating": {"min": 1, "max": 40},
     "Termostat_*_SensorGulv": {"min": 0, "max": 50},
     "InneTemperatur": {"min": 10, "max": 40},
 }
