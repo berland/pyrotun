@@ -94,7 +94,7 @@ Syrom:
   heating_rate: 0.4
   maxtemp: 30
   sensor_item: Termostat_Syrom_SensorGulv
-  setpoint_base: target
+  setpoint_base: temperature
   setpoint_force: 8
   setpoint_item: Termostat_Syrom_SetpointHeating
   wattage: 800
@@ -127,7 +127,7 @@ Vaskerom:
   heating_rate: 1.5
   maxtemp: 30
   sensor_item: Termostat_Vaskerom_SensorGulv
-  setpoint_base: target
+  setpoint_base: temperature
   setpoint_force: 8
   setpoint_item: Termostat_Vaskerom_SetpointHeating
   wattage: 800
