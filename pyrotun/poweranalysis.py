@@ -50,7 +50,7 @@ async def estimate_savings_yesterday(pers, dryrun):
     if not dryrun:
         await pers.openhab.set_item(
             "PowercostSavingsYesterday",
-            float(savings),
+            float(saving),
             log=True,
         )
     else:
@@ -97,20 +97,33 @@ async def estimate_savings(pers, daycount, norway_daily_profile, plot=False):
                 * df_date["kwh-weekend"]
             )
 
+        minmaxdiff = df_date["price"].max() - df_date["price"].min()
         profcost = (df_date["scaled_profile"] * df_date["price"] / 100).sum()
         cost = (df_date["usage"] * df_date["price"] / 100).sum()
         savings = profcost - cost
         results.append(
-            {"date": date, "cost": cost, "profcost": profcost, "savings": savings}
+            {
+                "date": date,
+                "cost": cost,
+                "profcost": profcost,
+                "savings": savings,
+                "minmaxdiff": minmaxdiff,
+            }
         )
     res = pd.DataFrame(results).set_index("date")
+    print(res)
+    print(res.index.dtype)
+    print("Total savings: " + str(res["savings"].sum()))
     if plot:
         res.plot(y="savings")
+        pyplot.show()
+
+        res.plot.scatter(x="minmaxdiff", y="savings")
         pyplot.show()
     return res
 
 
-async def main(pers=None, days=30, yesterday=False):
+async def main(pers=None, days=30, plot=False, yesterday=False):
     closepers = False
     if pers is None:
         pers = pyrotun.persist.PyrotunPersistence()
@@ -120,9 +133,10 @@ async def main(pers=None, days=30, yesterday=False):
     if yesterday:
         await estimate_savings_yesterday(pers, dryrun=False)
     else:
-        res = await estimate_savings(pers, days, get_daily_profile())
+        res = await estimate_savings(pers, days, get_daily_profile(), plot=plot)
         print(res)
         print("Total savings: " + str(res["savings"].sum()))
+
     if closepers:
         await pers.aclose()
 
@@ -135,6 +149,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=30)
     parser.add_argument("--yesterday", action="store_true")
+    parser.add_argument("--plot", action="store_true")
     return parser
 
 
@@ -142,4 +157,4 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     parser = get_parser()
     args = parser.parse_args()
-    asyncio.run(main(pers=None, days=args.days, yesterday=args.yesterday))
+    asyncio.run(main(pers=None, days=args.days, plot=args.plot))
