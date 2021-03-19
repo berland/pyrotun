@@ -50,7 +50,7 @@ async def estimate_savings_yesterday(pers, dryrun):
     if not dryrun:
         await pers.openhab.set_item(
             "PowercostSavingsYesterday",
-            float(saving),
+            float(savings),
             log=True,
         )
     else:
@@ -157,4 +157,6 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     parser = get_parser()
     args = parser.parse_args()
-    asyncio.run(main(pers=None, days=args.days, plot=args.plot))
+    asyncio.run(
+        main(pers=None, yesterday=args.yesterday, days=args.days, plot=args.plot)
+    )
