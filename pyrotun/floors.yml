@@ -79,7 +79,7 @@ Leane:
 Sofastue:
   backup_setpoint: 20
   cooling_rate: -0.3
-  delta: -5
+  delta: -4
   heating_rate: 1
   maxtemp: 25
   sensor_item: Termostat_Sofastue_SensorGulv
@@ -116,7 +116,7 @@ Vaskegang:
   heating_rate: 0.6
   maxtemp: 30
   sensor_item: Sensor_Vaskegang_gulv_temperatur
-  setpoint_base: target
+  setpoint_base: temperature
   setpoint_force: 8
   setpoint_item: Termostat_Vaskegang_SetpointHeating
   wattage: 800

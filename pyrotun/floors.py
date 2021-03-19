@@ -199,7 +199,7 @@ async def main(
             - datetime.timedelta(minutes=minutesago)
         ).astimezone(tz)
 
-        graph = heatreservoir_temp_cost_graph(
+        graph = await heatreservoir_temp_cost_graph(
             starttime=starttime,
             starttemp=currenttemp,
             prices_df=prices_df,
@@ -315,7 +315,7 @@ def float_temp(int_temp):
     return float(int_temp / float(TEMPERATURE_RESOLUTION))
 
 
-def heatreservoir_temp_cost_graph(
+async def heatreservoir_temp_cost_graph(
     starttemp=60,
     prices_df=None,
     mintemp=10,
@@ -372,6 +372,9 @@ def heatreservoir_temp_cost_graph(
     dframe = dframe[dframe.index > starttime]
     logger.debug(dframe.head())
 
+    # Yield..
+    await asyncio.sleep(0.001)
+
     # Build Graph, starting with current temperature
     graph = networkx.DiGraph()
 
@@ -384,6 +387,8 @@ def heatreservoir_temp_cost_graph(
     logger.debug(f"First timestamp in graph is {first_tstamp}")
     # Loop over all datetimes, and inject nodes and possible edges
     for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
+        # Yield..
+        await asyncio.sleep(0.001)
         temps[next_tstamp] = []
 
         # Collapse similar temperatures
@@ -450,6 +455,9 @@ def heatreservoir_temp_cost_graph(
                         f"Adding edge for heater-on at cost {cost} to "
                         f"temp {heater_on_temp}"
                     )
+
+        # Yield..
+        await asyncio.sleep(0.001)
         # For every temperature node, we need to link up with other nodes
         # between its corresponding no-heater and heater-temp, as we
         # should regard these as "reachable" for algorithm stability.

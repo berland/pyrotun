@@ -9,7 +9,7 @@ logger = pyrotun.getLogger(__name__)
 PERS = None
 
 
-async def main(pers=PERS):
+async def main(pers=PERS, debug=False):
     dotenv.load_dotenv()
 
     closepers = False
@@ -23,6 +23,11 @@ async def main(pers=PERS):
     armed = await pers.sectoralarm.armed(hist)
     locked = await pers.sectoralarm.locked(hist)
 
+    if debug:
+        print(hist)
+        print(armed)
+        print(locked)
+
     oh_bool = {True: "ON", False: "OFF"}
     await pers.openhab.set_item("AlarmArmert", oh_bool[armed], log="change")
     await pers.openhab.set_item("DoorLocked", oh_bool[locked], log="change")
@@ -33,4 +38,4 @@ async def main(pers=PERS):
 
 if __name__ == "__main__":
     PERS = pyrotun.persist.PyrotunPersistence()
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.get_event_loop().run_until_complete(main(debug=True))
