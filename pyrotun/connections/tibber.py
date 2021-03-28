@@ -84,9 +84,12 @@ class TibberConnection:
             else:
                 logger.warning("Using on-disk frame for price_df")
                 disk_frame = pd.read_csv(
-                    "/var/tmp/tibber_lastpriceframe.csv", index_col=0, parse_dates=True
+                    "/var/tmp/tibber_lastpriceframe.csv", index_col=0
                 )
-                disk_frame.index = disk_frame.index.tz_convert(tz)
+                disk_frame.index = pd.to_datetime(
+                    disk_frame.index, utc=True
+                ).tz_convert(tz)
+
                 return disk_frame
         prices_df = pd.DataFrame.from_dict(self.home.price_total, orient="index")
         prices_df.columns = ["NOK/KWh"]
