@@ -16,6 +16,7 @@ class PyrotunPersistence:
         self.sectoralarm = None
         self.openhab = None
         self.mqtt = None
+        self.yr = None
 
         # If true, no values are ever sent anywhere
         self.readonly = readonly
@@ -47,6 +48,10 @@ class PyrotunPersistence:
         if "mqtt" in requested or "all" in requested:
             self.mqtt = connections.mqtt.MqttConnection()
             await self.mqtt.ainit()
+
+        if "yr" in requested or "all" in requested:
+            self.yr = connections.yr.YrConnection()
+            await self.yr.ainit(websession=self.websession)
 
     async def aclose(self):
         logger.info("Tearing down pyrotunpersistence")
