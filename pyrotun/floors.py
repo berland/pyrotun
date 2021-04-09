@@ -603,8 +603,21 @@ def find_node(graph, when, temp):
     return (row["index"], row["temp"])
 
 
-def temp_requirement(timestamp, vacation=False, prices=None, delta=0):
+def temp_requirement(timestamp, vacation=False, prices=None, master_correction=None, delta=0):
+    """
+    Args:
+        timestamp (pd.Timestamp)
+        vacation (bool)
+        prices (pd.DataFrame): not used
+        master_correction (pd.Series): A time-dependent correction added to the master temperature
+        delta (float): Room-dependent (constant in time) correction added to master temperature
+
+    Return:
+        float
+    """
     hour = timestamp.hour
+
+    if master_correction is not None:
 
     if vacation:
         return 15 + delta

@@ -5,6 +5,7 @@ import pytz
 import datetime
 from pathlib import Path
 
+import sklearn
 from matplotlib import pyplot
 import pandas as pd
 
@@ -15,10 +16,13 @@ from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)
 
-
-async def make_heatingmodel(influx, target, ambient, powermeasure):
-    """Make a linear heating model, for how  much wattage is needed
-    to obtain a target temperature
+async def make_heatingmodel(
+    pers,
+    target="Sensor_fraluft_temperatur",
+    ambient="Netatmo_ute_temperatur",  # "UteTemperatur",
+    powermeasure="Smappee_avgW_5min",
+):
+    """Make heating and/or power models.
 
     Args:
         influx:  A pyrotun.connection object to InfluxDB
@@ -26,18 +30,92 @@ async def make_heatingmodel(influx, target, ambient, powermeasure):
         ambient: item-name
         powermeasure: item-name, unit=Watt
     """
-    raise NotImplementedError
+    target = "Sensor_fraluft_temperatur"
     # Resampling in InfluxDB over Pandas for speed reasons.
-    # target_series = await influx.get_series_grouped(target, time="1h")
-    # ambient_series = await influx.get_series_grouped(ambient, time="1h")
-    # power_series = await influx.get_series_grouped(powermeasure, time="1h")
-    # Substract waterheater from power_series.
+    # BUG: get_series_grouped returns dataframe..
+    target_series = (await pers.influxdb.get_series_grouped(target, time="1h"))[target]
+    ambient_series = (await pers.influxdb.get_series_grouped(ambient, time="1h"))[
+        ambient
+    ]
+    power_series = (await pers.influxdb.get_series_grouped(powermeasure, time="1h"))[
+        powermeasure
+    ]
 
+    # Sun altitude in degrees:
+    sunheight = (await pers.influxdb.get_series_grouped("Solhoyde", time="1h"))[
+        "Solhoyde"
+    ].clip(lower=0)
 
-async def non_heating_powerusage(influx):
+    # No contribution from low sun (terrain)
+    sunheight[sunheight < 10] = 0
+
+    # Cloud cover (sort of. Number 12 is chosen as it gives the highest explanation in regression)
+    yrmelding = 12- (
+        (await pers.influxdb.get_series_grouped("YrmeldingNaa", time="1h"))[
+            "YrmeldingNaa"
+        ]
+        .ffill()
+        .clip(lower=1, upper=12)
+    )
+
+    irradiation_proxy = (sunheight * yrmelding) / 100
+    irradiation_proxy.name = "IrradiationProxy"
+    irradiation_proxy.plot()
+
+    substract = await non_heating_powerusage(pers)
+    heating_power = power_series / 1000 - substract
+    heating_power.name = "HeatingPower"
+    heating_power.clip(lower=0, inplace=True)
+
+    dataset = pd.concat(
+        [target_series, ambient_series, heating_power, irradiation_proxy], axis=1,
+    ).dropna()
+
+    dataset["indoorvsoutdoor"] = dataset[target] - dataset[ambient]
+    dataset["indoorderivative"] = dataset[target].diff()
+    dataset.dropna(inplace=True)  # Drop egde NaN due to diff()
+    dataset.plot(y="HeatingPower")
+
+    lm = sklearn.linear_model.LinearRegression()
+    modelparameters = ["indoorderivative", "indoorvsoutdoor", "IrradiationProxy"]
+    X = dataset[modelparameters]
+    y = dataset[["HeatingPower"]]
+
+    powermodel = lm.fit(X, y)
+    print("How much can we explain? %.2f" % powermodel.score(X, y))
+    print("Coefficients %s" % str(powermodel.coef_))
+
+    print(" - in variables: %s" % str(modelparameters))
+    print("Preheating requirement: %f" % (powermodel.coef_[0][1] / powermodel.coef_[0][0] + 1))
+
+    p2 = ["HeatingPower", "indoorvsoutdoor" ,"IrradiationProxy"]
+    y2 = dataset["indoorderivative"]
+    lm2 = sklearn.linear_model.LinearRegression()
+    tempmodel = lm2.fit(dataset[p2], y2)
+    print("How much can we explain? %.3f" % tempmodel.score(dataset[p2], y2))
+    print("Coefficients %s" % str(tempmodel.coef_))
+    print(" - in variables: %s" % str(p2))
+
+    return {"powerneed": powermodel, "tempincrease": tempmodel}
+
+async def non_heating_powerusage(pers):
     """Return a series with hour sampling  for power usage that is not
-    used in heating, typically waterheater and electrical car"""
-    raise NotImplementedError
+    used in heating, typically waterheater and electrical car.
+
+    Returns time-series with unit kwh.
+    """
+    cum_item = "Varmtvannsbereder_kwh_sum"
+    cum_usage = (await pers.influxdb.get_series(cum_item))[cum_item]
+    cum_usage_rawdiff = cum_usage.diff()
+    cum_usage = cum_usage[(0 < cum_usage_rawdiff) & (cum_usage_rawdiff < 1000)].dropna()
+
+    cum_usage_hourly = (
+        cum_usage.resample("1h").mean().interpolate(method="linear").diff().shift(-1)
+    )
+    return cum_usage_hourly[
+        (0 < cum_usage_hourly) & (cum_usage_hourly < 3.0)
+    ]  # .clip(lower=0, upper=3.0)
+
     # cum_usage = await influx.get_series("Varmtvannsbereder_kwh_sum")
     # The cumulative series is perhaps regularly reset to zero.
 
@@ -49,9 +127,7 @@ async def estimate_savings_yesterday(pers, dryrun):
     savings = results.loc[yesterday]["savings"]
     if not dryrun:
         await pers.openhab.set_item(
-            "PowercostSavingsYesterday",
-            float(savings),
-            log=True,
+            "PowercostSavingsYesterday", float(savings), log=True,
         )
     else:
         logger.info("(dryrun) Power savings yesterday %s", str(savings))
@@ -129,6 +205,8 @@ async def main(pers=None, days=30, plot=False, yesterday=False):
         pers = pyrotun.persist.PyrotunPersistence()
         await pers.ainit(["influxdb", "openhab"])
         closepers = True
+
+    res = await make_heatingmodel(pers)
 
     if yesterday:
         await estimate_savings_yesterday(pers, dryrun=False)

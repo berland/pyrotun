@@ -1,4 +1,6 @@
 import os
+import asyncio
+import datetime
 
 import dotenv
 import aiohttp
@@ -112,3 +114,46 @@ class YrConnection:
             dframe = pd.concat([dframe, prec_frame], axis=1)
 
             return dframe
+
+    async def get_historical_cloud_fraction(
+        self, startdate="2017-01-01", enddate=datetime.datetime.now().date().isoformat()
+    ):
+        """Returns a series with historical cloud fraction
+
+        Values for every third hour. 0.0 means clear sky, 1.0 means
+        overcast.
+        """
+        async with self.websession.get(
+            "https://frost.met.no/observations/v0.jsonld",
+            params=dict(
+                sources="SN50540",
+                referencetime=str(startdate) + "/" + str(enddate),
+                elements="cloud_area_fraction",
+            ),
+            auth=aiohttp.BasicAuth(MET_CLIENT_ID, ""),
+            headers={"User-Agent": "Custom smarthouse using OpenHAB"},
+        ) as response:
+            result = await response.json()
+            time_index = [x["referenceTime"] for x in result["data"]]
+            cloud_fractions = [x["observations"][0]["value"] for x in result["data"]]
+            series = pd.Series(
+                cloud_fractions,
+                index=pd.to_datetime(time_index),
+                name="cloud_area_fraction"
+            )
+            # the series is of type "octa", where 0 is clear sky, and
+            # 8 is totally overcast. Translate this to a fraction beteween
+            # 0 (clear sky) and 1.0 (overcast)
+            series = series / 8.0
+            return series
+
+
+async def main():
+    yr = YrConnection()
+    await yr.ainit()
+    res = await yr.get_historical_cloud_fraction()
+    print(res)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
