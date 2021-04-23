@@ -119,6 +119,61 @@ async def non_heating_powerusage(pers):
     # cum_usage = await influx.get_series("Varmtvannsbereder_kwh_sum")
     # The cumulative series is perhaps regularly reset to zero.
 
+async def sunheating_model(pers, plot=False):
+    """Make a model of how much sun and cloud-cover affects maximal
+    indoor temperature during a day.
+
+    For prediction from weather forecast, ensure that the equation for making
+    the irradiation proxy is the same.
+    """
+    # Indoor temp:
+    indoor = (await pers.influxdb.get_series_grouped("InneTemperatur", time="1h"))[
+        "InneTemperatur"
+    ]
+
+    # Sun altitude in degrees:
+    sunheight = (await pers.influxdb.get_series_grouped("Solhoyde", time="1h"))[
+        "Solhoyde"
+    ].clip(lower=0)
+
+    # No contribution from low sun (terrain)
+    sunheight[sunheight < 10] = 0
+
+    # Cloud cover
+    cloudcover = (
+        await pers.influxdb.get_series_grouped("Yr_cloud_area_fraction", time="1h")
+    )["Yr_cloud_area_fraction"]
+
+    irradiation_proxy = sunheight * (100 - cloudcover) / 10000
+    irradiation_proxy.name = "IrradiationProxy"
+
+    dataset = (
+        pd.concat([indoor, sunheight, cloudcover, irradiation_proxy], axis=1)
+        .dropna()
+        .resample("1d")
+        .agg({"InneTemperatur": "max", "IrradiationProxy": "sum"})
+        .dropna()
+    )
+
+    lm = sklearn.linear_model.LinearRegression()
+    modelparameters = ["IrradiationProxy"]
+    X = dataset[modelparameters]
+    y = dataset[["InneTemperatur"]]
+
+    powermodel = lm.fit(X, y)
+
+    if plot:
+        dataset.plot.scatter(x="IrradiationProxy", y="InneTemperatur")
+        pyplot.plot(dataset["IrradiationProxy"], lm.predict(dataset["IrradiationProxy"].values.reshape(-1,1)), color='blue', linewidth=3)
+        pyplot.show()
+
+    print("How much can we explain? %.2f" % powermodel.score(X, y))
+    print("Coefficients %s" % str(powermodel.coef_))
+
+    print(" - in variables: %s" % str(modelparameters))
+
+    return powermodel
+
 
 async def estimate_savings_yesterday(pers, dryrun):
     yesterday = datetime.date.today() - datetime.timedelta(hours=24)
@@ -214,6 +269,9 @@ async def main(pers=None, days=30, plot=False, yesterday=False):
         res = await estimate_savings(pers, days, get_daily_profile(), plot=plot)
         print(res)
         print("Total savings: " + str(res["savings"].sum()))
+
+
+    sunmodel = await sunheating_model(pers, plot)
 
     if closepers:
         await pers.aclose()

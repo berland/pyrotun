@@ -3,6 +3,10 @@ import asyncio
 
 import dotenv
 
+import astral
+from astral.sun import sun
+import datetime
+
 import pyrotun
 from pyrotun import persist
 import pyrotun.connections.openhab
@@ -27,6 +31,14 @@ async def main(pers=None):
 
     # print(pers.yr.symbolcodedict)
     forecast_df = await pers.yr.forecast()
+
+    # Predict sunheight:
+    city = astral.LocationInfo(
+            "HOME", os.getenv("LOCAL_CITY"), os.getenv("TIMEZOME"), LATITUDE, LONGITUDE
+        )
+    forecast_df["sunheight"] = [astral.sun.elevation(city.observer, timepoint + datetime.timedelta(minutes=30)) for timepoint in forecast_df.index]
+    print(forecast_df)
+    breakpoint()
 
     # Each column in the forecast dataframe has its own item in OpenHAB:
     for yr_item in forecast_df.columns:
