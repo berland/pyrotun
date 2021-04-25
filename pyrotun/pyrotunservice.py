@@ -25,6 +25,7 @@ import pyrotun.exercise_uploader
 import pyrotun.dataspike_remover
 import pyrotun.polar_dump
 import pyrotun.pollsectoralarm
+import pyrotun.powermodels
 
 import pyrotun.connections.smappee
 import pyrotun.connections.sectoralarm
@@ -114,6 +115,13 @@ async def estimate_savings():
 async def yrmelding():
     logger.info(" ** Yrmelding")
     await pyrotun.yrmelding.main(PERS)
+
+
+@aiocron.crontab(EVERY_HOUR)
+async def sunheatingmodel():
+    logger.info(" ** sunheating model")
+    sunmodel = await pyrotun.powermodels.sunheating_model(PERS)
+    PERS["powermodels"].sunheatingmodel = sunmodel
 
 
 @aiocron.crontab(EVERY_15_MINUTE)

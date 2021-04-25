@@ -1,6 +1,6 @@
 import aiohttp
 
-from pyrotun import connections, waterheater, getLogger
+from pyrotun import connections, waterheater, powermodels, getLogger
 
 logger = getLogger(__name__)
 
@@ -17,6 +17,7 @@ class PyrotunPersistence:
         self.openhab = None
         self.mqtt = None
         self.yr = None
+        self.powermodels = None
 
         # If true, no values are ever sent anywhere
         self.readonly = readonly
@@ -52,6 +53,10 @@ class PyrotunPersistence:
         if "yr" in requested or "all" in requested:
             self.yr = connections.yr.YrConnection()
             await self.yr.ainit(websession=self.websession)
+
+        if "powermodels" in requested or "all" in requested:
+            self.powermodels = powermodels.Powermodels()
+            await self.powermodels.ainit(pers=self)
 
     async def aclose(self):
         logger.info("Tearing down pyrotunpersistence")

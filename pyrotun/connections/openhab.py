@@ -83,7 +83,8 @@ class OpenHABConnection:
                     extra_host + "/items/" + str(item_name), data=str(new_state)
                 ) as resp:
                     if resp.status != 200:
-                        logger.error(resp)
+                        pass
+                        # logger.error(resp)
             except OSError as err:
                 logger.warning("Secondary OpenHAB instance not responding")
                 logger.warning(str(err))

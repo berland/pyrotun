@@ -45,7 +45,7 @@ FLOORS = {
 TIMEDELTA_MINUTES = 60  # minimum is 8 minutes!!
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 VACATION_ITEM = "Ferie"
-
+WEATHER_COMPENSATION_ITEM = "Estimert_soloppvarming"
 BACKUPSETPOINT = 22
 
 
@@ -178,6 +178,12 @@ async def main(
             delta = FLOORS[floor]["delta"]
         else:
             delta = 0
+
+        # Deduct more in to correct for good weather:
+        weathercompensation = await pers.openhab.get_item(
+            WEATHER_COMPENSATION_ITEM, datatype=float
+        )
+        delta = delta - round(weathercompensation * 2.0) / 2.0
 
         if currenttemp > FLOORS[floor]["maxtemp"]:
             logger.info("Floor is above allowed maxtemp, turning OFF")
@@ -603,7 +609,9 @@ def find_node(graph, when, temp):
     return (row["index"], row["temp"])
 
 
-def temp_requirement(timestamp, vacation=False, prices=None, master_correction=None, delta=0):
+def temp_requirement(
+    timestamp, vacation=False, prices=None, master_correction=None, delta=0
+):
     """
     Args:
         timestamp (pd.Timestamp)
@@ -616,8 +624,6 @@ def temp_requirement(timestamp, vacation=False, prices=None, master_correction=N
         float
     """
     hour = timestamp.hour
-
-    if master_correction is not None:
 
     if vacation:
         return 15 + delta
