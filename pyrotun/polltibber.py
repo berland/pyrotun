@@ -15,7 +15,7 @@ PERS = None
 async def main(pers=PERS):
     dotenv.load_dotenv()
     if pers is None:
-        pers = pyrotun.persist.PyrotunPersistence(readonly=True)
+        pers = pyrotun.persist.PyrotunPersistence(readonly=False)
     if pers.tibber is None:
         await pers.ainit(["tibber", "smappee", "openhab"])
     prices_df = await pers.tibber.get_prices()

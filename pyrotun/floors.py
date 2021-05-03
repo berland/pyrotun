@@ -617,8 +617,10 @@ def temp_requirement(
         timestamp (pd.Timestamp)
         vacation (bool)
         prices (pd.DataFrame): not used
-        master_correction (pd.Series): A time-dependent correction added to the master temperature
-        delta (float): Room-dependent (constant in time) correction added to master temperature
+        master_correction (pd.Series): A time-dependent correction added
+            to the master temperature
+        delta (float): Room-dependent (constant in time) correction added
+            to master temperature
 
     Return:
         float
@@ -629,6 +631,8 @@ def temp_requirement(
         return 15 + delta
     if hour < 6 or hour > 21:
         return 18 + delta
+    if hour > 17 and hour < 22:
+        return 24 + delta
     return 25 + delta
 
 
