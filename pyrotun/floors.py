@@ -631,8 +631,8 @@ def temp_requirement(
         return 15 + delta
     if hour < 6 or hour > 21:
         return 18 + delta
-    if hour > 17 and hour < 22:
-        return 24 + delta
+    if hour > 16 and hour < 22:
+        return 23 + delta
     return 25 + delta
 
 
