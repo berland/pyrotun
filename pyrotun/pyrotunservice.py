@@ -121,7 +121,7 @@ async def yrmelding():
 async def sunheatingmodel():
     logger.info(" ** sunheating model")
     sunmodel = await pyrotun.powermodels.sunheating_model(PERS)
-    PERS["powermodels"].sunheatingmodel = sunmodel
+    PERS.powermodels.sunheatingmodel = sunmodel
 
 
 @aiocron.crontab(EVERY_15_MINUTE)

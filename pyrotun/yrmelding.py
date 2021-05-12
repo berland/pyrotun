@@ -4,6 +4,7 @@ import asyncio
 import dotenv
 
 import astral
+from astral.sun import sun  # noqa
 import datetime
 
 import pyrotun
