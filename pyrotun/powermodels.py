@@ -3,6 +3,7 @@ import asyncio
 
 import sklearn
 import pandas as pd
+from matplotlib import pyplot
 
 import dotenv
 
@@ -39,11 +40,17 @@ async def sunheating_model(pers, plot=False):
 
     For prediction from weather forecast, ensure that the equation for making
     the irradiation proxy is the same.
+
+    After this algorithm was applied, the training data is destroyed, so
+    we need to limit the training data set to a small set of days in april 2021..
     """
     # Indoor temp:
     indoor = (await pers.influxdb.get_series_grouped("InneTemperatur", time="1h"))[
         "InneTemperatur"
     ]
+    # After this algorithm was applied, the training data is destroyed, so
+    # we need to limit the training data set to a small set of days in april 2021..
+    indoor = indoor[indoor.index < pd.to_datetime("2021-05-01 00:00:00+00:00")]
 
     # Sun altitude in degrees:
     sunheight = (await pers.influxdb.get_series_grouped("Solhoyde", time="1h"))[
