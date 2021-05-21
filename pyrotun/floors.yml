@@ -79,7 +79,7 @@ Leane:
 Sofastue:
   backup_setpoint: 20
   cooling_rate: -0.3
-  delta: -4
+  delta: -5
   heating_rate: 1
   maxtemp: 25
   sensor_item: Termostat_Sofastue_SensorGulv
