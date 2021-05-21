@@ -33,6 +33,7 @@ FLOORS = {
         "sensor_item": "Termostat_Bad_SensorGulv",
         "setpoint_item": "Termostat_Bad_SetpointHeating",
         "setpoint_base": "temperature",  # or "target"
+        "delta": 0,
         "heating_rate": 5,
         "cooling_rate": -0.4,
         "setpoint_force": 1,
@@ -143,6 +144,12 @@ async def main(
         else:
             logger.info("Vacation forced to off")
             vacation = False
+
+    # Summer mode; truncate maxtemp to two degrees above setpoint:
+    if 4 < datetime.datetime.now().month < 10:
+        for floor in FLOORS:
+            # Bad coding: overwriting a "constant" variable.
+            FLOORS[floor]["maxtemp"] = 25 + 2 + FLOORS[floor].get("delta", 0)
 
     for floor in selected_floors:
         logger.info("Starting optimization for floor %s", floor)
