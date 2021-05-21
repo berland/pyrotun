@@ -1,9 +1,17 @@
+import asyncio
+
 import pyrotun
+import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
 
+PERS = None
 
-async def main(pers):
+
+async def main(pers=PERS):
+
+    if pers.smappee is None or pers.openhab is None:
+        await pers.ainit(["smappee", "openhab"])
 
     # Oops, blocking call..
     wattage = pers.smappee.avg_watt_5min()
@@ -18,4 +26,5 @@ async def main(pers):
 
 
 if __name__ == "__main__":
-    main()
+    PERS = pyrotun.persist.PyrotunPersistence()
+    asyncio.run(main(PERS))
