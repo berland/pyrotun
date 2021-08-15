@@ -85,9 +85,9 @@ class OpenHABConnection:
                     if resp.status != 200:
                         pass
                         # logger.error(resp)
-            except OSError as err:
-                logger.warning("Secondary OpenHAB instance not responding")
-                logger.warning(str(err))
+            except OSError:  # as err:
+                # logger.warning("Secondary OpenHAB instance not responding")
+                # logger.warning(str(err))
                 pass
 
     def sync_get_item(self, item_name):

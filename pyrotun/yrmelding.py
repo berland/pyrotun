@@ -65,6 +65,8 @@ async def main(pers=None):
 
     # Each column in the forecast dataframe has its own item in OpenHAB:
     for yr_item in forecast_df.columns:
+        if "percentile" in yr_item:
+            continue
         await pers.openhab.set_item(
             "Yr_" + yr_item, forecast_df.iloc[0][yr_item], log=True
         )

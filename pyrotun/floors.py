@@ -200,7 +200,7 @@ async def main(
                 )
                 await pers.openhab.set_item(
                     FLOORS[floor]["setpoint_item"],
-                    str(min_temp - FLOORS[floor]["setpoint_force"]),
+                    str(max(10, min_temp - FLOORS[floor]["setpoint_force"])),
                     log=True,
                 )
             continue
