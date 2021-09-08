@@ -633,13 +633,21 @@ def temp_requirement(
         float
     """
     hour = timestamp.hour
-
+    weekday = timestamp.weekday()  # Monday = 0, Sunday = 6
+    friday = 4
     if vacation:
+        # Ferie
         return 15 + delta
     if hour < 6 or hour > 21:
+        # Natt:
+        return 18 + delta
+    if hour > 7 and hour < 13 and weekday <= friday:
+        # Dagsenking:
         return 18 + delta
     if hour > 16 and hour < 22:
+        # Ettermiddag
         return 23 + delta
+    # Morgen og middagstid
     return 25 + delta
 
 
