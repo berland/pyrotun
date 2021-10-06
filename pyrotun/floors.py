@@ -646,9 +646,9 @@ def temp_requirement(
         return 18 + delta
     if hour > 16 and hour < 22:
         # Ettermiddag
-        return 23 + delta
+        return 22 + delta
     # Morgen og middagstid
-    return 25 + delta
+    return 24 + delta
 
 
 def path_costs(graph, path):
