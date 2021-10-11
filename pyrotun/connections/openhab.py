@@ -60,9 +60,11 @@ class OpenHABConnection:
             current_state = await self.get_item(item_name)
             if str(current_state) == str(new_state):
                 logger.info(
-                    "OpenHAB: No change in %s, value %s", item_name, str(new_state)
+                    "OpenHAB: No change in %s, value %s, still sending command",
+                    item_name,
+                    str(new_state),
                 )
-                return
+                # return  # If we don't push new commands, items will expire :(
             if log is True:
                 logger.info("OpenHAB: Setting %s to %s", item_name, str(new_state))
             if log == "change":
