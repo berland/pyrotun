@@ -20,8 +20,12 @@ class InfluxDBConnection:
 
     async def get_series(self, item):
         resp = await self.client.query(f"SELECT * FROM {item}")
-        resp.columns = [item]
-        return resp
+        if len(resp.columns) > 1:
+            # OH3 changed how it writes to Influx series
+            resp.columns = ["item", item]
+        else:
+            resp.columns = [item]
+        return resp[[item]]
 
     async def get_series_grouped(
         self, item, aggregator="mean", time="1h", condition=""
