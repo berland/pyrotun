@@ -1,9 +1,10 @@
-import os
 import asyncio
 import datetime
+import os
 
-import dotenv
 import aiohttp
+import defusedxml.minidom
+import dotenv
 import pandas as pd
 
 import pyrotun
@@ -56,6 +57,15 @@ class YrConnection:
                 os.getenv("TIMEZONE")
             )
             return dframe["precipitation_rate"]
+
+    async def get_svg_meteogram(self, met_location_id):
+        async with self.websession.get(
+            "https://www.yr.no/nb/innhold/" + met_location_id + "/meteogram.svg"
+        ) as response:
+            assert response.status == 200
+            svg = await response.text()
+            print(svg[0:100])
+            return svg
 
     async def _symbols(self):
         """Return weather symbol information, as a dict with three views of the data"""
@@ -139,13 +149,51 @@ class YrConnection:
             series = pd.Series(
                 cloud_fractions,
                 index=pd.to_datetime(time_index),
-                name="cloud_area_fraction"
+                name="cloud_area_fraction",
             )
             # the series is of type "octa", where 0 is clear sky, and
             # 8 is totally overcast. Translate this to a fraction beteween
             # 0 (clear sky) and 1.0 (overcast)
             series = series / 8.0
             return series
+
+
+def crop_svg_meteogram(svg) -> str:
+    """Removes logos and stuff from yr's meteogram"""
+    doc = defusedxml.minidom.parseString(svg)
+
+    root = doc.childNodes[0]
+    # Remove all whitespace nodes:
+    for node in root.childNodes:
+        if node.toxml().strip() == "":
+            node.unlink()
+
+    # node 3 should contain <rect> which fill the background with white.
+
+    # Remove blue yr-logo:
+    assert "circle fill" in root.childNodes[5].toxml()
+    root.childNodes[5].unlink()
+
+    assert "En tjeneste fra" in root.childNodes[7].toxml()
+    root.childNodes[7].unlink()
+
+    # NRK-logo:
+    root.childNodes[9].unlink()
+
+    # Meteorologisk institutt-logo:
+    root.childNodes[11].unlink()
+
+    assert "Værvarsel for " in root.childNodes[13].toxml()
+    root.childNodes[13].unlink()
+
+    # Node 15 er selve meteogrammet, inkludert dato.
+    meteo = root.childNodes[15]
+    assert "Vindkast" in meteo.toxml()
+
+    assert meteo.getAttribute("transform") == "translate(0, 84.86)"
+    meteo.setAttribute("transform", "translate(0, 0)")
+
+    return doc.toxml()
 
 
 async def main():

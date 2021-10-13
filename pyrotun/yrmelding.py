@@ -1,16 +1,16 @@
-import os
 import asyncio
-
-import dotenv
+import datetime
+import os
+from pathlib import Path
 
 import astral
+import dotenv
 from astral.sun import sun  # noqa
-import datetime
 
 import pyrotun
-from pyrotun import persist
 import pyrotun.connections.openhab
 import pyrotun.connections.yr
+from pyrotun import persist
 
 logger = pyrotun.getLogger()
 
@@ -19,6 +19,8 @@ dotenv.load_dotenv()
 LONGITUDE = os.getenv("LOCAL_LONGITUDE")
 LATITUDE = os.getenv("LOCAL_LATITUDE")
 MET_CLIENT_ID = os.getenv("FROST_CLIENT_ID")
+MET_LOCATION_ID = "1-92917"  # Used to fetch meteogram svg
+METEOGRAM_SVG_FILENAME = "/etc/openhab/html/meteogram.svg"
 
 
 async def main(pers=None):
@@ -31,6 +33,10 @@ async def main(pers=None):
 
     # print(pers.yr.symbolcodedict)
     forecast_df = await pers.yr.forecast()
+
+    svg = await pers.yr.get_svg_meteogram(MET_LOCATION_ID)
+    svg = pyrotun.connections.yr.crop_svg_meteogram(svg)
+    Path(METEOGRAM_SVG_FILENAME).write_text(svg)
 
     # Predict sunheight:
     city = astral.LocationInfo(

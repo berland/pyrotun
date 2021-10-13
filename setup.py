@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from glob import glob
-from os.path import splitext, basename
 
 import setuptools
 from setuptools import find_packages
@@ -13,6 +11,7 @@ REQUIREMENTS = [
     "asyncio",
     "asyncio_mqtt",
     "asyncsector",
+    "defusedxml",
     "python-dotenv",
     "geopy",
     "gpxpy",
@@ -43,6 +42,7 @@ SETUP_REQUIREMENTS = [
 TEST_REQUIREMENTS = [
     "black>=20.8b0",
     "flake8",
+    "isort",
     "pytest",
     "pytest-asyncio",
     "rstcheck",
