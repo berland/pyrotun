@@ -80,6 +80,7 @@ async def remove_spikes(pers, mindev=7, stddevs=3, readonly=True, hours=48):
         # indexed by datetime in UTC
         if isinstance(meas_data, dict):  # this means empty..
             continue
+        meas_data = meas_data[["value"]]
         series = meas_data
         # Find the deviation from a 5-point rolling mean
         deviation = abs(series - series.rolling(5).mean())
