@@ -67,7 +67,7 @@ class OpenHABConnection:
                 # return  # If we don't push new commands, items will expire :(
             if log is True:
                 logger.info("OpenHAB: Setting %s to %s", item_name, str(new_state))
-            if log == "change":
+            if log == "change" and str(current_state) != str(new_state):
                 logger.info(
                     "OpenHAB: Changing %s from %s to %s",
                     item_name,
