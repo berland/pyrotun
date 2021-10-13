@@ -64,7 +64,6 @@ class YrConnection:
         ) as response:
             assert response.status == 200
             svg = await response.text()
-            print(svg[0:100])
             return svg
 
     async def _symbols(self):
