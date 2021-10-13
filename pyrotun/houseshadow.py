@@ -42,7 +42,7 @@ SUN_RADIUS = 8
 MOON_COLOR = "#999999"
 MOON_RADIUS = 6
 STROKE_WIDTH = "1"
-FILENAME = "/etc/openhab2/html/husskygge.svg"
+FILENAME = "/etc/openhab/html/husskygge.svg"
 LATITUDE = None
 LONGITUDE = None
 
