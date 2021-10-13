@@ -169,7 +169,7 @@ def crop_svg_meteogram(svg) -> str:
             node.unlink()
 
     # node 3 should contain <rect> which fill the background with white.
-    root.childNodes[3].setAttribute("height", "300")
+    root.childNodes[3].setAttribute("height", "280")
 
     # Remove blue yr-logo:
     assert "circle fill" in root.childNodes[5].toxml()
@@ -193,6 +193,9 @@ def crop_svg_meteogram(svg) -> str:
 
     assert meteo.getAttribute("transform") == "translate(0, 84.86)"
     meteo.setAttribute("transform", "translate(0, 0)")
+
+    assert "Vindkast" in meteo.childNodes[11].toxml()
+    meteo.childNodes[11].unlink()
 
     return doc.toxml()
 
