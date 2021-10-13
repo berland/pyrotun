@@ -37,6 +37,7 @@ async def main(pers=None):
     svg = await pers.yr.get_svg_meteogram(MET_LOCATION_ID)
     svg = pyrotun.connections.yr.crop_svg_meteogram(svg)
     Path(METEOGRAM_SVG_FILENAME).write_text(svg)
+    logger.info("Wrote cropped meteogram to %s", METEOGRAM_SVG_FILENAME)
 
     # Predict sunheight:
     city = astral.LocationInfo(

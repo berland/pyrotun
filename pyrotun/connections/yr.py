@@ -169,6 +169,7 @@ def crop_svg_meteogram(svg) -> str:
             node.unlink()
 
     # node 3 should contain <rect> which fill the background with white.
+    root.childNodes[3].setAttribute("height", "300")
 
     # Remove blue yr-logo:
     assert "circle fill" in root.childNodes[5].toxml()
