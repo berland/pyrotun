@@ -127,7 +127,7 @@ async def sunheatingmodel():
 @aiocron.crontab(EVERY_15_MINUTE)
 async def houseshadow():
     logger.info(" ** Houseshadow")
-    pyrotun.houseshadow.main("/etc/openhab2/html/husskygge.svg")
+    pyrotun.houseshadow.main("/etc/openhab/html/husskygge.svg")
 
 
 @aiocron.crontab(EVERY_15_MINUTE)
