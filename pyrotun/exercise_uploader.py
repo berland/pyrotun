@@ -20,6 +20,16 @@ dotenv.load_dotenv()
 
 logger = pyrotun.getLogger(__name__)
 
+MAP_SPORT_INFO = {
+    "BACKCOUNTRY_SKIING": "Skitur",
+    "CROSS-COUNTRY_SKIING": "Langrenn",
+    "HIKING": "Fjelltur",
+    "INDOOR_CYCLING": "Sykkelrulle",
+    "RUNNING": "Løp",
+    "TRAIL_RUNNING": "Løp, terreng",
+    "TREADMILL_RUNNING": "Løp, mølle",
+}
+
 EXERCISE_DIR = Path.home() / "polar_dump"
 
 DONE_FILE = "done"
@@ -118,15 +128,6 @@ def make_http_post_data(dirname):
         move_time = sum(ddf[ddf.moving].t_delta)
         moving_speed = prettyprintseconds(move_time / (dist / 1000.0))
 
-    map_sport_info = {
-        "RUNNING": "Løp",
-        "HIKING": "Fjelltur",
-        "INDOOR_CYCLING": "Sykkelrulle",
-        "BACKCOUNTRY_SKIING": "Skitur",
-        "CROSS-COUNTRY_SKIING": "Langrenn",
-        "TRAIL_RUNNING": "Løp, terreng",
-    }
-
     details = ""
     if "distance" in exercise_summary:
         distance = exercise_summary["distance"] / 1000
@@ -150,7 +151,7 @@ def make_http_post_data(dirname):
     post_data = {
         "legginn": "ja",
         "navn": os.getenv("EXERCISE_NAME"),
-        "hva": map_sport_info.get(exercise_summary["detailed-sport-info"], "polar v"),
+        "hva": MAP_SPORT_INFO.get(exercise_summary["detailed-sport-info"], "polar v"),
         "dato": exercise_datetime.strftime("%Y-%m-%d"),
         "hoyintensitet": threezones_df.loc["hoy"]["hh:mm"],
         "modintensitet": threezones_df.loc["moderat"]["hh:mm"],
