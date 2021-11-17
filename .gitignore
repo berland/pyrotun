@@ -1,0 +1,8 @@
+version.py
+.env
+__pycache__
+*.swp
+.eggs
+*.egg-info
+.hypothesis
+.pytest_cache

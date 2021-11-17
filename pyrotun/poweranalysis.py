@@ -25,7 +25,7 @@ async def make_heatingmodel(
     """Make heating and/or power models.
 
     Args:
-        influx:  A pyrotun.connection object to InfluxDB
+        influx: A pyrotun.connection object to InfluxDB
         target: item-name
         ambient: item-name
         powermeasure: item-name, unit=Watt
@@ -99,7 +99,7 @@ async def make_heatingmodel(
     return {"powerneed": powermodel, "tempincrease": tempmodel}
 
 async def non_heating_powerusage(pers):
-    """Return a series with hour sampling  for power usage that is not
+    """Return a series with hour sampling for power usage that is not
     used in heating, typically waterheater and electrical car.
 
     Returns time-series with unit kwh.
