@@ -1,20 +1,19 @@
-import os
+import argparse
 import asyncio
-import networkx
 import datetime
+import os
 import random
-import yaml
 from pathlib import Path
 
-import argparse
-import pytz
+import dotenv
+import networkx
 import numpy as np
 import pandas as pd
+import pytz
+import yaml
 from matplotlib import pyplot
-import dotenv
 
 import pyrotun
-
 from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)

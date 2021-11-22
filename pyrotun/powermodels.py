@@ -1,11 +1,10 @@
 import argparse
 import asyncio
 
-import sklearn
-import pandas as pd
-from matplotlib import pyplot
-
 import dotenv
+import pandas as pd
+import sklearn
+from matplotlib import pyplot
 
 import pyrotun
 from pyrotun import persist  # noqa

@@ -1,6 +1,7 @@
 import asyncio
-import pandas as pd
+
 import dotenv
+import pandas as pd
 
 import pyrotun
 import pyrotun.persist

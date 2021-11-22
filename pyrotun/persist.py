@@ -1,6 +1,6 @@
 import aiohttp
 
-from pyrotun import connections, waterheater, powermodels, getLogger
+from pyrotun import connections, getLogger, powermodels, waterheater
 
 logger = getLogger(__name__)
 

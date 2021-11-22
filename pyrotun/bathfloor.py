@@ -1,16 +1,16 @@
-import os
 import asyncio
-import networkx
 import datetime
 import itertools
-import pytz
+import os
+
+import dotenv
+import networkx
 import numpy as np
 import pandas as pd
+import pytz
 from matplotlib import pyplot
-import dotenv
 
 import pyrotun
-
 from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)

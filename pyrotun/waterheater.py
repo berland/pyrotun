@@ -1,16 +1,16 @@
-import os
 import asyncio
-import networkx
 import datetime
 import itertools
-import pytz
-from sklearn import linear_model
-import pandas as pd
-from matplotlib import pyplot
+import os
+
 import dotenv
+import networkx
+import pandas as pd
+import pytz
+from matplotlib import pyplot
+from sklearn import linear_model
 
 import pyrotun
-
 from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)

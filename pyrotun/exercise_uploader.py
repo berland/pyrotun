@@ -1,17 +1,17 @@
-import os
-from pathlib import Path
-import dateutil
+import argparse
 import asyncio
 import json
+import os
 import time
+from pathlib import Path
 
+import dateutil
+import dotenv
+import gpxpy
 import isodate
 import pandas as pd
 import watchgod
-import dotenv
-import gpxpy
 from geopy import distance
-import argparse
 
 import pyrotun
 import pyrotun.persist

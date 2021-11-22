@@ -1,9 +1,9 @@
 #!/bin/env python
-import asyncio
-import dotenv
-import fnmatch
 import argparse
+import asyncio
+import fnmatch
 
+import dotenv
 import pandas as pd
 
 import pyrotun

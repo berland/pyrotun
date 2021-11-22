@@ -1,10 +1,10 @@
-import os
 import datetime
-import pytz
+import os
 
 import pandas as pd
-import smappy
+import pytz
 import requests
+import smappy
 
 import pyrotun
 
