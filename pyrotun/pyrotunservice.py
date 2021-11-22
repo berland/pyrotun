@@ -26,6 +26,7 @@ import pyrotun.dataspike_remover
 import pyrotun.polar_dump
 import pyrotun.pollsectoralarm
 import pyrotun.powermodels
+import pyrotun.powercontroller
 
 import pyrotun.connections.smappee
 import pyrotun.connections.sectoralarm
@@ -88,6 +89,12 @@ async def polltibber():
 async def calc_power_savings_yesterday():
     logger.info(" ** Calculating power cost savings yesterday")
     await pyrotun.poweranalysis.estimate_savings_yesterday(PERS, dryrun=False)
+
+
+@aiocron.crontab(EVERY_MINUTE)
+async def update_thishour_powerestimate():
+    estimate = await pyrotun.powercontroller.estimate_currenthourusage(PERS)
+    await PERS.openhab.set_item("EstimatedKWh_thishour", estimate)
 
 
 @aiocron.crontab(EVERY_8_MINUTE)
