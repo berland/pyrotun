@@ -5,8 +5,11 @@ To be run()'ed every minute.
 """
 import asyncio
 import datetime
+from pathlib import Path
+from typing import Dict, List
 
 import aiofiles
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -15,7 +18,7 @@ from pyrotun import persist
 CURRENT_POWER_ITEM = "AMSpower"
 HOURUSAGE_ESTIMATE_ITEM = "WattHourEstimate"
 MAXHOURWATT_LASTMONTH_ITEM = "MaxHourwatt_lastmonth"
-FLOORSFILE = "floors.yml"
+FLOORSFILE = Path(__file__).absolute().parent / "floors.yml"
 
 
 def run(pers, dry=True):
@@ -151,34 +154,61 @@ async def control_powerusage(pers) -> None:
 
     powerload_df = await get_powerloads()
 
+    actions = _decide(overshoot, powerload_df)
+    for action, appliance in actions.items():
+        turn(action, appliance)
+
+
+def _decide(overshoot: int, powerload_df: pd.DataFrame):
+    assert isinstance(overshoot, int)
+    assert isinstance(powerload_df, pd.DataFrame)
+    actions: List[Dict[str, dict]] = []
+    if powerload_df.empty:
+        return actions
+    if "lastchange" not in powerload_df.columns:
+        powerload_df["lastchange"] = np.nan
+    if "is_on" not in powerload_df.columns:
+        powerload_df["is_on"] = np.nan
+    if "on_need" not in powerload_df.columns:
+        powerload_df["on_need"] = np.nan
+
+    # Need an index as a column
+    powerload_df.reset_index(inplace=True)
+
+    # Sort all rows for candidacy for change:
+    powerload_df["change_candidate"] = 0
+    powerload_df.loc[
+        (powerload_df["lastchange"] > 5) & (powerload_df["is_on"] != "NO"),
+        "change_candidate",
+    ] = 1
+    powerload_df.loc[
+        (powerload_df["lastchange"] > 5) & (powerload_df["is_on"] != "YES"),
+        "change_candidate",
+    ] = -1
     if overshoot > 0:
         remainder_overshoot = overshoot
-        while remainder_overshoot > 0:
+
+        while remainder_overshoot > 0 and not powerload_df.empty:
             turnmeoff = (
-                powerload_df[
-                    (powerload_df["lastchange_minutes"] > 5)
-                    & (powerload_df["is_on"] != "NO")
-                ]
-                .sort_values("on_need")
+                powerload_df.sort_values(["change_candidate", "on_need"])
                 .tail(1)
-                .to_dict()
+                .to_dict(orient="records")[0]
             )
-            await turn("ON", turnmeon)
+            actions.append({"OFF": turnmeoff})
+            powerload_df.drop(axis=0, index=turnmeoff["index"], inplace=True)
             remainder_overshoot -= turnmeoff["wattage"]
     else:
         remainder_undershoot = -overshoot
-        while remainder_undershoot > 0:
+        while remainder_undershoot > 0 and not powerload_df.empty:
             turnmeon = (
-                powerload_df[
-                    (powerload_df["lastchange_minutes"] > 5)
-                    & (powerload_df["is_on"] != "YES")
-                ]
-                .sort_values("on_need")
+                powerload_df.sort_values(["change_candidate", "on_need"])
                 .head(1)
-                .to_dict()
+                .to_dict(orient="records")[0]
             )
-            await turn("OFF", turnmeon)
-            remainder_overshoot -= turnmeoff["wattage"]
+            actions.append({"ON": turnmeon})
+            powerload_df.drop(axis=0, index=turnmeon["index"], inplace=True)
+            remainder_overshoot -= turnmeon["wattage"]
+    return actions
 
 
 async def turn(action: str, device: dict) -> None:
@@ -225,7 +255,7 @@ def _estimate_currenthourusage(
         ),
         data=lastminute_value,
     )
-    full_hour = pd.concat([lasthour_s, remainder_hour])
+    full_hour = pd.concat([lasthour_s, remainder_hour], axis=0)
     return round(full_hour.mean())
 
 

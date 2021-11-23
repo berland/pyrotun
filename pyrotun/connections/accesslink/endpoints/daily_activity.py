@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from .resource import Resource
 from .daily_activity_transaction import DailyActivityTransaction
+from .resource import Resource
 
 
 class DailyActivity(Resource):
