@@ -1,16 +1,16 @@
-import os
 import asyncio
-import networkx
 import datetime
 import itertools
-import pytz
-from sklearn import linear_model
-import pandas as pd
-from matplotlib import pyplot
+import os
+
 import dotenv
+import networkx
+import pandas as pd
+import pytz
+from matplotlib import pyplot
+from sklearn import linear_model
 
 import pyrotun
-
 from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)
@@ -20,6 +20,7 @@ ROUND = 1
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 SENSOR_ITEM = "Varmtvannsbereder_temperatur"
 HEATERCONTROLLER_ITEM = "Varmtvannsbereder_bryter"
+TARGETTEMP_ITEM = "Varmtvannsbereder_temperaturtarget"
 SAVINGS24H_ITEM = "Varmtvannsbereder_besparelse"
 VACATION_ITEM = "Ferie"
 
@@ -65,6 +66,7 @@ class WaterHeater:
         if currenttemp is None:
             logger.warning("Waterheater set ON, no temperature knowledge")
             await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
+            await self.pers.openhab.set_item(TARGETTEMP_ITEM, 65, log=True)
             return
 
         vacation = await self.pers.openhab.get_item(VACATION_ITEM, datatype=bool)
@@ -88,12 +90,18 @@ class WaterHeater:
                 str(currenttemp),
             )
             await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
+            # High target gives high priority:
+            await self.pers.openhab.set_item(
+                TARGETTEMP_ITEM, currenttemp + 10, log=True
+            )
             return
 
         opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=55)
 
         # Turn on if temperature in the path should increase:
-        if opt_results["opt_path"][1][1] > opt_results["opt_path"][0][1]:
+        next_temp = opt_results["opt_path"][1][1]
+        await self.pers.openhab.set_item(TARGETTEMP_ITEM, next_temp, log=True)
+        if next_temp > opt_results["opt_path"][0][1]:
             await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
         else:
             await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "OFF", log=True)
