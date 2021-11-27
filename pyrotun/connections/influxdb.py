@@ -1,5 +1,7 @@
+import datetime
 import os
 
+import pandas as pd
 from aioinflux import InfluxDBClient
 
 
@@ -55,6 +57,14 @@ class InfluxDBConnection:
     async def get_lastvalue(self, item):
         resp = await self.client.query(f"SELECT last(value) FROM {item}")
         return resp["last"].values[0]
+
+    async def item_age(self, item, unit="minutes"):
+        resp = await self.client.query(f"SELECT last(value) FROM {item}")
+        divisors = {"minutes": 60, "seconds": 1, "hours": 60 * 60}
+        assert unit in divisors
+        return (
+            pd.Timestamp(datetime.datetime.utcnow(), tz="utc") - resp.index[0]
+        ).seconds / divisors[unit]
 
     async def get_measurements(self):
         """Return a list of all measurements in database"""

@@ -1,6 +1,6 @@
 """Bridging MQTT messages to Discord via Discord webhooks"""
-import os
 import asyncio
+import os
 
 import dotenv
 

@@ -1,5 +1,4 @@
 import pyrotun
-
 from pyrotun.connections.polar import Polar
 
 logger = pyrotun.getLogger(__name__)

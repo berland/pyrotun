@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from .resource import Resource
 from .physical_info_transaction import PhysicalInfoTransaction
+from .resource import Resource
 
 
 class PhysicalInfo(Resource):

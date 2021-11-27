@@ -49,3 +49,72 @@ async def test_estimate_currenthourusage_for_real():
     print(est)
     assert 600 < est < 10000
     await pers.aclose()
+
+
+@pytest.mark.parametrize(
+    "overshoot, powerload_df, expected_actions",
+    [
+        (0, pd.DataFrame(), []),
+        (1000, pd.DataFrame(), []),
+        (-1000, pd.DataFrame(), []),
+        (1000, {"switch_item": "foo_bryter", "wattage": 1000}, [{"ON": "foo_bryter"}]),
+        (
+            1000,
+            [
+                {"switch_item": "foo_bryter", "wattage": 100},
+                {"switch_item": "bar_bryter", "wattage": 100},
+            ],
+            [{"ON": "bar_bryter"}, {"ON": "foo_bryter"}],
+        ),
+        (
+            1000,
+            [
+                {
+                    "switch_item": "foo_bryter",
+                    "wattage": 100,
+                    "lastchange": 10,
+                    "is_on": "YES",
+                },
+                {"switch_item": "bar_bryter", "wattage": 100},
+            ],
+            [{"ON": "foo_bryter"}, {"ON": "bar_bryter"}],
+        ),
+        (
+            100,
+            [
+                {
+                    "switch_item": "foo_bryter",
+                    "wattage": 100,
+                    "lastchange": 10,
+                    "is_on": "YES",
+                },
+                {"switch_item": "bar_bryter", "wattage": 100},
+            ],
+            [{"ON": "foo_bryter"}],
+        ),
+        (
+            100,
+            [
+                {
+                    "switch_item": "foo_bryter",
+                    "wattage": 100,
+                    "lastchange": 10,
+                    "is_on": "NO",
+                },
+                {"switch_item": "bar_bryter", "wattage": 100},
+            ],
+            [{"ON": "bar_bryter"}],
+        ),
+    ],
+)
+def test_decide(overshoot, powerload_df, expected_actions):
+    if isinstance(powerload_df, dict):
+        powerload_df = pd.DataFrame([powerload_df])
+    if isinstance(powerload_df, list):
+        powerload_df = pd.DataFrame(powerload_df)
+    actions = powercontroller._decide(overshoot, powerload_df)
+    # Slice out only switch_item, for testing:
+    sliced_actions = [
+        {list(act.keys())[0]: list(act.values())[0]["switch_item"]} for act in actions
+    ]
+    assert sliced_actions == expected_actions

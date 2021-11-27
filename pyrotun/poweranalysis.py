@@ -1,20 +1,20 @@
-import os
 import argparse
 import asyncio
-import pytz
 import datetime
+import os
 from pathlib import Path
 
+import dotenv
+import pandas as pd
+import pytz
 import sklearn
 from matplotlib import pyplot
-import pandas as pd
-
-import dotenv
 
 import pyrotun
 from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)
+
 
 async def make_heatingmodel(
     pers,
@@ -50,7 +50,7 @@ async def make_heatingmodel(
     sunheight[sunheight < 10] = 0
 
     # Cloud cover (sort of. Number 12 is chosen as it gives the highest explanation in regression)
-    yrmelding = 12- (
+    yrmelding = 12 - (
         (await pers.influxdb.get_series_grouped("YrmeldingNaa", time="1h"))[
             "YrmeldingNaa"
         ]
@@ -68,7 +68,8 @@ async def make_heatingmodel(
     heating_power.clip(lower=0, inplace=True)
 
     dataset = pd.concat(
-        [target_series, ambient_series, heating_power, irradiation_proxy], axis=1,
+        [target_series, ambient_series, heating_power, irradiation_proxy],
+        axis=1,
     ).dropna()
 
     dataset["indoorvsoutdoor"] = dataset[target] - dataset[ambient]
@@ -86,9 +87,12 @@ async def make_heatingmodel(
     print("Coefficients %s" % str(powermodel.coef_))
 
     print(" - in variables: %s" % str(modelparameters))
-    print("Preheating requirement: %f" % (powermodel.coef_[0][1] / powermodel.coef_[0][0] + 1))
+    print(
+        "Preheating requirement: %f"
+        % (powermodel.coef_[0][1] / powermodel.coef_[0][0] + 1)
+    )
 
-    p2 = ["HeatingPower", "indoorvsoutdoor" ,"IrradiationProxy"]
+    p2 = ["HeatingPower", "indoorvsoutdoor", "IrradiationProxy"]
     y2 = dataset["indoorderivative"]
     lm2 = sklearn.linear_model.LinearRegression()
     tempmodel = lm2.fit(dataset[p2], y2)
@@ -97,6 +101,7 @@ async def make_heatingmodel(
     print(" - in variables: %s" % str(p2))
 
     return {"powerneed": powermodel, "tempincrease": tempmodel}
+
 
 async def non_heating_powerusage(pers):
     """Return a series with hour sampling for power usage that is not
@@ -118,6 +123,7 @@ async def non_heating_powerusage(pers):
 
     # cum_usage = await influx.get_series("Varmtvannsbereder_kwh_sum")
     # The cumulative series is perhaps regularly reset to zero.
+
 
 async def sunheating_model(pers, plot=False):
     """Make a model of how much sun and cloud-cover affects maximal
@@ -164,7 +170,12 @@ async def sunheating_model(pers, plot=False):
 
     if plot:
         dataset.plot.scatter(x="IrradiationProxy", y="InneTemperatur")
-        pyplot.plot(dataset["IrradiationProxy"], lm.predict(dataset["IrradiationProxy"].values.reshape(-1,1)), color='blue', linewidth=3)
+        pyplot.plot(
+            dataset["IrradiationProxy"],
+            lm.predict(dataset["IrradiationProxy"].values.reshape(-1, 1)),
+            color="blue",
+            linewidth=3,
+        )
         pyplot.show()
 
     print("How much can we explain? %.2f" % powermodel.score(X, y))
@@ -182,7 +193,9 @@ async def estimate_savings_yesterday(pers, dryrun):
     savings = results.loc[yesterday]["savings"]
     if not dryrun:
         await pers.openhab.set_item(
-            "PowercostSavingsYesterday", float(savings), log=True,
+            "PowercostSavingsYesterday",
+            float(savings),
+            log=True,
         )
     else:
         logger.info("(dryrun) Power savings yesterday %s", str(savings))
@@ -269,7 +282,6 @@ async def main(pers=None, days=30, plot=False, yesterday=False):
         res = await estimate_savings(pers, days, get_daily_profile(), plot=plot)
         print(res)
         print("Total savings: " + str(res["savings"].sum()))
-
 
     sunmodel = await sunheating_model(pers, plot)
 
