@@ -8,7 +8,7 @@ logger = getLogger(__name__)
 class PyrotunPersistence:
     def __init__(self, readonly=False):
         logger.info("Initializing PyrotunPersistence")
-        self.websession = aiohttp.ClientSession()
+        self.websession = None
         self.tibber = None
         self.influxdb = None
         self.waterheater = None
@@ -24,6 +24,7 @@ class PyrotunPersistence:
 
     async def ainit(self, requested="all"):
         logger.info("PyrotunPersistence.ainit()")
+        self.websession = aiohttp.ClientSession()
         if "openhab" in requested or "all" in requested:
             self.openhab = connections.openhab.OpenHABConnection(
                 websession=self.websession, readonly=self.readonly

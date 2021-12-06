@@ -14,7 +14,15 @@ logger = pyrotun.getLogger(__name__)
 
 class Powermodels:
     """Container class for various statistical models
-    related to power/heating"""
+    related to power/heating:
+    
+    * powermodel: How many watts are needed to raise house temperature
+      at a given outdoor difference
+    * tempmodel: How much the indoor temperature reacts to power usage
+    * sunheatingmodel: How much sun and cloud-cover affects maximal
+      indoor temperature during a day.
+
+    """
 
     def __init__(self):
         self.powermodel = None
@@ -64,6 +72,12 @@ async def sunheating_model(pers, plot=False):
         await pers.influxdb.get_series_grouped("Yr_cloud_area_fraction", time="1h")
     )["Yr_cloud_area_fraction"]
 
+    print(sunheight)
+    print(sunheight.max())
+    print(sunheight.min())
+    print(cloudcover)
+    print(cloudcover.max())
+    print(cloudcover.min())
     irradiation_proxy = sunheight * (1 - cloudcover / 100) / 100
     # 1/100 is just a scaling factor to get number in the ballpark 0 - 10.
     irradiation_proxy.name = "IrradiationProxy"
@@ -196,7 +210,7 @@ async def make_heatingmodel(
 
     return {"powermodel": powermodel, "tempmodel": tempmodel}
 
-
+ 
 async def non_heating_powerusage(pers):
     """Return a series with hour sampling  for power usage that is not
     used in heating, typically waterheater and electrical car.

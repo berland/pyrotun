@@ -6,6 +6,7 @@ import pytest
 from pyrotun import persist, powercontroller
 
 
+
 def test_estimate_currenthourusage():
     now = datetime.datetime.now()
     hourstart = now.replace(minute=0, second=0, microsecond=0)
@@ -37,7 +38,7 @@ def test_estimate_currenthourusage_athourstart():
     )
 
     # Empty series might happen:
-    est = powercontroller._estimate_currenthourusage(pd.Series(), 200)
+    est = powercontroller._estimate_currenthourusage(pd.Series(dtype=float), 200)
     assert est == 200
 
 
@@ -57,16 +58,17 @@ async def test_estimate_currenthourusage_for_real():
         (0, pd.DataFrame(), []),
         (1000, pd.DataFrame(), []),
         (-1000, pd.DataFrame(), []),
-        (1000, {"switch_item": "foo_bryter", "wattage": 1000}, [{"ON": "foo_bryter"}]),
+        (1000, {"switch_item": "foo_bryter", "wattage": 1000}, [{"OFF": "foo_bryter"}]),
         (
             1000,
             [
                 {"switch_item": "foo_bryter", "wattage": 100},
                 {"switch_item": "bar_bryter", "wattage": 100},
             ],
-            [{"ON": "bar_bryter"}, {"ON": "foo_bryter"}],
+            [{"OFF": "bar_bryter"}, {"OFF": "foo_bryter"}],
         ),
         (
+            # Prioritize assumedly ON appliances:
             1000,
             [
                 {
@@ -77,9 +79,10 @@ async def test_estimate_currenthourusage_for_real():
                 },
                 {"switch_item": "bar_bryter", "wattage": 100},
             ],
-            [{"ON": "foo_bryter"}, {"ON": "bar_bryter"}],
+            [{"OFF": "foo_bryter"}, {"OFF": "bar_bryter"}],
         ),
         (
+            # Stop when overshoot is solved:
             100,
             [
                 {
@@ -90,9 +93,10 @@ async def test_estimate_currenthourusage_for_real():
                 },
                 {"switch_item": "bar_bryter", "wattage": 100},
             ],
-            [{"ON": "foo_bryter"}],
+            [{"OFF": "foo_bryter"}],
         ),
         (
+            # Skip assumedly OFF
             100,
             [
                 {
@@ -103,7 +107,59 @@ async def test_estimate_currenthourusage_for_real():
                 },
                 {"switch_item": "bar_bryter", "wattage": 100},
             ],
-            [{"ON": "bar_bryter"}],
+            [{"OFF": "bar_bryter"}],
+        ),
+        (
+            # If needed, also message assumedly OFF devices
+            500,
+            [
+                {
+                    "switch_item": "foo_bryter",
+                    "wattage": 100,
+                    "lastchange": 10,
+                    "is_on": "NO",
+                },
+                {"switch_item": "bar_bryter", "wattage": 100},
+            ],
+            [{"OFF": "bar_bryter"}, {"OFF": "foo_bryter"}],
+        ),
+        (
+            # Prioritize on on_need, turn off less important first.
+            500,
+            [
+                {"switch_item": "foo_bryter", "wattage": 100, "on_need": 5},
+                {"switch_item": "bar_bryter", "wattage": 100, "on_need": 20},
+            ],
+            [{"OFF": "foo_bryter"}, {"OFF": "bar_bryter"}],
+        ),
+        (
+            # Prioritize on on_need, reverse on undershoot, and skip third:
+            -200,
+            [
+                {"switch_item": "foo_bryter", "wattage": 100, "on_need": 5},
+                {"switch_item": "bar_bryter", "wattage": 100, "on_need": 20},
+                {"switch_item": "com_bryter", "wattage": 100, "on_need": 2},
+            ],
+            [{"ON": "bar_bryter"}, {"ON": "foo_bryter"}],
+        ),
+        (
+            # Prioritize on lastchange over on_need
+            500,
+            [
+                {
+                    "switch_item": "foo_bryter",
+                    "wattage": 100,
+                    "on_need": 5,
+                    "lastchange": 4,
+                },
+                {
+                    "switch_item": "bar_bryter",
+                    "wattage": 100,
+                    "on_need": 20,
+                    "lastchange": 6,
+                },
+            ],
+            [{"OFF": "bar_bryter"}, {"OFF": "foo_bryter"}],
         ),
     ],
 )

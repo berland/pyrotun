@@ -63,7 +63,7 @@ class TibberConnection:
             self.authenticated = False
 
     async def get_prices(self):
-        """Prices in the dataframe is valid *forwards* in time"""
+        """Prices in the dataframe are valid *forwards* in time"""
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         if (
             self.lastpriceframe_timestamp is not None
@@ -102,6 +102,31 @@ class TibberConnection:
         self.lastpriceframe = prices_df
         self.lastpriceframe_timestamp = datetime.datetime.now()
         return prices_df
+
+    def _bkk_energiledd(timestamp: datetime.datetime) -> float:
+        if timestamp.month < 4 or timestamp.month == 12:
+            # Winter:
+            if timestamp.hour < 6 or timestamp.hour >= 22:
+                # Night
+                return 24.89
+            else:
+                # Day
+                return 34.89
+        else:
+            # Summer:
+            if timestamp.hour < 6 or timestamp.hour >= 22:
+                # Night
+                return 33.01
+            else:
+                # Day
+                return 43.01
+
+    def get_gridprices(self) -> pd.DataFrame:
+        tz = pytz.timezone(os.getenv("TIMEZONE"))
+        lasthour = datetime.datetime.now(tz).replace(second=0, minute=0, microsecond=0)
+        dframe = pd.DataFrame(index=pd.date_range(start=lasthour, periods=24, freq="h"))
+        dframe["energiledd"] = map(_bkk_energiledd, dframe.index)
+        return dframe
 
     async def get_currentprice(self):
         """Get the current power price in øre/kwh"""

@@ -276,6 +276,9 @@ async def main(
             setpoint = setpoint_base - FLOORS[floor]["setpoint_force"]
             logger.info("Turning floor %s OFF now", floor)
 
+        # Truncate setpoint from below:
+        setpoint = max(11, setpoint)
+
         if not dryrun:
             await pers.openhab.set_item(
                 FLOORS[floor]["setpoint_item"],

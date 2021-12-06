@@ -84,7 +84,36 @@ class YrConnection:
             }
 
     async def forecast(self):
-        """Returns a dataframe with the current forecast"""
+        """Returns a dataframe with the current forecast
+
+        Index is DateTimeIndex in local timezone, one point
+        for every hour.
+
+        Columns:
+          * wind_from_direction
+          * precipitation_amount
+          * air_temperature
+          * precipitation_amount_max
+          * cloud_area_fraction_medium
+          * sunheight
+          * irradiation_next24
+          * precipitation_amount_min
+          * ultraviolet_index_clear_sky
+          * fog_area_fraction
+          * cloud_area_fraction_high
+          * relative_humidity
+          * cloud_area_fraction_low
+          * air_pressure_at_sea_level
+          * probability_of_precipitation
+          * cloud_area_fraction
+          * irradiation_next12
+          * wind_speed
+          * wind_speed_of_gust
+          * probability_of_thunder
+          * dew_point_temperature
+          * irradiation_now
+          * symbol_code
+        """
         async with self.websession.get(
             "https://api.met.no/weatherapi/locationforecast/2.0/complete",
             params=dict(lon=LONGITUDE, lat=LATITUDE),
@@ -204,6 +233,9 @@ async def main():
     await yr.ainit()
     res = await yr.get_historical_cloud_fraction()
     print(res)
+
+    forecast = await yr.forecast()
+    print(forecast)
 
 
 if __name__ == "__main__":

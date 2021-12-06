@@ -3,6 +3,7 @@
 To be run()'ed every minute.
 
 """
+import argparse
 import asyncio
 import datetime
 from pathlib import Path
@@ -13,12 +14,19 @@ import numpy as np
 import pandas as pd
 import yaml
 
+import pyrotun
 from pyrotun import persist
 
+logger = pyrotun.getLogger(__name__)
+
 CURRENT_POWER_ITEM = "AMSpower"
+BACKUP_POWER_ITEM = "Smappee_avgW_5min"
 HOURUSAGE_ESTIMATE_ITEM = "WattHourEstimate"
 MAXHOURWATT_LASTMONTH_ITEM = "MaxHourwatt_lastmonth"
 FLOORSFILE = Path(__file__).absolute().parent / "floors.yml"
+
+ONOFF2YESNO = {"ON": "YES", "OFF": "NO"}
+INV_ONOFF2YESNO = {"ON": "NO", "OFF": "YES"}
 
 
 def run(pers, dry=True):
@@ -49,37 +57,47 @@ async def get_powerloads(pers) -> pd.DataFrame:
             "lastchange": await pers.influxdb.item_age(
                 "Verksted_varmekabler_nattsenking", unit="minutes"
             ),
-            "on_need": max(
-                12 - await pers.openhab.get_item("VerkstedTemperatur", datatype=float),
-                0,
-            ),
+            "is_on": INV_ONOFF2YESNO[
+                await pers.openhab.get_item("Verksted_varmekabler_nattsenking")
+            ],
+            "on_need": 12
+            - await pers.openhab.get_item("VerkstedTemperatur", datatype=float),
         }
     )
     loads.append(
         {
             "switch_item": "Garasje_varmekabler_nattsenking",
             "inverted_switch": True,
-            "wattage": 1700,
+            "wattage": 2400,
             "lastchange": await pers.influxdb.item_age(
                 "Garasje_varmekabler_nattsenking", unit="minutes"
             ),
-            "on_need": max(
-                6
-                - await pers.openhab.get_item(
-                    "Sensor_Garasje_temperatur", datatype=float
-                ),
-                0,
-            ),
+            "is_on": INV_ONOFF2YESNO[
+                await pers.openhab.get_item("Garasje_varmekabler_nattsenking")
+            ],
+            "on_need": 6
+            - await pers.openhab.get_item("Sensor_Garasje_temperatur", datatype=float),
         }
     )
 
     loads.append(
         {
-            "switch_name": "Varmtvannsbereder_bryter",
+            "switch_item": "Varmtvannsbereder_bryter",
             "wattage": 2800,
-            "is_on": await pers.openhab.get_item("Varmtvannsbereder_bryter"),
+            "is_on": ONOFF2YESNO[
+                await pers.openhab.get_item("Varmtvannsbereder_bryter")
+            ],
             "lastchange": await pers.influxdb.item_age(
                 "Varmtvannsbereder_bryter", unit="minutes"
+            ),
+            "on_need": await pers.openhab.get_item(
+                "Varmtvannsbereder_temperaturtarget", datatype=float
+            )
+            - await pers.openhab.get_item(
+                "Varmtvannsbereder_temperatur", datatype=float
+            ),
+            "measured": await pers.openhab.get_item(
+                "Varmtvannsbereder_temperatur", datatype=float
             ),
         }
     )
@@ -88,11 +106,10 @@ async def get_powerloads(pers) -> pd.DataFrame:
         contents = await filehandle.read()
     floors = yaml.safe_load(contents)
 
-    # Varmepumpe?
+    master_temperature = await pers.openhab.get_item("Master_termostat", datatype=float)
 
     for floor in floors:
         thisfloor = floors[floor].copy()  # needed?
-        print(floor)
         if isinstance(thisfloor["setpoint_item"], list):
             bryter_name = thisfloor["setpoint_item"][0].replace(
                 "SetpointHeating", "bryter"
@@ -106,7 +123,8 @@ async def get_powerloads(pers) -> pd.DataFrame:
             meas_temp = await pers.openhab.get_item(
                 thisfloor["sensor_item"], datatype=float
             )
-            target_temp = 25 + thisfloor.get("delta", 0)
+            thisfloor.update({"measured": meas_temp})
+            target_temp = master_temperature + thisfloor.get("delta", 0)
             if meas_temp is not None:
                 on_need = max(target_temp - meas_temp, 0)
                 thisfloor.update(
@@ -118,7 +136,7 @@ async def get_powerloads(pers) -> pd.DataFrame:
                 # Can be a list for floors with multiple thermostats
                 thisfloor.update(
                     {
-                        "is_on": await pers.openhab.get_item(bryter_name),
+                        "is_on": ONOFF2YESNO[await pers.openhab.get_item(bryter_name)],
                     }
                 )
         else:
@@ -148,15 +166,21 @@ async def control_powerusage(pers) -> None:
     if powerplan is None:
         powerplan = 4800
 
-    estimated_wh = pers.openhab.get_item("EstimatedKWh_thishour")
+    estimated_wh = await pers.openhab.get_item("EstimatedKWh_thishour", datatype=float)
+    overshoot = int(estimated_wh - powerplan)
+    logger.info("Current over/under-shoot is: %d", overshoot)
 
-    overshoot = estimated_wh - powerplan
+    powerload_df = await get_powerloads(pers)
 
-    powerload_df = await get_powerloads()
+    logger.info("Built dataframe of powerloads:")
+    print(powerload_df)
 
     actions = _decide(overshoot, powerload_df)
-    for action, appliance in actions.items():
-        turn(action, appliance)
+    logger.info("I have decided on power actions:")
+    print(yaml.dump(actions))
+    for action in actions:
+        act = list(action.keys())[0]  # ON or OFF
+        turn(act, action[act])
 
 
 def _decide(overshoot: int, powerload_df: pd.DataFrame):
@@ -165,6 +189,7 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
     actions: List[Dict[str, dict]] = []
     if powerload_df.empty:
         return actions
+    powerload_df = powerload_df.copy()
     if "lastchange" not in powerload_df.columns:
         powerload_df["lastchange"] = np.nan
     if "is_on" not in powerload_df.columns:
@@ -177,21 +202,23 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
 
     # Sort all rows for candidacy for change:
     powerload_df["change_candidate"] = 0
-    powerload_df.loc[
-        (powerload_df["lastchange"] > 5) & (powerload_df["is_on"] != "NO"),
-        "change_candidate",
-    ] = 1
-    powerload_df.loc[
-        (powerload_df["lastchange"] > 5) & (powerload_df["is_on"] != "YES"),
-        "change_candidate",
-    ] = -1
+
     if overshoot > 0:
         remainder_overshoot = overshoot
 
+        # Prioritize non-recently-changed and ON appliances:
+        powerload_df.loc[
+            (powerload_df["lastchange"] > 5) & (powerload_df["is_on"] != "NO"),
+            "change_candidate",
+        ] = 1
+
         while remainder_overshoot > 0 and not powerload_df.empty:
             turnmeoff = (
-                powerload_df.sort_values(["change_candidate", "on_need"])
+                powerload_df.sort_values(
+                    ["change_candidate", "on_need"], ascending=[True, False]
+                )
                 .tail(1)
+                .dropna(axis="columns")
                 .to_dict(orient="records")[0]
             )
             actions.append({"OFF": turnmeoff})
@@ -199,15 +226,26 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
             remainder_overshoot -= turnmeoff["wattage"]
     else:
         remainder_undershoot = -overshoot
+
+        # Prioritize non-recently-changed and OFF appliances:
+        powerload_df.loc[
+            (powerload_df["lastchange"] > 5) & (powerload_df["is_on"] != "YES"),
+            "change_candidate",
+        ] = -1
+
         while remainder_undershoot > 0 and not powerload_df.empty:
             turnmeon = (
-                powerload_df.sort_values(["change_candidate", "on_need"])
+                powerload_df.sort_values(
+                    ["change_candidate", "on_need"], ascending=[True, False]
+                )
                 .head(1)
+                .dropna(axis="columns")
                 .to_dict(orient="records")[0]
             )
             actions.append({"ON": turnmeon})
             powerload_df.drop(axis=0, index=turnmeon["index"], inplace=True)
-            remainder_overshoot -= turnmeon["wattage"]
+            remainder_undershoot -= turnmeon["wattage"]
+
     return actions
 
 
@@ -230,36 +268,54 @@ async def estimate_currenthourusage(pers) -> int:
 
     query = f"SELECT * FROM {CURRENT_POWER_ITEM} WHERE time > '{lasthour}'"
 
+    # Smapeee-dataene er egentlig 10 minutter forsinket :/
+    backup_query = f"SELECT * FROM {BACKUP_POWER_ITEM} WHERE time > '{lasthour}'"
+
     lasthour_df = await pers.influxdb.dframe_query(query)
+    lasthour_backup_df = await pers.influxdb.dframe_query(backup_query)
+
+    # Merge and sort the two frames. Data from the backup is pr. 5 min, and will
+    # drown if the 2-sec data is dense. The Smappee 10-min delay will affect though!
+
+    merged_df = pd.concat(
+        [lasthour_df, lasthour_backup_df], axis="index", sort=False
+    ).sort_index()
 
     # Use last minute for extrapolation:
     lastminute = await pers.influxdb.dframe_query(
         f"SELECT mean(*) FROM {CURRENT_POWER_ITEM} WHERE time > '{lastminute}'"
     )
-    return _estimate_currenthourusage(lasthour_df["value"], lastminute.values[0][0])
+    if lastminute.empty:
+        return _estimate_currenthourusage(merged_df["value"], None)
+    return _estimate_currenthourusage(merged_df["value"], lastminute.values[0][0])
 
 
 def _estimate_currenthourusage(
-    lasthour_series: pd.Series, lastminute_value: float
+    lasthour_series: pd.Series, extrapolation_value: float
 ) -> int:
     if lasthour_series.empty:
-        return round(lastminute_value)
+        return round(extrapolation_value)
     time_min = lasthour_series.index.min()
     time_max = time_min + datetime.timedelta(hours=1)
     lasthour_s = lasthour_series.resample("s").mean().fillna(method="ffill")
+
+    if extrapolation_value is None:
+        extrapolation_value = lasthour_s.tail(1).values[0]
+
+    # Extrapolate through the rest of the hour:
     remainder_hour = pd.Series(
         index=pd.date_range(
             start=lasthour_s.index[-1] + datetime.timedelta(seconds=1),
             end=time_max - datetime.timedelta(seconds=1),  # end at :59:59
             freq="s",
         ),
-        data=lastminute_value,
+        data=extrapolation_value,
     )
-    full_hour = pd.concat([lasthour_s, remainder_hour], axis=0)
+    full_hour = pd.concat([lasthour_s, remainder_hour], axis="index", sort=False)
     return round(full_hour.mean())
 
 
-async def main() -> None:
+async def main(maketurns: bool = False) -> None:
     pers = persist.PyrotunPersistence()
     await pers.ainit(["influxdb", "openhab"])
     est = await estimate_currenthourusage(pers)
@@ -267,8 +323,28 @@ async def main() -> None:
 
     powerloads = await get_powerloads(pers)
     print(powerloads)
+
+    print("If overshoot by 1000, we would turn off:")
+    print(_decide(1000, powerloads))
+    print("If undershoot by 1000, we would turn on:")
+    print(_decide(-1000, powerloads))
+
+    if maketurns:
+        await control_powerusage(pers)
+
     await pers.aclose()
 
 
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--maketurns", help="If true, will send actions to openhab", action="store_true"
+    )
+    return parser
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = get_parser()
+    args = parser.parse_args()
+
+    asyncio.run(main(maketurns=args.maketurns))

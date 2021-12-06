@@ -71,6 +71,7 @@ class SmappeeConnection:
         # Need to go more than 5 minutes back in time, otherwise we
         # risk getting nothing in return.
         lastrow = self.get_recent_df(minutes=15).tail(1)
+        print(lastrow)
         if lastrow.empty:
             return None
         avgwatt = (60 / 5) * float(lastrow["consumption"].values)
