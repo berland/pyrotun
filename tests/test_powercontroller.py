@@ -6,7 +6,6 @@ import pytest
 from pyrotun import persist, powercontroller
 
 
-
 def test_estimate_currenthourusage():
     now = datetime.datetime.now()
     hourstart = now.replace(minute=0, second=0, microsecond=0)
@@ -174,3 +173,59 @@ def test_decide(overshoot, powerload_df, expected_actions):
         {list(act.keys())[0]: list(act.values())[0]["switch_item"]} for act in actions
     ]
     assert sliced_actions == expected_actions
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("hoursago", range(1, 100))
+async def test_amspower_summation(hoursago: int):
+    """Test summation (with infill) of AMSPower data up to the reported cumulatives.
+
+    This proves that 2-second data from meter can be used to estimate within given hour."""
+    pers = persist.PyrotunPersistence()
+    await pers.ainit("influxdb")
+    assert hoursago > 0
+    start = datetime.datetime.utcnow().replace(
+        second=0, minute=0, microsecond=0
+    ) - datetime.timedelta(hours=hoursago)
+    end = datetime.datetime.utcnow().replace(
+        second=0, minute=0, microsecond=0
+    ) - datetime.timedelta(hours=hoursago - 1)
+
+    CURRENT_POWER_ITEM = "AMSpower"
+    BACKUP_POWER_ITEM = "Smappee_avgW_5min"
+    HOUR_ITEM = "AMS_cumulative_lasthour_KWh"
+    HOURUSAGE_ESTIMATE_ITEM = "EstimatedKWh_thishour"
+    query = (
+        f"SELECT * FROM {CURRENT_POWER_ITEM} WHERE time > '{start}' AND time < '{end}'"
+    )
+
+    lasthour_df = await pers.influxdb.dframe_query(query)
+    coverage = len(lasthour_df) / (60 * 60 / 2)
+    print(f"coverage: {coverage}")
+    fromseconddata = powercontroller._estimate_currenthourusage(lasthour_df["value"])
+    print(f"from second-datas: {fromseconddata}")
+
+    # Get the latest estimates in that hour:
+    query = f"SELECT * FROM {HOURUSAGE_ESTIMATE_ITEM} WHERE time > '{end - datetime.timedelta(minutes=10)}' AND time < '{end}'"
+    query_df = await pers.influxdb.dframe_query(query)
+    estimates = query_df["value"].values
+    # We should not have high variance in the end
+    if estimates.std() > 50:
+        print(f"high deviation, estimates={estimates}")
+    estimate = float(estimates[-1])
+    print(f"last estimate: {estimate}")
+    # Get the correct hour-cumulative (inferred from the meter itself)
+    query = f"SELECT * FROM {HOUR_ITEM} WHERE time > '{end}' AND time < '{end + datetime.timedelta(minutes=2)}'"
+    query_df = await pers.influxdb.dframe_query(query)
+    if isinstance(query_df, pd.DataFrame):
+        fromcumulative = query_df["value"].values[0]
+        if fromcumulative > 0:
+            print(f"from cumulative data: {fromcumulative*1000}")
+            miss = fromcumulative * 1000 - fromseconddata
+            print(f"MISS: {miss}")
+            estimatemiss = abs(estimate - fromcumulative * 1000)
+            if coverage > 0.7:
+                assert abs(miss) < 200
+                assert estimatemiss < 100
+    else:
+        print("MISSING CUMULATIVE DATA")

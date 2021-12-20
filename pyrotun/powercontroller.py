@@ -21,7 +21,7 @@ logger = pyrotun.getLogger(__name__)
 
 CURRENT_POWER_ITEM = "AMSpower"
 BACKUP_POWER_ITEM = "Smappee_avgW_5min"
-HOURUSAGE_ESTIMATE_ITEM = "WattHourEstimate"
+HOURUSAGE_ESTIMATE_ITEM = "EstimatedKWh_thishour"
 MAXHOURWATT_LASTMONTH_ITEM = "MaxHourwatt_lastmonth"
 FLOORSFILE = Path(__file__).absolute().parent / "floors.yml"
 
@@ -291,27 +291,31 @@ async def estimate_currenthourusage(pers) -> int:
 
 
 def _estimate_currenthourusage(
-    lasthour_series: pd.Series, extrapolation_value: float
+    lasthour_series: pd.Series, extrapolation_value: float = None
 ) -> int:
+    assert isinstance(lasthour_series, pd.Series)
     if lasthour_series.empty:
         return round(extrapolation_value)
     time_min = lasthour_series.index.min()
-    time_max = time_min + datetime.timedelta(hours=1)
+    time_max = (time_min + datetime.timedelta(hours=1)).replace(second=0, minute=0, microsecond=0)
     lasthour_s = lasthour_series.resample("s").mean().fillna(method="ffill")
 
-    if extrapolation_value is None:
-        extrapolation_value = lasthour_s.tail(1).values[0]
 
-    # Extrapolate through the rest of the hour:
-    remainder_hour = pd.Series(
-        index=pd.date_range(
-            start=lasthour_s.index[-1] + datetime.timedelta(seconds=1),
-            end=time_max - datetime.timedelta(seconds=1),  # end at :59:59
-            freq="s",
-        ),
-        data=extrapolation_value,
-    )
-    full_hour = pd.concat([lasthour_s, remainder_hour], axis="index", sort=False)
+    if lasthour_s.index[-1] + datetime.timedelta(seconds=1) < time_max:
+        if extrapolation_value is None:
+            extrapolation_value = lasthour_s.tail(1).values[0]
+        # Extrapolate through the rest of the hour:
+        remainder_hour = pd.Series(
+            index=pd.date_range(
+                start=lasthour_s.index[-1] + datetime.timedelta(seconds=1),
+                end=time_max - datetime.timedelta(seconds=1),  # end at :59:59
+                freq="s",
+            ),
+            data=extrapolation_value,
+        )
+        full_hour = pd.concat([lasthour_s, remainder_hour], axis="index", sort=False)
+    else:
+        full_hour = pd.concat([lasthour_s], axis="index", sort=False)
     return round(full_hour.mean())
 
 
