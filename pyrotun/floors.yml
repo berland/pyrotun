@@ -6,7 +6,7 @@ Andre:
   maxtemp: 26.0
   sensor_item: Sensor_Andre_gulv_temperatur
   setpoint_base: target
-  setpoint_force: 9.0
+  setpoint_force: 8.0
   setpoint_item: Termostat_Andre_SetpointHeating
   wattage: 600.0
 Bad_Kjeller:

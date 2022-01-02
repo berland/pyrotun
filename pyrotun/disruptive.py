@@ -30,11 +30,11 @@ sensors = {
 
 def process_dweets(pers):
     for dweet in listen_for_dweets_from("foobarcomfoobarcom", timeout=None):
-        # print(json.dumps(dweet, indent=2, sort_keys=True))
         try:
             event = dweet["content"]["event"]
             data = event["data"]
             sensor = event["targetName"].split("/")[-1]
+            logger.debug(json.dumps(dweet, indent=2, sort_keys=True))
             if event["eventType"] == "networkStatus":
                 logger.debug(
                     "ping from disruptive sensor " + dweet["content"]["labels"]["name"]

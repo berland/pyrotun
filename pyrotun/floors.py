@@ -18,6 +18,9 @@ from pyrotun import persist  # noqa
 
 logger = pyrotun.getLogger(__name__)
 
+# Positive number means colder house:
+COLDER_FOR_POWERSAVING = 1
+
 TEMPERATURE_RESOLUTION = 10000
 """If the temperature resolution is too low, it will make the decisions
 unstable for short timespans. It is tempting to keep it low to allow
@@ -189,7 +192,7 @@ async def main(
         weathercompensation = await pers.openhab.get_item(
             WEATHER_COMPENSATION_ITEM, datatype=float
         )
-        delta = delta - round(weathercompensation * 2.0) / 2.0
+        delta = delta - round(weathercompensation * 2.0) / 2.0 - COLDER_FOR_POWERSAVING
 
         if currenttemp > FLOORS[floor]["maxtemp"]:
             logger.info("Floor is above allowed maxtemp, turning OFF")
@@ -275,6 +278,8 @@ async def main(
         else:
             setpoint = setpoint_base - FLOORS[floor]["setpoint_force"]
             logger.info("Turning floor %s OFF now", floor)
+
+        setpoint = max(11, int(setpoint))
 
         if not dryrun:
             await pers.openhab.set_item(
@@ -626,7 +631,7 @@ def temp_requirement(
         master_correction (pd.Series): A time-dependent correction added
             to the master temperature
         delta (float): Room-dependent (constant in time) correction added
-            to master temperature
+            to master temperature. Positive value means warmer.
 
     Return:
         float
@@ -634,20 +639,21 @@ def temp_requirement(
     hour = timestamp.hour
     weekday = timestamp.weekday()  # Monday = 0, Sunday = 6
     friday = 4
+    corona = True
     if vacation:
         # Ferie
         return 15 + delta
     if hour < 6 or hour > 21:
         # Natt:
         return 18 + delta
-    if hour > 7 and hour < 13 and weekday <= friday:
+    if corona is False and (hour > 7 and hour < 13 and weekday <= friday):
         # Dagsenking:
         return 18 + delta
     if hour > 16 and hour < 22:
         # Ettermiddag
         return 22 + delta
-    # Morgen og middagstid
-    return 24 + delta
+    # Morgen og middagstid, 25 er egentlig komfort her!!
+    return 23 + delta
 
 
 def path_costs(graph, path):
