@@ -144,8 +144,12 @@ def make_http_post_data(dirname):
             details += f"Tid: {prettyprintseconds(move_time)}. "
 
     if "heart-rate" in exercise_summary:
-        avg_beat = exercise_summary["heart-rate"]["average"]
-        max_beat = exercise_summary["heart-rate"]["maximum"]
+        avg_beat = "-"
+        max_beat = "-"
+        if "average" in exercise_summary["heart-rate"]:
+            avg_beat = exercise_summary["heart-rate"]["average"]
+        if "maximum" in exercise_summary["heart-rate"]:
+            max_beat = exercise_summary["heart-rate"]["maximum"]
         details += f"Puls {avg_beat} / {max_beat}."
 
     post_data = {
