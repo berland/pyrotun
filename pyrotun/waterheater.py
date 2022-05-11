@@ -361,6 +361,8 @@ def watertemp_requirement(timestamp, vacation=False, prices=None):
         if cheapest_hours:
             if hour == (cheapest_hours[0] + pd.Timedelta(hours=1)).hour:
                 return 80
+    if 16 <= hour <= 18:
+        return 60  # For doing the dishes
     if vacation:
         return 30
     if hour < 6:
