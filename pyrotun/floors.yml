@@ -68,7 +68,7 @@ Inngang:
 Leane:
   backup_setpoint: 20
   cooling_rate: -0.7
-  delta: -4
+  delta: -6
   heating_rate: 1.5
   maxtemp: 25
   sensor_item: Sensor_Leane_gulv_temperatur

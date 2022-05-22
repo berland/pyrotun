@@ -49,6 +49,7 @@ TIMEDELTA_MINUTES = 60  # minimum is 8 minutes!!
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 VACATION_ITEM = "Ferie"
 WEATHER_COMPENSATION_ITEM = "Estimert_soloppvarming"
+WEATHER_COMPENSATION_MULTIPLIER = 2
 BACKUPSETPOINT = 22
 
 
@@ -189,8 +190,9 @@ async def main(
             delta = 0
 
         # Deduct more in to correct for good weather:
-        weathercompensation = await pers.openhab.get_item(
-            WEATHER_COMPENSATION_ITEM, datatype=float
+        weathercompensation = (
+            await pers.openhab.get_item(WEATHER_COMPENSATION_ITEM, datatype=float)
+            * WEATHER_COMPENSATION_MULTIPLIER
         )
         delta = delta - round(weathercompensation * 2.0) / 2.0 - COLDER_FOR_POWERSAVING
 
