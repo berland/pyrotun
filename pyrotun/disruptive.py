@@ -16,6 +16,7 @@ BASE_URL = "https://dweet.io"
 thing = "foobarcomfoobarcom"
 
 sensors = {
+    "bjei7avbluqg00dltkk0": {"wateritem": "Sensor_Oppvaskmaskin_lekkasje"},
     "bjehrg8pismg008hqa20": {"wateritem": "Sensor_Gulvutenfordusj_vann"},
     "bjehsk8pismg008hqac0": {"tempitem": "Sensor_Bakganggulv_temperatur"},
     "bjeiidu7gpvg00cjo7qg": {"tempitem": "Sensor_Teleskap_temperatur"},
@@ -34,11 +35,12 @@ def process_dweets(pers):
             event = dweet["content"]["event"]
             data = event["data"]
             sensor = event["targetName"].split("/")[-1]
-            logger.debug(json.dumps(dweet, indent=2, sort_keys=True))
             if event["eventType"] == "networkStatus":
                 logger.debug(
                     "ping from disruptive sensor " + dweet["content"]["labels"]["name"]
                 )
+            elif event["eventType"] == "batteryStatus":
+                pass
             elif event["eventType"] == "temperature":
                 pers.openhab.sync_set_item(
                     sensors[sensor]["tempitem"],
@@ -56,7 +58,24 @@ def process_dweets(pers):
                     data["humidity"]["temperature"],
                     log=True,
                 )
+            elif event["eventType"] == "touch":
+                if dweet["content"]["metadata"]["deviceType"] == "waterDetector":
+                    # Water present is seemingly missed, but touch always gets
+                    # through (!!?) If it is a touch, a waterpresent==off event
+                    # will be sent shortly after
+                    pers.openhab.sync_set_item(
+                        sensors[sensor]["wateritem"],
+                        "ON",
+                        log=True,
+                    )
+                logger.info(f"A sensor was touched, sensor data: {sensors[sensor]}")
+                pers.openhab.sync_set_item(
+                    "Sensor_Disruptive_touchevent",
+                    "Disruptive touch event: "
+                    f"{dweet['content']['labels']['name']}, sensorname {sensor}",
+                )
             elif event["eventType"] == "waterPresent":
+                logger.info(json.dumps(dweet, indent=2, sort_keys=True))
                 pers.openhab.sync_set_item(
                     sensors[sensor]["wateritem"],
                     {"NOT_PRESENT": "OFF", "PRESENT": "ON"}[
@@ -65,7 +84,8 @@ def process_dweets(pers):
                     log=True,
                 )
             else:
-                logger.warning("Unprocessed Disruptive event! Unknown sensor?")
+                logger.error("Unprocessed Disruptive event! Unknown sensor?")
+                logger.error(json.dumps(dweet, indent=2, sort_keys=True))
         except KeyError:
             print(f"Not able to parse dweet {dweet}")
             pass
