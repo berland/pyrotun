@@ -6,6 +6,7 @@ from setuptools import find_packages
 
 REQUIREMENTS = [
     "aiocron",
+    "aiofiles",
     "aioinflux",
     "astral",
     "asyncio",
@@ -27,6 +28,7 @@ REQUIREMENTS = [
     "python-dotenv",
     "python-openhab",
     "pytibber",
+    "pyyaml",
     "requests>2.23",
     "sklearn",
     "smappy",
