@@ -16,6 +16,7 @@ import pyrotun.connections.openhab
 import pyrotun.connections.sectoralarm
 import pyrotun.connections.smappee
 import pyrotun.connections.tibber
+import pyrotun.connections.unifiprotect
 import pyrotun.dataspike_remover
 import pyrotun.discord
 import pyrotun.disruptive

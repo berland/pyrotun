@@ -16,6 +16,7 @@ class PyrotunPersistence:
         self.sectoralarm = None
         self.openhab = None
         self.mqtt = None
+        self.unifiprotect = None
         self.yr = None
         self.powermodels = None
 
@@ -57,6 +58,10 @@ class PyrotunPersistence:
         if "powermodels" in requested or "all" in requested:
             self.powermodels = powermodels.Powermodels()
             await self.powermodels.ainit(pers=self)
+
+        if "unifiprotect" in requested or "all" in requested:
+            self.unifiprotect = connections.unifiprotect.UnifiProtectConnection()
+            await self.unifiprotect.ainit()
 
     async def aclose(self):
         logger.info("Tearing down pyrotunpersistence")
