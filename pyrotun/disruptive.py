@@ -68,12 +68,13 @@ def process_dweets(pers):
                         "ON",
                         log=True,
                     )
-                logger.info(f"A sensor was touched, sensor data: {sensors[sensor]}")
-                pers.openhab.sync_set_item(
-                    "Sensor_Disruptive_touchevent",
-                    "Disruptive touch event: "
-                    f"{dweet['content']['labels']['name']}, sensorname {sensor}",
-                )
+                else:
+                    logger.info(f"A sensor was touched, sensor data: {sensors[sensor]}")
+                    pers.openhab.sync_set_item(
+                        "Sensor_Disruptive_touchevent",
+                        "Disruptive touch event: "
+                        f"{dweet['content']['labels']['name']}, sensorname {sensor}",
+                    )
             elif event["eventType"] == "waterPresent":
                 logger.info(json.dumps(dweet, indent=2, sort_keys=True))
                 pers.openhab.sync_set_item(
