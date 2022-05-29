@@ -28,6 +28,7 @@ REQUIREMENTS = [
     "python-dotenv",
     "python-openhab",
     "pytibber",
+    "pyunifiprotect",
     "pyyaml",
     "requests>2.23",
     "sklearn",

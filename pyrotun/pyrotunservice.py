@@ -31,6 +31,7 @@ import pyrotun.polltibber
 import pyrotun.poweranalysis
 import pyrotun.powercontroller
 import pyrotun.powermodels
+import pyrotun.unifiprotect
 import pyrotun.skyss
 import pyrotun.vent_calculations
 import pyrotun.yrmelding
@@ -48,6 +49,12 @@ EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
 
 PERS = None
+
+
+@aiocron.crontab(EVERY_15_SECOND)
+async def poll_unifiprotect():
+    logger.info("Getting garage camera")
+    await pyrotun.unifiprotect.main(PERS)
 
 
 @aiocron.crontab(EVERY_15_SECOND)
