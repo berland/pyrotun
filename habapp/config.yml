@@ -1,0 +1,43 @@
+directories:
+  logging: /var/log/openhab  # Folder where the logs will be written to
+  rules: rules # Folder from which the rule files will be loaded
+  param: params # Folder from which the parameter files will be loaded
+  config: config # Folder from which configuration files (e.g. for textual thing configuration) will be loaded
+  lib: lib # Folder where additional libraries can be placed
+location:
+  latitude: 0.0
+  longitude: 0.0
+  elevation: 0.0
+mqtt:
+  connection:
+    client_id: HABApp
+    host: ''
+    port: 8883
+    user: ''
+    password: ''
+    tls: true
+    tls_ca_cert: ''  # Path to a CA certificate that will be treated as trusted
+    tls_insecure: false
+  general:
+    listen_only: false  # If True HABApp will not publish any value to the broker
+  publish:
+    qos: 0  # Default QoS when publishing values
+    retain: false # Default retain flag when publishing values
+  subscribe:
+    qos: 0  # Default QoS for subscribing
+    topics:
+    - '#'
+    - 0
+openhab:
+  connection:
+    host: raaserv.r40
+    port: 8090
+    user: ''
+    password: ''
+  general:
+    listen_only: false  # If True HABApp will not change anything on the openHAB instance.
+    wait_for_openhab: true # If True HABApp will wait for items from the openHAB instance before loading any rules on startup
+  ping:
+    enabled: false  # If enabled the configured item will show how long it takes to send an update from HABApp and get the updated value back from openhabin milliseconds
+    item: HABApp_Ping # Name of the Numberitem
+    interval: 10 # Seconds between two pings

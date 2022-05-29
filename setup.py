@@ -16,6 +16,7 @@ REQUIREMENTS = [
     "python-dotenv",
     "geopy",
     "gpxpy",
+    "habapp",
     "holidays",
     "isodate",
     "lxml",
