@@ -31,6 +31,7 @@ import pyrotun.polltibber
 import pyrotun.poweranalysis
 import pyrotun.powercontroller
 import pyrotun.powermodels
+import pyrotun.skyss
 import pyrotun.vent_calculations
 import pyrotun.yrmelding
 
@@ -53,6 +54,12 @@ PERS = None
 async def poll_sectoralarm():
     logger.info(" ** Polling sectoralarm")
     await pyrotun.pollsectoralarm.main(PERS)
+
+
+@aiocron.crontab(EVERY_15_SECOND)
+async def poll_skyss():
+    logger.info(" ** Polling skyss")
+    await pyrotun.skyss.main(PERS)
 
 
 @aiocron.crontab(EVERY_15_SECOND)
