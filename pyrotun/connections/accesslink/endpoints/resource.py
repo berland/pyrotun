@@ -2,7 +2,6 @@
 
 
 class Resource(object):
-
     def __init__(self, oauth):
         self.oauth = oauth
 

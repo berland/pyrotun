@@ -4,7 +4,8 @@ from .resource import Resource
 
 
 class PullNotifications(Resource):
-    """This resource allows partners to check if their users have available data for downloading
+    """This resource allows partners to check if their users have available
+    data for downloading
 
     https://www.polar.com/accesslink-api/?http#pull-notifications
     """

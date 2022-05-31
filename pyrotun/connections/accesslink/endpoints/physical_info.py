@@ -18,12 +18,16 @@ class PhysicalInfo(Resource):
         :param user_id: id of the user
         :param access_token: access token of the user
         """
-        response = self._post(endpoint="/users/{}/physical-information-transactions".format(user_id),
-                              access_token=access_token)
+        response = self._post(
+            endpoint="/users/{}/physical-information-transactions".format(user_id),
+            access_token=access_token,
+        )
         if not response:
             return None
 
-        return PhysicalInfoTransaction(oauth=self.oauth,
-                                       transaction_url=response["resource-uri"],
-                                       user_id=user_id,
-                                       access_token=access_token)
+        return PhysicalInfoTransaction(
+            oauth=self.oauth,
+            transaction_url=response["resource-uri"],
+            user_id=user_id,
+            access_token=access_token,
+        )

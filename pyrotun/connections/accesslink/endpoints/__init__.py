@@ -1,5 +1,5 @@
-from .daily_activity import DailyActivity
-from .physical_info import PhysicalInfo
-from .pull_notifications import PullNotifications
-from .training_data import TrainingData
-from .users import Users
+from .daily_activity import DailyActivity  # noqa
+from .physical_info import PhysicalInfo  # noqa
+from .pull_notifications import PullNotifications  # noqa
+from .training_data import TrainingData  # noqa
+from .users import Users  # noqa

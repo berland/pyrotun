@@ -4,7 +4,6 @@ from .resource import Resource
 
 
 class Transaction(Resource):
-
     def __init__(self, oauth, transaction_url, user_id, access_token):
         super(Transaction, self).__init__(oauth)
         self.transaction_url = transaction_url
@@ -16,5 +15,6 @@ class Transaction(Resource):
 
         This should be done after retrieving data from the transaction.
         """
-        return self._put(endpoint=None, url=self.transaction_url,
-                         access_token=self.access_token)
+        return self._put(
+            endpoint=None, url=self.transaction_url, access_token=self.access_token
+        )
