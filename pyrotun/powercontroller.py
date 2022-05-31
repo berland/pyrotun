@@ -152,11 +152,11 @@ async def control_powerusage(pers) -> None:
 
     overshoot = estimated_wh - powerplan
 
-    powerload_df = await get_powerloads()
+    powerload_df = await get_powerloads(pers)
 
     actions = _decide(overshoot, powerload_df)
     for action, appliance in actions.items():
-        turn(action, appliance)
+        await turn(action, appliance)
 
 
 def _decide(overshoot: int, powerload_df: pd.DataFrame):
@@ -225,18 +225,22 @@ async def turn(action: str, device: dict) -> None:
 
 
 async def estimate_currenthourusage(pers) -> int:
-    lasthour = datetime.datetime.utcnow().replace(second=0, minute=0, microsecond=0)
-    lastminute = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
+    lasthour: datetime.datetime = datetime.datetime.utcnow().replace(
+        second=0, minute=0, microsecond=0
+    )
+    lastminute: datetime.datetime = datetime.datetime.utcnow() - datetime.timedelta(
+        minutes=1
+    )
 
     query = f"SELECT * FROM {CURRENT_POWER_ITEM} WHERE time > '{lasthour}'"
 
     lasthour_df = await pers.influxdb.dframe_query(query)
 
     # Use last minute for extrapolation:
-    lastminute = await pers.influxdb.dframe_query(
+    lastminutes: pd.DataFrame = await pers.influxdb.dframe_query(
         f"SELECT mean(*) FROM {CURRENT_POWER_ITEM} WHERE time > '{lastminute}'"
     )
-    return _estimate_currenthourusage(lasthour_df["value"], lastminute.values[0][0])
+    return _estimate_currenthourusage(lasthour_df["value"], lastminutes.values[0][0])
 
 
 def _estimate_currenthourusage(

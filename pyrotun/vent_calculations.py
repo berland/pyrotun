@@ -141,7 +141,3 @@ async def main(pers):
         fuktfravarmeveksler,
         log="change",
     )
-
-
-if __name__ == "__main__":
-    main()

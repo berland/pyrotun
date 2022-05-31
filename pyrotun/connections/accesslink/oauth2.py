@@ -7,7 +7,7 @@ from requests.exceptions import HTTPError
 try:
     from urllib.parse import urlencode
 except ImportError:
-    from urllib import urlencode
+    from urllib import urlencode  # type: ignore
 
 
 class OAuth2Client(object):
