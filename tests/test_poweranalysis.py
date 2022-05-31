@@ -1,5 +1,6 @@
-from pyrotun import poweranalysis, persist
 import pytest
+
+from pyrotun import persist, poweranalysis
 
 # env variables must be sourced before this can run.
 

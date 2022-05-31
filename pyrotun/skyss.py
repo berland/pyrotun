@@ -1,9 +1,10 @@
 import asyncio
-import dotenv
 import json
+
+import dotenv
+
 import pyrotun
 import pyrotun.connections.openhab
-
 from pyrotun import persist
 
 logger = pyrotun.getLogger()

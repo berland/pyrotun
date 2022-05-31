@@ -1,12 +1,11 @@
 import datetime
+
 import networkx
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot
 
-import pytest
-
-from pyrotun import waterheater, persist
+from pyrotun import waterheater
 
 
 def test_waterheaterobject():
@@ -15,10 +14,14 @@ def test_waterheaterobject():
     assert w_heater.waterusageprofile is None
     assert w_heater.meanwatertemp is None
 
+
 def test_make_heatloss_diffusion_model():
     mock_temps = pd.DataFrame(
-        index=pd.date_range(start=datetime.datetime.now().replace(minute=0,
-            second=0, microsecond=0), freq="1h", periods=4),
+        index=pd.date_range(
+            start=datetime.datetime.now().replace(minute=0, second=0, microsecond=0),
+            freq="1h",
+            periods=4,
+        ),
         data=[60, 59.5, 59, 58.5],
         columns=["watertemp"],
     )
@@ -37,8 +40,11 @@ def test_make_heatloss_diffusion_model():
 
     # Another testdata where lower temperatures gives lower heatloss:
     mock_temps = pd.DataFrame(
-        index=pd.date_range(start=datetime.datetime.now().replace(minute=0,
-            second=0, microsecond=0), freq="1h", periods=4),
+        index=pd.date_range(
+            start=datetime.datetime.now().replace(minute=0, second=0, microsecond=0),
+            freq="1h",
+            periods=4,
+        ),
         data=[60, 59.8, 59.7, 59.65],
         columns=["watertemp"],
     )
@@ -51,23 +57,27 @@ def test_make_heatloss_diffusion_model():
     assert np.isclose(w_heater.diffusionloss(59.8), 0.1)
     assert np.isclose(w_heater.diffusionloss(59.7), 0.05)
 
+
 def test_diffusionloss():
     w_heater = waterheater.WaterHeater()
     # Time period is implicit in the heatlossmodels coefficient.
 
     # This should mean one degree loss pr. hour if at 60 degrees:
-    w_heater.heatlossdiffusionmodel = (0, -1/60)
+    w_heater.heatlossdiffusionmodel = (0, -1 / 60)
     assert w_heater.diffusionloss(60) == 1
     # A little bit more if we are above 60 degrees:
-    assert np.isclose(w_heater.diffusionloss(70) , 1.16666667)
+    assert np.isclose(w_heater.diffusionloss(70), 1.16666667)
     # and vice versa:
     assert np.isclose(w_heater.diffusionloss(50), 0.8333333)
 
 
 def test_make_graph():
     mock_prices = pd.DataFrame(
-        index=pd.date_range(start=datetime.datetime.now().replace(minute=0,
-            second=0, microsecond=0), freq="1h", periods=3),
+        index=pd.date_range(
+            start=datetime.datetime.now().replace(minute=0, second=0, microsecond=0),
+            freq="1h",
+            periods=3,
+        ),
         data=[0.0, 1, 1],
         columns=["NOK/KWh"],
     )
@@ -80,7 +90,7 @@ def test_make_graph():
     ).set_index(["day", "hour", "minute"])
 
     # This gives 0.1 degree temp loss every hour, indep of temp
-    w_heater.heatlossdiffusionmodel = (-0.1,0)
+    w_heater.heatlossdiffusionmodel = (-0.1, 0)
     assert w_heater.diffusionloss(40) == 0.1
     assert w_heater.diffusionloss(80) == 0.1
     w_heater.meanwatertemp = 65
@@ -95,24 +105,27 @@ def test_make_graph():
     fig, ax = pyplot.subplots()
     waterheater.plot_graph(graph, ax=ax)
     path = networkx.shortest_path(
-            graph,
-            source=(mock_prices.index[0], 70),
-            target=(mock_prices.index[-1], 69.8),
-            weight="cost")
+        graph,
+        source=(mock_prices.index[0], 70),
+        target=(mock_prices.index[-1], 69.8),
+        weight="cost",
+    )
     waterheater.plot_path(path, ax=ax)
     pyplot.show()
 
+
 def test_predict_tempincrease():
     assert waterheater.predict_tempincrease(pd.Timedelta(0)) == 0
-    assert np.isclose(waterheater.predict_tempincrease(pd.Timedelta(15,
-        unit="m")), 2.99158)
+    assert np.isclose(
+        waterheater.predict_tempincrease(pd.Timedelta(15, unit="m")), 2.99158
+    )
     assert 29.9 < waterheater.predict_tempincrease(pd.Timedelta(2.5, unit="h")) < 30
 
 
 def test_waterheatercost():
-    assert waterheater.WATTAGE == 2700
+    assert waterheater.WATTAGE == 2600
 
     # Price in NOK/KWh, gives result in NOK:
     assert waterheater.waterheatercost(1, pd.Timedelta(1, unit="h")) == 2.7
     assert waterheater.waterheatercost(0, pd.Timedelta(1, unit="h")) == 0
-    assert waterheater.waterheatercost(1, pd.Timedelta(30, unit="min")) ==2.7/2
+    assert waterheater.waterheatercost(1, pd.Timedelta(30, unit="min")) == 2.7 / 2

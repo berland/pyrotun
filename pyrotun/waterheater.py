@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import itertools
 import os
+from typing import Tuple
 
 import dotenv
 import networkx
@@ -392,9 +393,8 @@ def waterheaterkwh(t_delta):
     return kwh
 
 
-def waterheatercost(powerprice, t_delta):
+def waterheatercost(powerprice: float, t_delta: pd.Timedelta) -> Tuple[float, float]:
     """Returns cost in NOK"""
-    # assert isinstance(t_delta, pd._libs.tslibs.timedeltas.TimeDelta)
     hours = float(t_delta.value) / 1e9 / 60 / 60  # from nanoseconds
     kwh = hours * WATTAGE / 1000
     return powerprice * kwh, kwh

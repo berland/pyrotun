@@ -49,7 +49,8 @@ async def make_heatingmodel(
     # No contribution from low sun (terrain)
     sunheight[sunheight < 10] = 0
 
-    # Cloud cover (sort of. Number 12 is chosen as it gives the highest explanation in regression)
+    # Cloud cover (sort of. Number 12 is chosen as it gives the highest
+    # explanation in regression)
     yrmelding = 12 - (
         (await pers.influxdb.get_series_grouped("YrmeldingNaa", time="1h"))[
             "YrmeldingNaa"
@@ -284,6 +285,7 @@ async def main(pers=None, days=30, plot=False, yesterday=False):
         print("Total savings: " + str(res["savings"].sum()))
 
     sunmodel = await sunheating_model(pers, plot)
+    print(sunmodel)
 
     if closepers:
         await pers.aclose()
