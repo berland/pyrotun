@@ -16,4 +16,4 @@ async def test_make_heatingmodel():
     print(coeffs)
     assert 2 < coeffs[0] < 3  # indoorderivative
     assert 0.1 < coeffs[1] < 0.3  # indoorvsoutdoor
-    assert 0.1 < coeffs[2] < 0.2  # IrradiationProxy
+    assert 0.08 < coeffs[2] < 0.2  # IrradiationProxy

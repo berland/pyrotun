@@ -160,6 +160,14 @@ async def control_powerusage(pers) -> None:
 
 
 def _decide(overshoot: int, powerload_df: pd.DataFrame):
+    """
+
+    Args:
+        overshoot: How much is the current wattage compared
+            to what we want to consume right now.
+        powerload_df: Dataframe with current loads, one row
+            pr consumer.
+    """
     assert isinstance(overshoot, int)
     assert isinstance(powerload_df, pd.DataFrame)
     actions: List[Dict[str, dict]] = []
