@@ -5,7 +5,7 @@ import os
 import time
 from pathlib import Path
 
-import dateutil
+import dateutil  # type: ignore
 import dotenv
 import gpxpy
 import isodate

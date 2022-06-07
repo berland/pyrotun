@@ -18,7 +18,7 @@ UNIFI_PASSWORD = os.getenv("UNIFI_PASSWORD")
 
 class UnifiProtectConnection:
     def __init__(self):
-        self.protect = None
+        self.protect: ProtectApiClient = None
         self.websession = None
         self._close_websession_in_aclose = None
 
@@ -40,6 +40,16 @@ class UnifiProtectConnection:
         )
         await self.protect.update()  # Sets up websocket
 
+        # subscribe to Websocket for updates to UFP
+        self.ws_sub = self.protect.subscribe_websocket(ws_callback)
+
     async def aclose(self):
+        # Close ws subscription:
+        self.ws_sub()
+
         if self._close_websession_in_aclose:
             self.websession.close()
+
+
+def ws_callback(message):
+    print(message)

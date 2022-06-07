@@ -55,7 +55,7 @@ PERS = None
 @aiocron.crontab(EVERY_15_SECOND)
 async def poll_unifiprotect():
     logger.info("Getting garage camera")
-    await pyrotun.unifiprotect.main(PERS)
+    await pyrotun.unifiprotect.fetch_snapshot(PERS.unifiprotect.protect)
 
 
 @aiocron.crontab(EVERY_15_SECOND)
