@@ -55,7 +55,13 @@ class TibberConnection:
         self.websession = await self._create_session()
         self.mytibber = tibber.Tibber(self.token, timeout=2, websession=self.websession)
         try:
+            # This occasionally gives a 503, but that is not an exception
             await self.mytibber.update_info()
+
+            if not self.mytibber.get_homes():
+                # This happens if 503:
+                self.authenticated = False
+                return
             self.home = self.mytibber.get_homes()[0]
             await self.home.update_info()
             self.authenticated = True
