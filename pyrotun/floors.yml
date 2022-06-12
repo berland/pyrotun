@@ -90,7 +90,7 @@ Sofastue:
 Syrom:
   backup_setpoint: 15
   cooling_rate: -0.1
-  delta: -8
+  delta: -7
   heating_rate: 0.4
   maxtemp: 30
   sensor_item: Termostat_Syrom_SensorGulv
