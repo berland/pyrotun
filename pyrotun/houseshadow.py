@@ -42,9 +42,9 @@ SUN_RADIUS = 8
 MOON_COLOR = "#999999"
 MOON_RADIUS = 6
 STROKE_WIDTH = "1"
-FILENAME = "/etc/openhab/html/husskygge.svg"
 LATITUDE = None
 LONGITUDE = None
+FILENAME = Path("/etc/openhab/html/husskygge.svg")
 
 # Shape of the house in a 100 by 100 units square
 
@@ -71,9 +71,9 @@ HOURS = 1
 DEGS = []
 
 
-class shadow(object):
+class shadow:
     def __init__(self):
-
+        global FILENAME
         self.debug = False
         timezone = pytz.timezone(os.getenv("TIMEZONE"))
 
@@ -85,7 +85,9 @@ class shadow(object):
         assert os.getenv("LOCAL_CITY")
         assert os.getenv("TIMEZONE")
 
-        assert Path(FILENAME).parent.is_dir()
+        if not FILENAME.parent.is_dir():
+            FILENAME = Path(Path(FILENAME).name)
+            logger.warning("Requested directory for svg file did not exist")
 
         self.city = astral.LocationInfo(
             "HOME", os.getenv("LOCAL_CITY"), os.getenv("TIMEZOME"), LATITUDE, LONGITUDE
