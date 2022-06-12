@@ -21,6 +21,7 @@ class UnifiProtectConnection:
         self.protect: ProtectApiClient = None
         self.websession = None
         self._close_websession_in_aclose = None
+        self.ws_sub = None
 
     async def ainit(self, websession=None):
         logger.info("unifiprotectconnection.ainit()")
@@ -40,16 +41,9 @@ class UnifiProtectConnection:
         )
         await self.protect.update()  # Sets up websocket
 
-        # subscribe to Websocket for updates to UFP
-        self.ws_sub = self.protect.subscribe_websocket(ws_callback)
-
     async def aclose(self):
         # Close ws subscription:
         self.ws_sub()
 
         if self._close_websession_in_aclose:
             self.websession.close()
-
-
-def ws_callback(message):
-    print(message)
