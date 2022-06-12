@@ -6,6 +6,7 @@ Runs continously as a service, calls underlying tools/scripts
 from asyncio at regular intervals (similar to crontab)
 """
 import asyncio
+from typing import Any, List
 
 import aiocron
 import dotenv
@@ -52,25 +53,27 @@ EVERY_MIDNIGHT = EVERY_DAY
 PERS = None
 
 
-@aiocron.crontab(EVERY_15_SECOND)
+@aiocron.crontab(EVERY_15_SECOND, start=False)
 async def poll_unifiprotect():
-    logger.info("Getting garage camera")
-    await pyrotun.unifiprotect.fetch_snapshot(PERS.unifiprotect.protect)
+    logger.info("Getting garage camera snapshot")
+    await pyrotun.unifiprotect.fetch_snapshot(
+        PERS.unifiprotect.protect, pyrotun.unifiprotect.CAMERA_FILENAME
+    )
 
 
-@aiocron.crontab(EVERY_15_SECOND)
+@aiocron.crontab(EVERY_15_SECOND, start=False)
 async def poll_sectoralarm():
     logger.info(" ** Polling sectoralarm")
     await pyrotun.pollsectoralarm.main(PERS)
 
 
-@aiocron.crontab(EVERY_15_SECOND)
+@aiocron.crontab(EVERY_15_SECOND, start=False)
 async def poll_skyss():
     logger.info(" ** Polling skyss")
     await pyrotun.skyss.main(PERS)
 
 
-@aiocron.crontab(EVERY_15_SECOND)
+@aiocron.crontab(EVERY_15_SECOND, start=False)
 async def vent_calc():
     logger.info(" ** Ventilation calculations")
     await pyrotun.vent_calculations.main(PERS)
@@ -112,16 +115,16 @@ async def update_thishour_powerestimate():
 
 
 @aiocron.crontab(EVERY_8_MINUTE)
-async def waterheater_controller():
-    await asyncio.sleep(60)  # No need to overlap with bathfloor
-    logger.info(" ** Waterheater controller")
-    await pyrotun.waterheater.controller(PERS)
-
-
-@aiocron.crontab(EVERY_8_MINUTE)
 async def floors_controller():
     logger.info(" ** Floor controller")
     await pyrotun.floors.main(PERS)
+
+
+@aiocron.crontab(EVERY_8_MINUTE)
+async def waterheater_controller():
+    await asyncio.sleep(60)  # No need to overlap with floors_controller
+    logger.info(" ** Waterheater controller")
+    await pyrotun.waterheater.controller(PERS)
 
 
 @aiocron.crontab(EVERY_HOUR)
@@ -153,7 +156,6 @@ async def houseshadow():
 
 @aiocron.crontab(EVERY_15_MINUTE)
 async def polar_dump_now():
-    """Blocking(!)"""
     logger.info(" ** Polar dumper")
     pyrotun.polar_dump.main()
 
@@ -164,9 +166,13 @@ async def spikes():
     await pyrotun.dataspike_remover.main(PERS, readonly=False)
 
 
-async def at_startup(pers):
+async def at_startup(pers) -> List[Any]:
+    """Schedule coroutines for immediate execution as tasks, return
+    list of the scheduled tasks in order to avoid gc."""
 
-    tasks = list()
+    # Keep a strong reference to each task we construct, in
+    # order to avoid them being garbage collected before completion:
+    tasks = []
     tasks.append(
         asyncio.create_task(pyrotun.dataspike_remover.main(pers, readonly=False))
     )
@@ -181,28 +187,44 @@ async def at_startup(pers):
     # it will never finish.
     tasks.append(asyncio.create_task(pyrotun.disruptive.main(pers)))
 
+    tasks.append(
+        asyncio.create_task(pyrotun.unifiprotect.main(pers, waitforever=False))
+    )
+
     # Sets up an async generator:
     tasks.append(asyncio.create_task(pyrotun.exercise_uploader.main(pers)))
 
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
 
-    tasks.append(pyrotun.floors.main(pers))
-    tasks.append(pyrotun.waterheater.controller(pers))
-    tasks.append(pyrotun.yrmelding.main(pers))
-    tasks.append(pyrotun.helligdager.main(pers))
+    tasks.append(asyncio.create_task(pyrotun.floors.main(pers)))
+    tasks.append(asyncio.create_task(pyrotun.waterheater.controller(pers)))
+    tasks.append(asyncio.create_task(pyrotun.yrmelding.main(pers)))
+    tasks.append(asyncio.create_task(pyrotun.helligdager.main(pers)))
 
-    # This "blocks" because at least the discord modules contains
-    # infinite generators.
-    asyncio.gather(*tasks)
+    return tasks
+
+
+async def main():
+    logger.info("Starting pyrotun service loop")
+    pers = pyrotun.persist.PyrotunPersistence()
+    await pers.ainit(requested="all")
+    PERS = pers  # noqa
+
+    startup_tasks = await at_startup(pers)
+    assert startup_tasks
+    # (these tasks are kept in memory forever..)
+
+    # The ones that depend on 'pers' are not autostarted by
+    # aiocron, start them explicitly:
+    poll_unifiprotect.start()
+    poll_sectoralarm.start()
+    poll_skyss.start()
+    vent_calc.start()
+
+    # Wait forever
+    await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
-    logger.info("Starting pyrotun service loop")
     dotenv.load_dotenv(verbose=True)
-    pers = pyrotun.persist.PyrotunPersistence()
-    PERS = pers
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(pers.ainit())
-    loop.run_until_complete(at_startup(pers))
-    # we probably never get here..
-    loop.run_forever()
+    asyncio.run(main(), debug=False)
