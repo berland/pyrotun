@@ -20,7 +20,7 @@ LONGITUDE = os.getenv("LOCAL_LONGITUDE")
 LATITUDE = os.getenv("LOCAL_LATITUDE")
 MET_CLIENT_ID = os.getenv("FROST_CLIENT_ID")
 MET_LOCATION_ID = "1-92917"  # Used to fetch meteogram svg
-METEOGRAM_SVG_FILENAME = "/etc/openhab/html/meteogram.svg"
+METEOGRAM_SVG_FILENAME = Path("/etc/openhab/html/meteogram.svg")
 
 
 async def main(pers=None):
@@ -36,8 +36,11 @@ async def main(pers=None):
 
     svg = await pers.yr.get_svg_meteogram(MET_LOCATION_ID)
     svg = pyrotun.connections.yr.crop_svg_meteogram(svg)
-    Path(METEOGRAM_SVG_FILENAME).write_text(svg)
-    logger.info("Wrote cropped meteogram to %s", METEOGRAM_SVG_FILENAME)
+    filename = METEOGRAM_SVG_FILENAME
+    if not filename.parent.exists():
+        filename = filename.name
+    Path(filename).write_text(svg)
+    logger.info("Wrote cropped meteogram to %s", filename)
 
     # Predict sunheight:
     city = astral.LocationInfo(
