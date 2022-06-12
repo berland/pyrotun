@@ -30,7 +30,7 @@ async def main(pers=None):
     if pers is None:
         pers = persist.PyrotunPersistence()
         close_pers_here = True
-    await pers.ainit(requested=["openhab"])
+        await pers.ainit(requested=["openhab"])
 
     bybanenfralagunen = await get_departures(pers, stop_id=SKYSS_STOPS["lagunen"])
 

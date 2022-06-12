@@ -50,120 +50,110 @@ EVERY_HOUR = "0 * * * *"
 EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
 
-PERS = None
 
+def setup_crontabs(pers):
+    """Registers coroutines for execution via crontab syntax.
 
-@aiocron.crontab(EVERY_15_SECOND, start=False)
-async def poll_unifiprotect():
-    logger.info("Getting garage camera snapshot")
-    await pyrotun.unifiprotect.fetch_snapshot(
-        PERS.unifiprotect.protect, pyrotun.unifiprotect.CAMERA_FILENAME
-    )
+    Requires the persistence object to be initialized."""
 
+    @aiocron.crontab(EVERY_15_SECOND)
+    async def poll_unifiprotect():
+        await asyncio.sleep(3)
+        logger.info("Getting garage camera snapshot")
+        await pyrotun.unifiprotect.fetch_snapshot(
+            pers.unifiprotect.protect, pyrotun.unifiprotect.CAMERA_FILENAME
+        )
 
-@aiocron.crontab(EVERY_15_SECOND, start=False)
-async def poll_sectoralarm():
-    logger.info(" ** Polling sectoralarm")
-    await pyrotun.pollsectoralarm.main(PERS)
+    @aiocron.crontab(EVERY_15_SECOND)
+    async def poll_sectoralarm():
+        logger.info(" ** Polling sectoralarm")
+        await pyrotun.pollsectoralarm.main(pers)
 
+    @aiocron.crontab(EVERY_15_SECOND)
+    async def vent_calc():
+        logger.info(" ** Ventilation calculations")
+        await pyrotun.vent_calculations.main(pers)
 
-@aiocron.crontab(EVERY_15_SECOND, start=False)
-async def poll_skyss():
-    logger.info(" ** Polling skyss")
-    await pyrotun.skyss.main(PERS)
+    @aiocron.crontab(EVERY_15_SECOND)
+    async def poll_skyss():
+        await asyncio.sleep(5)  # No need to overlap with ventilation
+        logger.info(" ** Polling skyss")
+        await pyrotun.skyss.main(pers)
 
+    @aiocron.crontab(EVERY_5_MINUTE)
+    async def pollsmappe():
+        await asyncio.sleep(10)
+        logger.info(" ** Pollsmappee")
+        await pyrotun.pollsmappee.main(pers)
 
-@aiocron.crontab(EVERY_15_SECOND, start=False)
-async def vent_calc():
-    logger.info(" ** Ventilation calculations")
-    await pyrotun.vent_calculations.main(PERS)
+    @aiocron.crontab(EVERY_MIDNIGHT)
+    async def reset_daily_cum():
+        await pers.openhab.set_item("Smappee_day_cumulative", 0)
 
+    @aiocron.crontab(EVERY_HOUR)
+    async def helligdager():
+        logger.info(" ** Helligdager")
+        await pyrotun.helligdager.main(pers)
 
-@aiocron.crontab(EVERY_5_MINUTE)
-async def pollsmappe():
-    logger.info(" ** Pollsmappee")
-    await pyrotun.pollsmappee.main(PERS)
+    @aiocron.crontab(EVERY_15_MINUTE)
+    async def polltibber():
+        logger.info(" ** Polling tibber")
+        await pyrotun.polltibber.main(pers)
 
+    @aiocron.crontab(EVERY_MIDNIGHT)
+    async def calc_power_savings_yesterday():
+        logger.info(" ** Calculating power cost savings yesterday")
+        await pyrotun.poweranalysis.estimate_savings_yesterday(pers, dryrun=False)
 
-@aiocron.crontab(EVERY_MIDNIGHT)
-async def reset_daily_cum():
-    await PERS.openhab.set_item("Smappee_day_cumulative", 0)
+    @aiocron.crontab(EVERY_MINUTE)
+    async def update_thishour_powerestimate():
+        estimate = await pyrotun.powercontroller.estimate_currenthourusage(pers)
+        await pers.openhab.set_item("EstimatedKWh_thishour", estimate)
 
+    @aiocron.crontab(EVERY_8_MINUTE)
+    async def floors_controller():
+        logger.info(" ** Floor controller")
+        await pyrotun.floors.main(pers)
 
-@aiocron.crontab(EVERY_HOUR)
-async def helligdager():
-    logger.info(" ** Helligdager")
-    await pyrotun.helligdager.main(PERS)
+    @aiocron.crontab(EVERY_8_MINUTE)
+    async def waterheater_controller():
+        await asyncio.sleep(60)  # No need to overlap with floors_controller
+        logger.info(" ** Waterheater controller")
+        await pyrotun.waterheater.controller(pers)
 
+    @aiocron.crontab(EVERY_HOUR)
+    async def estimate_savings():
+        # 3 minutes after every hour
+        await asyncio.sleep(60 * 3)
+        logger.info(" ** Waterheater 24h saving estimation")
+        await pyrotun.waterheater.estimate_savings(pers)
 
-@aiocron.crontab(EVERY_15_MINUTE)
-async def polltibber():
-    logger.info(" ** Polling tibber")
-    await pyrotun.polltibber.main(PERS)
+    @aiocron.crontab(EVERY_HOUR)
+    async def yrmelding():
+        logger.info(" ** Yrmelding")
+        await pyrotun.yrmelding.main(pers)
 
+    @aiocron.crontab(EVERY_HOUR)
+    async def sunheatingmodel():
+        logger.info(" ** sunheating model")
+        sunmodel = await pyrotun.powermodels.sunheating_model(pers)
+        pers.powermodels.sunheatingmodel = sunmodel
 
-@aiocron.crontab(EVERY_MIDNIGHT)
-async def calc_power_savings_yesterday():
-    logger.info(" ** Calculating power cost savings yesterday")
-    await pyrotun.poweranalysis.estimate_savings_yesterday(PERS, dryrun=False)
+    @aiocron.crontab(EVERY_15_MINUTE)
+    async def houseshadow():
+        await asyncio.sleep(5)
+        logger.info(" ** Houseshadow")
+        pyrotun.houseshadow.main("/etc/openhab/html/husskygge.svg")
 
+    @aiocron.crontab(EVERY_15_MINUTE)
+    async def polar_dump_now():
+        logger.info(" ** Polar dumper")
+        pyrotun.polar_dump.main()
 
-@aiocron.crontab(EVERY_MINUTE)
-async def update_thishour_powerestimate():
-    estimate = await pyrotun.powercontroller.estimate_currenthourusage(PERS)
-    await PERS.openhab.set_item("EstimatedKWh_thishour", estimate)
-
-
-@aiocron.crontab(EVERY_8_MINUTE)
-async def floors_controller():
-    logger.info(" ** Floor controller")
-    await pyrotun.floors.main(PERS)
-
-
-@aiocron.crontab(EVERY_8_MINUTE)
-async def waterheater_controller():
-    await asyncio.sleep(60)  # No need to overlap with floors_controller
-    logger.info(" ** Waterheater controller")
-    await pyrotun.waterheater.controller(PERS)
-
-
-@aiocron.crontab(EVERY_HOUR)
-async def estimate_savings():
-    # 3 minutes after every hour
-    await asyncio.sleep(60 * 3)
-    logger.info(" ** Waterheater 24h saving estimation")
-    await pyrotun.waterheater.estimate_savings(PERS)
-
-
-@aiocron.crontab(EVERY_HOUR)
-async def yrmelding():
-    logger.info(" ** Yrmelding")
-    await pyrotun.yrmelding.main(PERS)
-
-
-@aiocron.crontab(EVERY_HOUR)
-async def sunheatingmodel():
-    logger.info(" ** sunheating model")
-    sunmodel = await pyrotun.powermodels.sunheating_model(PERS)
-    PERS.powermodels.sunheatingmodel = sunmodel
-
-
-@aiocron.crontab(EVERY_15_MINUTE)
-async def houseshadow():
-    logger.info(" ** Houseshadow")
-    pyrotun.houseshadow.main("/etc/openhab/html/husskygge.svg")
-
-
-@aiocron.crontab(EVERY_15_MINUTE)
-async def polar_dump_now():
-    logger.info(" ** Polar dumper")
-    pyrotun.polar_dump.main()
-
-
-@aiocron.crontab(EVERY_15_MINUTE)
-async def spikes():
-    logger.info(" ** Dataspike remover")
-    await pyrotun.dataspike_remover.main(PERS, readonly=False)
+    @aiocron.crontab(EVERY_15_MINUTE)
+    async def spikes():
+        logger.info(" ** Dataspike remover")
+        await pyrotun.dataspike_remover.main(pers, readonly=False)
 
 
 async def at_startup(pers) -> List[Any]:
@@ -205,23 +195,16 @@ async def at_startup(pers) -> List[Any]:
 
 
 async def main():
-    logger.info("Starting pyrotun service loop")
+    logger.info("Starting pyrotun service")
     pers = pyrotun.persist.PyrotunPersistence()
     await pers.ainit(requested="all")
-    PERS = pers  # noqa
 
     startup_tasks = await at_startup(pers)
     assert startup_tasks
     # (these tasks are kept in memory forever..)
 
-    # The ones that depend on 'pers' are not autostarted by
-    # aiocron, start them explicitly:
-    poll_unifiprotect.start()
-    poll_sectoralarm.start()
-    poll_skyss.start()
-    vent_calc.start()
+    setup_crontabs(pers)
 
-    # Wait forever
     await asyncio.Event().wait()
 
 
