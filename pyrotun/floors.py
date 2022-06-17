@@ -54,7 +54,8 @@ BACKUPSETPOINT = 22
 
 
 async def analyze_history(pers, selected_floors):
-    daysago = 7
+    daysago: int = 12 * 30
+    skipbackwardsdays = 0 * 30
     minutegrouping = 10
     if (Path(__file__).parent / FLOORSFILE).exists():
         logger.info("Loading floor configuration from %s", FLOORSFILE)
@@ -67,6 +68,7 @@ async def analyze_history(pers, selected_floors):
             f"SELECT difference(mean(value)) "
             f"FROM {FLOORS[floor]['sensor_item']} "
             f"where time > now() - {daysago}d "
+            f"and time < now() - {skipbackwardsdays}d "
             f"group by time({minutegrouping}m) "
             "fill(linear) "
         )
