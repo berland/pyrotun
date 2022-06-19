@@ -320,6 +320,8 @@ async def main(
                 FLOORS[floor]["sensor_item"],
                 since=datetime.datetime.now() - datetime.timedelta(hours=48),
             )
+            # Smoothen curve:
+            hist_temps = hist_temps.resample("15min").mean().interpolate(method="time")
             hist_temps.index = hist_temps.index.tz_convert(
                 "Europe/Oslo"
             ) + datetime.timedelta(hours=24)
