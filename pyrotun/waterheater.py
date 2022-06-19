@@ -13,6 +13,7 @@ from sklearn import linear_model
 
 import pyrotun
 from pyrotun import persist  # noqa
+from pyrotun.connections import localpowerprice
 
 logger = pyrotun.getLogger(__name__)
 
@@ -73,6 +74,8 @@ class WaterHeater:
         vacation = await self.pers.openhab.get_item(VACATION_ITEM, datatype=bool)
 
         prices_df = await self.pers.tibber.get_prices()
+        # Grid rental is time dependent:
+        prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
 
         graph = self.future_temp_cost_graph(
             starttemp=currenttemp,
@@ -131,6 +134,8 @@ class WaterHeater:
         and needs only to be run for every price change (i.e. every hour)"""
         if prices_df is None:
             prices_df = await self.pers.tibber.get_prices()
+            # Grid rental is time dependent:
+            prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
 
         logger.info("Building graph for 24h savings estimation")
         # starttemp should be above the minimum temperature, as the
@@ -599,6 +604,9 @@ async def main():
     # Make the weekly water usage profile, and persist it:
     await pers.ainit(["tibber", "waterheater", "influxdb", "openhab"])
     prices_df = await pers.tibber.get_prices()
+    # Grid rental is time dependent:
+    prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
+
     currenttemp = await pers.openhab.get_item(SENSOR_ITEM, datatype=float)
     starttemp = currenttemp
     graph = pers.waterheater.future_temp_cost_graph(
@@ -648,7 +656,4 @@ async def main():
 
 if __name__ == "__main__":
     dotenv.load_dotenv()
-    # loop = asyncio.get_event_loop()
-    # asyncio.ensure_future(main())
-    # loop.run_forever()
-    asyncio.run(main())
+    asyncio.run(main(), debug=False)
