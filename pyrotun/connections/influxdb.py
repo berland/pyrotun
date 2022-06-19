@@ -1,5 +1,6 @@
 import datetime
 import os
+from typing import Optional
 
 import pandas as pd
 from aioinflux import InfluxDBClient
@@ -20,8 +21,13 @@ class InfluxDBConnection:
             output="dataframe", db="openhab_db", host=self.host
         )
 
-    async def get_series(self, item):
-        resp = await self.client.query(f"SELECT * FROM {item}")
+    async def get_series(
+        self, item, since: Optional[datetime.datetime] = None
+    ) -> pd.Series:
+        sincestr = ""
+        if since is not None:
+            sincestr = f"WHERE time > '{since}'"
+        resp = await self.client.query(f"SELECT * FROM {item} {sincestr}")
         if len(resp.columns) > 1:
             # OH3 changed how it writes to Influx series
             resp.columns = ["item", item]
@@ -31,7 +37,7 @@ class InfluxDBConnection:
 
     async def get_series_grouped(
         self, item, aggregator="mean", time="1h", condition=""
-    ):
+    ) -> pd.DataFrame:
 
         resp = await self.client.query(
             (
