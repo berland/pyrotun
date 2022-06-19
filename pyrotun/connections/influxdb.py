@@ -42,7 +42,7 @@ class InfluxDBConnection:
             return pd.Series()
         if isinstance(resp, pd.DataFrame) and resp.empty:
             return pd.Series()
-        assert isinstance(resp, pd.Dataframe)
+        assert isinstance(resp, pd.DataFrame)
         if len(resp.columns) > 1:
             # OH3 changed how it writes to Influx series
             resp.columns = ["item", item]
