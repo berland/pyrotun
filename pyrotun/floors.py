@@ -37,7 +37,8 @@ FLOORS = {
         "setpoint_base": "temperature",  # or "target"
         "delta": 0,
         "heating_rate": 5,
-        "cooling_rate": -0.4,
+        "cooling_rate": -0.1,
+        "cooling_rate_winter": -0.6,
         "setpoint_force": 1,
         "wattage": 600,
         "maxtemp": 33,
@@ -308,6 +309,23 @@ async def main(
             fig, ax = pyplot.subplots()
             plot_path(opt_results["opt_path"], ax=ax, show=False)
             pyplot.title(floor)
+
+            # Yesterdays temperatures shifted forward by 24h:
+            hist_temps = await pers.influxdb.get_series(
+                FLOORS[floor]["sensor_item"],
+                since=datetime.datetime.now() - datetime.timedelta(hours=48),
+            )
+            hist_temps.index = hist_temps.index.tz_convert(
+                "Europe/Oslo"
+            ) + datetime.timedelta(hours=24)
+            ax.plot(
+                hist_temps.index,
+                hist_temps[FLOORS[floor]["sensor_item"]],
+                color="green",
+                label="direct",
+                alpha=0.7,
+            )
+
             prices_df["mintemp"] = (
                 prices_df.reset_index()["index"]
                 .apply(
@@ -315,13 +333,19 @@ async def main(
                 )
                 .values
             )
-            prices_df.plot(
-                drawstyle="steps-post", ax=ax, y="mintemp", color="blue", alpha=0.4
+            ax.step(
+                prices_df.index,
+                prices_df["mintemp"],
+                where="post",
+                color="blue",
+                alpha=0.4,
             )
 
             # Prices on a secondary y-axis:
             ax2 = ax.twinx()
-            prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
+            ax2.step(prices_df.index, prices_df["NOK/KWh"], where="post", alpha=0.2)
+
+            ax.set_xlim(left=prices_df.index.min(), right=prices_df.index.max())
             pyplot.show()
 
     if closepers:
@@ -591,19 +615,22 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
 
     path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
     path_dframe["temp"] = [float_temp(temp) for temp in path_dframe["temp"]]
+    # Draw a dot at starting position
+    ax.plot(
+        path_dframe.index[0],
+        path_dframe["temp"].values[0],
+        marker="o",
+        markersize=4,
+        color="red",
+    )
 
-    # pyplot.plot(
-    #    path_dframe.index[0],
-    #    path_dframe["temp"].values[0],
-    #    marker="o",
-    #    markersize=3,
-    #    color="red",
-    # )
-
-    # BUG: Circumvent unresolved plotting bug that messes up index in plot:
-    path_dframe = path_dframe.iloc[1:]
-
-    path_dframe.plot(y="temp", linewidth=linewidth, color=color, ax=ax)
+    ax.plot(
+        path_dframe.index,
+        path_dframe["temp"],
+        label="Planned temp",
+        color=color,
+        linewidth=linewidth,
+    )
     if show:
         pyplot.show()
 
