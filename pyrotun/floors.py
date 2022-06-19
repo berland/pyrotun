@@ -15,6 +15,7 @@ from matplotlib import pyplot
 
 import pyrotun
 from pyrotun import persist  # noqa
+from pyrotun.connections import localpowerprice
 
 logger = pyrotun.getLogger(__name__)
 
@@ -141,6 +142,10 @@ async def main(
         return
 
     prices_df = await pers.tibber.get_prices()
+
+    # Grid rental is time dependent:
+    prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
+
     if not vacation or vacation == "auto":
         vacation = await pers.openhab.get_item(VACATION_ITEM, datatype=bool)
     else:
