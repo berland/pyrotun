@@ -6,6 +6,37 @@ import pytest
 from pyrotun import persist, powercontroller
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "year, month, expected_bkk",
+    [
+        (2022, 5, 10360),
+        (2022, 4, 9550),
+        (2022, 3, 8950),
+        (2022, 2, 7970),
+        (2022, 1, 10120),
+        (2021, 12, 11520),
+        (2021, 11, 9400),
+        # (2021, 10, 9380),  # Local data hiatus!!!
+        # (2021, 9, 7890),
+        # (2021, 8, 6430),
+        # (2021, 7, 5300),
+        # (2021, 6, 7710),
+    ],
+)
+async def test_nettleie_maanedseffekt_vs_bkk(year: int, month: int, expected_bkk: int):
+    """Test that what we can calculate from local data resembles
+    what BKK claims our nettleietrinn will end at.
+
+    It seems we sometimes overestimate our own data, that is ok, then
+    we at least keep on the right side of the cost."""
+    pers = persist.PyrotunPersistence()
+    await pers.ainit("influxdb")
+    power = await powercontroller.nettleie_maanedseffekt(pers, year, month)
+    assert power < expected_bkk + 240  # We allow overestimate our own data!
+    assert power >= expected_bkk  # We never underestimate
+
+
 def test_estimate_currenthourusage():
     now = datetime.datetime.now()
     hourstart = now.replace(minute=0, second=0, microsecond=0)

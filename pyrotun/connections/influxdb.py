@@ -22,12 +22,27 @@ class InfluxDBConnection:
         )
 
     async def get_series(
-        self, item, since: Optional[datetime.datetime] = None
+        self,
+        item,
+        since: Optional[datetime.datetime] = None,
+        upuntil: Optional[datetime.datetime] = None,
     ) -> pd.Series:
         sincestr = ""
+        upuntilstr = ""
         if since is not None:
-            sincestr = f"WHERE time > '{since}'"
-        resp = await self.client.query(f"SELECT * FROM {item} {sincestr}")
+            sincestr = f"where time > '{since}'"
+        if upuntil is not None:
+            if sincestr == "":
+                upuntilstr = f"where time < '{upuntil}'"
+            else:
+                upuntilstr = f" and time < '{upuntil}'"
+        query = f"SELECT * FROM {item} {sincestr} {upuntilstr}"
+        resp = await self.client.query(query)
+        if isinstance(resp, dict) and not resp:
+            return pd.Series()
+        if isinstance(resp, pd.DataFrame) and resp.empty:
+            return pd.Series()
+        assert isinstance(resp, pd.Dataframe)
         if len(resp.columns) > 1:
             # OH3 changed how it writes to Influx series
             resp.columns = ["item", item]

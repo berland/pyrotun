@@ -110,6 +110,11 @@ def setup_crontabs(pers):
         estimate = await pyrotun.powercontroller.estimate_currenthourusage(pers)
         await pers.openhab.set_item("EstimatedKWh_thishour", estimate)
 
+    @aiocron.crontab(EVERY_HOUR)
+    async def update_thismonth_nettleie():
+        logger.info(" ** Updating nettleie")
+        await pyrotun.powercontroller.update_effekttrinn(pers)
+
     @aiocron.crontab(EVERY_8_MINUTE)
     async def floors_controller():
         logger.info(" ** Floor controller")
@@ -169,7 +174,7 @@ async def at_startup(pers) -> List[Any]:
     tasks.append(asyncio.create_task(pyrotun.vent_calculations.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
-
+    tasks.append(asyncio.create_task(pyrotun.powercontroller.update_effekttrinn(pers)))
     # discord.main() returns a list of tasks, the task is an async generator.
     tasks.extend(await pyrotun.discord.main(pers, gather=False))
 

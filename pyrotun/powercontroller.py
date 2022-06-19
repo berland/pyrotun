@@ -5,20 +5,26 @@ To be run()'ed every minute.
 """
 import asyncio
 import datetime
+import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import aiofiles
 import numpy as np
 import pandas as pd
+import pytz
 import yaml
 
 from pyrotun import persist
 
 CURRENT_POWER_ITEM = "AMSpower"
+CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
 HOURUSAGE_ESTIMATE_ITEM = "WattHourEstimate"
-MAXHOURWATT_LASTMONTH_ITEM = "MaxHourwatt_lastmonth"
+POWER_FOR_EFFEKTTRINN = "NettleieWatt"
+CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
 FLOORSFILE = Path(__file__).absolute().parent / "floors.yml"
+
+TZ = pytz.timezone(os.getenv("TIMEZONE"))  # type: ignore
 
 
 def run(pers, dry=True):
@@ -233,6 +239,8 @@ async def turn(action: str, device: dict) -> None:
 
 
 async def estimate_currenthourusage(pers) -> int:
+    """Estimates what the hour usage in Wh will be for the current hour (at end
+    of the hour)"""
     lasthour: datetime.datetime = datetime.datetime.utcnow().replace(
         second=0, minute=0, microsecond=0
     )
@@ -248,12 +256,18 @@ async def estimate_currenthourusage(pers) -> int:
     lastminutes: pd.DataFrame = await pers.influxdb.dframe_query(
         f"SELECT mean(*) FROM {CURRENT_POWER_ITEM} WHERE time > '{lastminute}'"
     )
+    if lastminutes.empty:
+        # If last minute fails, maybe intermittently missing new data:
+        lastminutes = pd.DataFrame([2000])
+
     return _estimate_currenthourusage(lasthour_df["value"], lastminutes.values[0][0])
 
 
 def _estimate_currenthourusage(
     lasthour_series: pd.Series, lastminute_value: float
 ) -> int:
+    """This function is factored out from its parent function to facilitate
+    testing"""
     if lasthour_series.empty:
         return round(lastminute_value)
     time_min = lasthour_series.index.min()
@@ -271,9 +285,73 @@ def _estimate_currenthourusage(
     return round(full_hour.mean())
 
 
+async def update_effekttrinn(pers):
+    effekttrinn_watt = await nettleie_maanedseffekt(pers)
+    await pers.openhab.set_item(POWER_FOR_EFFEKTTRINN, str(effekttrinn_watt), log=True)
+
+
+async def nettleie_maanedseffekt(
+    pers, year: Optional[int] = None, month: Optional[int] = None
+) -> int:
+    """Beregn effekttallet som brukes for å avgjøre hvilket
+    effekttrinn i nettleien som gjelder for inneværende måned.
+
+    "Gjennomsnittet av de tre timene med høyest forbruk, på tre ulike dager i
+    forrige måned, vil avgjøre hva slags trinn du havner i."
+
+    In Influx, this data is available at around 13 seconds after every hour.
+
+    """
+
+    if year is None and month is None:
+        # Make monthstart in UTC, but as timezone unaware object, this is what
+        # influxdb needs:
+        monthstart = (
+            datetime.datetime.now()
+            .replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            .astimezone(TZ)
+            .astimezone(pytz.timezone("UTC"))
+            .replace(tzinfo=None)
+        )
+        monthend = datetime.datetime.now()
+    else:
+        assert year is not None
+        assert month is not None
+        monthstart = datetime.datetime(year, month, 1, 0, 0)
+        if month < 12:
+            nextmonth = month + 1
+            nextyear = year
+        else:
+            nextmonth = 1
+            nextyear = year + 1
+        monthend = datetime.datetime(nextyear, nextmonth, 1, 0, 0) - datetime.timedelta(
+            seconds=1
+        )
+
+    cumulative_hour_usage_thismonth: pd.Series = await pers.influxdb.get_series(
+        CUMULATIVE_WH_ITEM, since=monthstart, upuntil=monthend
+    )
+    if cumulative_hour_usage_thismonth.empty:
+        return 0
+    hourly_usage: pd.Series = (
+        cumulative_hour_usage_thismonth.resample("1h").mean().diff()
+    )[CUMULATIVE_WH_ITEM]
+
+    # Get local timezone again:
+    hourly_usage.index = hourly_usage.index.tz_convert(TZ)
+    # Shift so that watt usage is valid forwards in time:
+    hourly_usage = hourly_usage.shift(-1)
+
+    # This is the BKK rule for determining effekttrinn:
+    daily_maximum = hourly_usage.resample("1d").max()
+    return int(daily_maximum.sort_values().tail(3).mean())
+
+
 async def main() -> None:
     pers = persist.PyrotunPersistence()
     await pers.ainit(["influxdb", "openhab"])
+    effekttrinn_watt = await nettleie_maanedseffekt(pers)
+    print(f"Effektverdi for effekttrinn: {effekttrinn_watt}")
     est = await estimate_currenthourusage(pers)
     print(f"Estimated power usage for current hour is: {est} Wh")
 
