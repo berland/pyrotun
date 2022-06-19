@@ -1,6 +1,6 @@
 Andre:
   backup_setpoint: 20.0
-  cooling_rate: -0.1
+  cooling_rate: -0.08
   cooling_rate_winter: -0.7
   delta: -2.0
   heating_rate: 1.5
@@ -35,7 +35,7 @@ Bad_Oppe:
   wattage: 600.0
 Bakgang:
   backup_setpoint: 15
-  cooling_rate: -0.05
+  cooling_rate: -0.03
   cooling_rate_winter: -0.5
   delta: -8
   heating_rate: 1.5
@@ -59,7 +59,7 @@ Gangoppe:
   wattage: 600
 Inngang:
   backup_setpoint: 23
-  cooling_rate: -0.2
+  cooling_rate: -0.1
   cooling_rate_winter: -0.6
   delta: -2
   heating_rate: 0.8
@@ -73,7 +73,7 @@ Inngang:
   wattage: 600
 Leane:
   backup_setpoint: 20
-  cooling_rate: -0.05
+  cooling_rate: -0.08
   cooling_rate_winter: -0.5
   delta: -6
   heating_rate: 0.7
@@ -97,7 +97,7 @@ Sofastue:
   wattage: 1700
 Syrom:
   backup_setpoint: 15
-  cooling_rate: -0.05
+  cooling_rate: -0.02
   cooling_rate_winter: -0.08
   delta: -7
   heating_rate: 0.1
@@ -121,7 +121,7 @@ Tvstue:
   wattage: 600
 Vaskegang:
   backup_setpoint: 15
-  cooling_rate: -0.1
+  cooling_rate: -0.05
   cooling_rate_winter: -0.1
   delta: -8
   heating_rate: 0.2
@@ -133,7 +133,7 @@ Vaskegang:
   wattage: 800
 Vaskerom:
   backup_setpoint: 15
-  cooling_rate: -0.1
+  cooling_rate: -0.05
   cooling_rate_winter: -0.5
   delta: -8
   heating_rate: 1.0
