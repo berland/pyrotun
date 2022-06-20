@@ -144,6 +144,7 @@ async def main(
     prices_df = await pers.tibber.get_prices()
 
     # Grid rental is time dependent:
+    prices_df = prices_df.copy()
     prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
 
     if not vacation or vacation == "auto":

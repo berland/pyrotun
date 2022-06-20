@@ -75,6 +75,7 @@ class WaterHeater:
 
         prices_df = await self.pers.tibber.get_prices()
         # Grid rental is time dependent:
+        prices_df = prices_df.copy()
         prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
 
         graph = self.future_temp_cost_graph(
@@ -135,6 +136,7 @@ class WaterHeater:
         if prices_df is None:
             prices_df = await self.pers.tibber.get_prices()
             # Grid rental is time dependent:
+            prices_df = prices_df.copy()
             prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
 
         logger.info("Building graph for 24h savings estimation")
