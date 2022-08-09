@@ -9,7 +9,7 @@ def get_gridrental(priceindex: pd.DatetimeIndex) -> pd.Series:
     high_rate = 0.499
     low_rate = 0.399
 
-    gridrental = pd.Series(index=priceindex)
+    gridrental = pd.Series(index=priceindex, dtype=float)
     gridrental[:] = high_rate
 
     # Night rate:
