@@ -170,7 +170,9 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
 
     Args:
         overshoot: How much is the current wattage compared
-            to what we want to consume right now.
+            to what we want to consume right now. Positive
+            number means we are using too much (and need to turn
+            something off)
         powerload_df: Dataframe with current loads, one row
             pr consumer.
     """

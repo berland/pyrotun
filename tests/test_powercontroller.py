@@ -10,6 +10,8 @@ from pyrotun import persist, powercontroller
 @pytest.mark.parametrize(
     "year, month, expected_bkk",
     [
+        (2022, 7, 8100),
+        (2022, 6, 8010),
         (2022, 5, 10360),
         (2022, 4, 9550),
         (2022, 3, 8950),
@@ -34,7 +36,7 @@ async def test_nettleie_maanedseffekt_vs_bkk(year: int, month: int, expected_bkk
     await pers.ainit("influxdb")
     power = await powercontroller.nettleie_maanedseffekt(pers, year, month)
     assert power < expected_bkk + 240  # We allow overestimate our own data!
-    assert power >= expected_bkk  # We never underestimate
+    assert power >= expected_bkk - 10  # We almost never underestimate
 
 
 def test_estimate_currenthourusage():
@@ -85,19 +87,25 @@ async def test_estimate_currenthourusage_for_real():
 @pytest.mark.parametrize(
     "overshoot, powerload_df, expected_actions",
     [
-        (0, pd.DataFrame(), []),
-        (1000, pd.DataFrame(), []),
-        (-1000, pd.DataFrame(), []),
-        (1000, {"switch_item": "foo_bryter", "wattage": 1000}, [{"ON": "foo_bryter"}]),
-        (
+        pytest.param(0, pd.DataFrame(), [], id="zero"),
+        pytest.param(1000, pd.DataFrame(), [], id="nothing_to_turn_off"),
+        pytest.param(-1000, pd.DataFrame(), [], id="nothing_to_turn_on"),
+        pytest.param(
+            1000,
+            {"switch_item": "foo_bryter", "wattage": 1000},
+            [{"OFF": "foo_bryter"}],
+            id="turn_off_single_option",
+        ),
+        pytest.param(
             1000,
             [
                 {"switch_item": "foo_bryter", "wattage": 100},
                 {"switch_item": "bar_bryter", "wattage": 100},
             ],
-            [{"ON": "bar_bryter"}, {"ON": "foo_bryter"}],
+            [{"OFF": "bar_bryter"}, {"OFF": "foo_bryter"}],
+            id="turn_off_multiple",
         ),
-        (
+        pytest.param(
             1000,
             [
                 {
@@ -108,9 +116,10 @@ async def test_estimate_currenthourusage_for_real():
                 },
                 {"switch_item": "bar_bryter", "wattage": 100},
             ],
-            [{"ON": "foo_bryter"}, {"ON": "bar_bryter"}],
+            [{"OFF": "foo_bryter"}, {"OFF": "bar_bryter"}],
+            id="turning_off_on_long_enough",
         ),
-        (
+        pytest.param(
             100,
             [
                 {
@@ -121,9 +130,10 @@ async def test_estimate_currenthourusage_for_real():
                 },
                 {"switch_item": "bar_bryter", "wattage": 100},
             ],
-            [{"ON": "foo_bryter"}],
+            [{"OFF": "foo_bryter"}],
+            id="prioritize_when_last_changed_exists_and_larger_than_5",
         ),
-        (
+        pytest.param(
             100,
             [
                 {
@@ -132,9 +142,29 @@ async def test_estimate_currenthourusage_for_real():
                     "lastchange": 10,
                     "is_on": "NO",
                 },
-                {"switch_item": "bar_bryter", "wattage": 100},
+                {"switch_item": "bar_bryter", "wattage": 100, "is_on": "YES"},
             ],
-            [{"ON": "bar_bryter"}],
+            [{"OFF": "bar_bryter"}],
+            id="skip_off_switches",
+        ),
+        pytest.param(
+            100,
+            [
+                {
+                    "switch_item": "foo_bryter",
+                    "wattage": 100,
+                    "lastchange": 4.9,
+                    "is_on": "YES",
+                },
+                {
+                    "switch_item": "bar_bryter",
+                    "wattage": 100,
+                    "lastchange": 5.1,
+                    "is_on": "YES",
+                },
+            ],
+            [{"OFF": "bar_bryter"}],
+            id="lastchange_5_minutes_matter",
         ),
     ],
 )

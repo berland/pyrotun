@@ -112,6 +112,7 @@ def setup_crontabs(pers):
 
     @aiocron.crontab(EVERY_HOUR)
     async def update_thismonth_nettleie():
+        await asyncio.sleep(30)  # Wait for AMS data to propagate to Influx
         logger.info(" ** Updating nettleie")
         await pyrotun.powercontroller.update_effekttrinn(pers)
 
