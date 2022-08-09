@@ -34,12 +34,17 @@ async def main(pers=None):
 
     bybanenfralagunen = await get_departures(pers, stop_id=SKYSS_STOPS["lagunen"])
 
-    await pers.openhab.set_item(
-        "NesteBybane", bybanenfralagunen["PassingTimes"][0]["DisplayTime"], log=True
-    )
-    await pers.openhab.set_item(
-        "Neste2Bybane", bybanenfralagunen["PassingTimes"][1]["DisplayTime"], log=True
-    )
+    if bybanenfralagunen["PassingTimes"]:
+        await pers.openhab.set_item(
+            "NesteBybane", bybanenfralagunen["PassingTimes"][0]["DisplayTime"], log=True
+        )
+        await pers.openhab.set_item(
+            "Neste2Bybane",
+            bybanenfralagunen["PassingTimes"][1]["DisplayTime"],
+            log=True,
+        )
+    else:
+        logger.error(f"Mangling response from skyss: {bybanenfralagunen}")
 
     if close_pers_here:
         await pers.aclose()
