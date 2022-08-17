@@ -34,7 +34,7 @@ async def main(pers=None):
 
     bybanenfralagunen = await get_departures(pers, stop_id=SKYSS_STOPS["lagunen"])
 
-    if bybanenfralagunen["PassingTimes"]:
+    if "PassingTimes" in bybanenfralagunen:
         await pers.openhab.set_item(
             "NesteBybane", bybanenfralagunen["PassingTimes"][0]["DisplayTime"], log=True
         )
