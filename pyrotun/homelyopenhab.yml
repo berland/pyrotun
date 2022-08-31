@@ -1,0 +1,40 @@
+- name: Røyksensor gang oppe
+  openhab_item: Sensor_Gangoppe_taktemperatur_brannvarsler
+  featurepath: temperature/states/temperature/value
+- name: Røyksensor gang oppe
+  openhab_item: Sensor_Gangoppe_brann
+  featurepath: alarm/states/fire/value
+  type: bool
+
+- name: Røyksensor gang nede
+  openhab_item: Sensor_Gangnede_taktemperatur_brannvarsler
+  featurepath: temperature/states/temperature/value
+- name: Røyksensor gang nede
+  openhab_item: Sensor_Gangnede_brann
+  featurepath: alarm/states/fire/value
+  type: bool
+
+- name: Bevegelse gang nede
+  openhab_item: Sensor_Gangnede_taktemperatur_homely
+  featurepath: temperature/states/temperature/value
+- name: Bevegelse gang nede
+  openhab_item: Sensor_Gangnede_bevegelse_homely
+  featurepath: alarm/states/alarm/value
+  type: bool
+
+- name: Bevegelse stue
+  openhab_item: Sensor_Stue_taktemperatur_homely
+  featurepath: temperature/states/temperature/value
+- name: Bevegelse stue
+  openhab_item: Sensor_Stue_bevegelse
+  featurepath: alarm/states/alarm/value
+  type: bool
+
+- name: Dør gjesterom
+  openhab_item: TerrassedorGjesterom
+  featurepath: alarm/states/alarm/value
+  type: door
+
+- name: Dør gjesterom
+  openhab_item: Sensor_TerrassedorGjesterom_temperatur
+  featurepath: temperature/states/temperature/value

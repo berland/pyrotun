@@ -1,4 +1,5 @@
 from . import (  # noqa
+    homely,
     influxdb,
     mqtt,
     openhab,

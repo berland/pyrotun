@@ -36,6 +36,8 @@ class OpenHABConnection:
         ) as resp:
             resp = await resp.json()
             if datatype == str:
+                if "state" not in resp:
+                    raise KeyError(f"{item_name} not found in response {resp}")
                 return resp["state"]
             elif datatype == float:
                 try:
@@ -49,7 +51,7 @@ class OpenHABConnection:
                 else:
                     return False
 
-    async def set_item(self, item_names, new_state, log=None):
+    async def set_item(self, item_names, new_state, log=None, method="post"):
         if self.readonly:
             logger.info(
                 "OpenHAB: Would have set %s to %s", str(item_names), str(new_state)
@@ -75,27 +77,34 @@ class OpenHABConnection:
                     str(current_state),
                     str(new_state),
                 )
-            async with self.websession.post(
-                self.openhab_url + "/items/" + str(item_name), data=str(new_state)
-            ) as resp:
-                if resp.status != 200:
-                    logger.error(resp)
-
-            try:
-                # Spare OpenHAB instance for a transition period:
-                extra_host = self.openhab_url.replace("serv", "serve").replace(
-                    "8090", "8080"
-                )
+            if method == "post":
                 async with self.websession.post(
-                    extra_host + "/items/" + str(item_name), data=str(new_state)
+                    self.openhab_url + "/items/" + str(item_name), data=str(new_state)
                 ) as resp:
                     if resp.status != 200:
-                        pass
-                        # logger.error(resp)
-            except OSError:  # as err:
-                # logger.warning("Secondary OpenHAB instance not responding")
-                # logger.warning(str(err))
-                pass
+                        logger.error(resp)
+            elif method == "put":
+                async with self.websession.put(
+                    self.openhab_url + "/items/" + str(item_name) + "/state",
+                    data=str(new_state),
+                ) as resp:
+                    if resp.status != 202:
+                        logger.error(resp)
+            # try:
+            #     # Spare OpenHAB instance for a transition period:
+            #     extra_host = self.openhab_url.replace("serv", "serve").replace(
+            #         "8090", "8080"
+            #     )
+            #      async with self.websession.post(
+            #         extra_host + "/items/" + str(item_name), data=str(new_state)
+            #      ) as resp:
+            #         if resp.status != 200:
+            #             pass
+            #             # logger.error(resp)
+            # except OSError:  # as err:
+            #     # logger.warning("Secondary OpenHAB instance not responding")
+            #     # logger.warning(str(err))
+            #     pass
 
     def sync_get_item(self, item_name):
         return self.client.get_item(item_name).state

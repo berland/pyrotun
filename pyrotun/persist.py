@@ -9,22 +9,29 @@ class PyrotunPersistence:
     def __init__(self, readonly=False):
         logger.info("Initializing PyrotunPersistence")
         self.websession = aiohttp.ClientSession()
-        self.tibber = None
+
+        self.homely = None
         self.influxdb = None
-        self.waterheater = None
-        self.smappee = None
-        self.sectoralarm = None
-        self.openhab = None
         self.mqtt = None
-        self.unifiprotect = None
-        self.yr = None
+        self.openhab = None
         self.powermodels = None
+        self.sectoralarm = None
+        self.smappee = None
+        self.tibber = None
+        self.unifiprotect = None
+        self.waterheater = None
+        self.yr = None
 
         # If true, no values are ever sent anywhere
         self.readonly = readonly
 
     async def ainit(self, requested="all"):
         logger.info("PyrotunPersistence.ainit()")
+        if "homely" in requested or "all" in requested:
+            self.homely = connections.homely.HomelyConnection(
+                websession=self.websession
+            )
+            await self.homely.ainit(websession=self.websession)
         if "openhab" in requested or "all" in requested:
             self.openhab = connections.openhab.OpenHABConnection(
                 websession=self.websession, readonly=self.readonly

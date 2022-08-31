@@ -3,7 +3,6 @@
 import setuptools
 from setuptools import find_packages
 
-
 REQUIREMENTS = [
     "aiocron",
     "aiofiles",
@@ -13,7 +12,6 @@ REQUIREMENTS = [
     "asyncio_mqtt",
     "asyncsector",
     "defusedxml",
-    "python-dotenv",
     "geopy",
     "gpxpy",
     "habapp",
@@ -26,6 +24,7 @@ REQUIREMENTS = [
     "paho-mqtt",
     "pandas",
     "pylunar",
+    "python-dotenv",
     "python-dotenv",
     "python-openhab",
     "pytibber",

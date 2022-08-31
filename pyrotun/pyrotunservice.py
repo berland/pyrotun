@@ -12,6 +12,7 @@ import aiocron
 import dotenv
 
 import pyrotun
+import pyrotun.connections.homely
 import pyrotun.connections.mqtt
 import pyrotun.connections.openhab
 import pyrotun.connections.sectoralarm
@@ -27,6 +28,7 @@ import pyrotun.helligdager
 import pyrotun.houseshadow
 import pyrotun.persist
 import pyrotun.polar_dump
+import pyrotun.pollhomely
 import pyrotun.pollsectoralarm
 import pyrotun.pollsmappee
 import pyrotun.polltibber
@@ -68,6 +70,11 @@ def setup_crontabs(pers):
     async def poll_sectoralarm():
         logger.info(" ** Polling sectoralarm")
         await pyrotun.pollsectoralarm.main(pers)
+
+    @aiocron.crontab(EVERY_15_SECOND)
+    async def poll_homely():
+        logger.info(" ** Polling Homely")
+        await pyrotun.pollhomely.amain(pers)
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def vent_calc():

@@ -315,7 +315,9 @@ async def nettleie_maanedseffekt(
             .astimezone(pytz.timezone("UTC"))
             .replace(tzinfo=None)
         )
-        monthend = datetime.datetime.now()
+        monthend = (
+            datetime.datetime.now()
+        )  # gir problem når denne akkurat bikker et nytt døgn
     else:
         assert year is not None
         assert month is not None
@@ -329,9 +331,12 @@ async def nettleie_maanedseffekt(
         monthend = datetime.datetime(nextyear, nextmonth, 1, 0, 0) - datetime.timedelta(
             seconds=1
         )
-
     cumulative_hour_usage_thismonth: pd.Series = await pers.influxdb.get_series(
         CUMULATIVE_WH_ITEM, since=monthstart, upuntil=monthend
+    )
+    # Get local timezone again:
+    cumulative_hour_usage_thismonth.index = (
+        cumulative_hour_usage_thismonth.index.tz_convert(TZ)
     )
     if cumulative_hour_usage_thismonth.empty:
         return 0
@@ -340,7 +345,7 @@ async def nettleie_maanedseffekt(
     )[CUMULATIVE_WH_ITEM]
 
     # Get local timezone again:
-    hourly_usage.index = hourly_usage.index.tz_convert(TZ)
+    # hourly_usage.index = hourly_usage.index.tz_convert(TZ)
     # Shift so that watt usage is valid forwards in time:
     hourly_usage = hourly_usage.shift(-1)
 
