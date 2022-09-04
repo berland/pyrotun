@@ -31,7 +31,7 @@ async def amain(pers=None, debug=False):
 async def update_openhab(pers, data):
     # "Alarm state" is not a "device" in the homely API response. Handled
     # outside the yaml file..
-    alarmstate_map = {"ARMED": "ON", "DISARMED": "OFF"}
+    alarmstate_map = {"ARMED_AWAY": "ON", "DISARMED": "OFF"}
     await pers.openhab.set_item(
         ALARM_ARMED_ITEM, alarmstate_map[data["alarmState"]], log=True
     )
@@ -45,6 +45,8 @@ async def update_openhab(pers, data):
     if notexisting_homely_devices:
         logger.warning(f"Not existing homely devices: {notexisting_homely_devices}")
     for conf_item in pers.homely.config:
+        if conf_item["name"] in notexisting_homely_devices:
+            continue
         item_dict = next(
             item for item in data["devices"] if item["name"] == conf_item["name"]
         )
