@@ -15,7 +15,6 @@ import pyrotun
 import pyrotun.connections.homely
 import pyrotun.connections.mqtt
 import pyrotun.connections.openhab
-import pyrotun.connections.sectoralarm
 import pyrotun.connections.smappee
 import pyrotun.connections.tibber
 import pyrotun.connections.unifiprotect
@@ -29,7 +28,6 @@ import pyrotun.houseshadow
 import pyrotun.persist
 import pyrotun.polar_dump
 import pyrotun.pollhomely
-import pyrotun.pollsectoralarm
 import pyrotun.pollsmappee
 import pyrotun.polltibber
 import pyrotun.poweranalysis
@@ -65,11 +63,6 @@ def setup_crontabs(pers):
         await pyrotun.unifiprotect.fetch_snapshot(
             pers.unifiprotect.protect, pyrotun.unifiprotect.CAMERA_FILENAME
         )
-
-    @aiocron.crontab(EVERY_15_SECOND)
-    async def poll_sectoralarm():
-        logger.info(" ** Polling sectoralarm")
-        await pyrotun.pollsectoralarm.main(pers)
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def poll_homely():
