@@ -7,7 +7,7 @@ import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
 
-ALARM_ARMED_ITEM = "HomelyAlarmArmert"
+ALARM_ARMED_ITEM = "AlarmArmert"
 
 
 async def amain(pers=None, debug=False):
