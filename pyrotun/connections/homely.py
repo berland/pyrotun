@@ -85,6 +85,7 @@ class HomelyConnection:
         ) as resp:
             json_response = await resp.json()
             self.access_token = json_response["access_token"]
+            print(self.access_token)
             logger.info("Acquired homely token")
 
     async def acquire_location_id(self, index=0):
@@ -94,6 +95,8 @@ class HomelyConnection:
         ) as resp:
             locations = await resp.json()
             self.location_id = locations[index]["locationId"]
+            print("Location:")
+            print(self.location_id)
 
     async def get_data(self) -> dict:
         logger.info("Polling for all homely data...")

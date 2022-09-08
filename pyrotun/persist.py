@@ -18,6 +18,7 @@ class PyrotunPersistence:
         self.sectoralarm = None
         self.smappee = None
         self.tibber = None
+        self.zaptec = None
         self.unifiprotect = None
         self.waterheater = None
         self.yr = None
@@ -46,7 +47,6 @@ class PyrotunPersistence:
         if "tibber" in requested or "all" in requested:
             self.tibber = connections.tibber.TibberConnection()
             await self.tibber.ainit(websession=self.websession)
-
         if "sectoralarm" in requested or "all" in requested:
             self.sectoralarm = connections.sectoralarm.SectorAlarmConnection()
             await self.sectoralarm.ainit(websession=self.websession)
@@ -69,6 +69,10 @@ class PyrotunPersistence:
         if "unifiprotect" in requested or "all" in requested:
             self.unifiprotect = connections.unifiprotect.UnifiProtectConnection()
             await self.unifiprotect.ainit()
+
+        if "zaptec" in requested or "all" in requested:
+            self.zaptec = connections.zaptec.ZaptecConnection()
+            await self.zaptec.ainit(websession=self.websession)
 
     async def aclose(self):
         logger.info("Tearing down pyrotunpersistence")
