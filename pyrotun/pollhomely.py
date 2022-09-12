@@ -1,4 +1,6 @@
+import argparse
 import asyncio
+import pprint
 
 import dotenv
 
@@ -10,7 +12,7 @@ logger = pyrotun.getLogger(__name__)
 ALARM_ARMED_ITEM = "AlarmArmert"
 
 
-async def amain(pers=None, debug=False):
+async def amain(pers=None, dryrun=False, debug=False):
     close_pers = False
     if pers is None:
         pers = pyrotun.persist.PyrotunPersistence()
@@ -22,7 +24,12 @@ async def amain(pers=None, debug=False):
         await pers.ainit(["openhab"])
 
     data = await pers.homely.get_data()
-    await update_openhab(pers, data)
+
+    if debug:
+        pprint.pprint(data)
+
+    if not dryrun:
+        await update_openhab(pers, data)
 
     if close_pers:
         await pers.aclose()
@@ -81,4 +88,15 @@ def fold(path: str, data: dict):
 
 
 if __name__ == "__main__":
-    asyncio.run(amain(pers=None))
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--debug", "-d", action="store_true", help="Debug mode, pretty print json data"
+    )
+    parser.add_argument(
+        "--dryrun",
+        "--dry",
+        action="store_true",
+        help="Dry run, do not submit to OpenHAB",
+    )
+    args = parser.parse_args()
+    asyncio.run(amain(pers=None, dryrun=args.dryrun, debug=args.debug))
