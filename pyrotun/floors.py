@@ -678,7 +678,7 @@ def temp_requirement(
     hour = timestamp.hour
     weekday = timestamp.weekday()  # Monday = 0, Sunday = 6
     friday = 4
-    corona = True
+    corona = False
     if vacation:
         # Ferie
         return 15 + delta
