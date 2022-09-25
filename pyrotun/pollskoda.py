@@ -9,6 +9,7 @@ logger = pyrotun.getLogger(__name__)
 
 
 async def amain(pers=None, debug=False):
+    close_pers = False
     if pers is None:
         pers = pyrotun.persist.PyrotunPersistence()
         dotenv.load_dotenv()

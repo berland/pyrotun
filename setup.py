@@ -32,6 +32,7 @@ REQUIREMENTS = [
     "pyyaml",
     "requests",
     "sklearn",
+    "skodaconnect",
     "smappy",
     "watchgod",
 ]
