@@ -20,6 +20,8 @@ sensors = {
     "bjehrg8pismg008hqa20": {"wateritem": "Sensor_Gulvutenfordusj_vann"},
     "bjehsk8pismg008hqac0": {"tempitem": "Sensor_Bakganggulv_temperatur"},
     "bjeiidu7gpvg00cjo7qg": {"tempitem": "Sensor_Teleskap_temperatur"},
+    "c17h64l17uj000bprk2g": {"tempitem": "Sensor_Undertrapp_temperatur"},
+    "c17h6b127gm0008e24j0": {"tempitem": "Sensor_Langgang_gulv_temperatur"},
     "bjr2lmtp0jt000a5h700": {
         "tempitem": "Sensor_Televeggverksted_temperatur",
         "humitem": "Sensor_Televeggverksted_fuktighet",
