@@ -15,6 +15,7 @@ import pyrotun
 import pyrotun.connections.homely
 import pyrotun.connections.mqtt
 import pyrotun.connections.openhab
+import pyrotun.connections.skoda
 import pyrotun.connections.smappee
 import pyrotun.connections.tibber
 import pyrotun.connections.unifiprotect
@@ -28,6 +29,7 @@ import pyrotun.houseshadow
 import pyrotun.persist
 import pyrotun.polar_dump
 import pyrotun.pollhomely
+import pyrotun.pollskoda
 import pyrotun.pollsmappee
 import pyrotun.polltibber
 import pyrotun.poweranalysis
@@ -69,6 +71,11 @@ def setup_crontabs(pers):
     async def poll_homely():
         logger.info(" ** Polling Homely")
         await pyrotun.pollhomely.amain(pers)
+
+    @aiocron.crontab(EVERY_MINUTE)
+    async def poll_skoda():
+        logger.info(" ** Polling Skoda")
+        await pyrotun.pollskoda.amain(pers)
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def vent_calc():

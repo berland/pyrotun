@@ -1,0 +1,7 @@
+battery_level:
+  openhab_item: EnyaqBatteryState
+electric_range:
+  openhab_item: EnyaqRange
+  multiplier: 1000
+charging_power:
+  openhab_item: EnyaqChargingPower

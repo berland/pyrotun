@@ -51,7 +51,7 @@ class HomelyConnection:
     async def aclose(self):
         logger.info("closing")
         if self._close_websession_in_aclose:
-            self.websession.close()
+            await self.websession.close()
 
     async def acquire_config(self):
         config_file = Path(__file__).parent.parent / CONFIG_FILE

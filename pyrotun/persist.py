@@ -16,6 +16,7 @@ class PyrotunPersistence:
         self.openhab = None
         self.powermodels = None
         self.sectoralarm = None
+        self.skoda = None
         self.smappee = None
         self.tibber = None
         self.unifiprotect = None
@@ -54,6 +55,10 @@ class PyrotunPersistence:
         if "smappee" in requested or "all" in requested:
             self.smappee = connections.smappee.SmappeeConnection()
 
+        if "skoda" in requested or "all" in requested:
+            self.skoda = connections.skoda.SkodaConnection()
+            await self.skoda.ainit()
+
         if "mqtt" in requested or "all" in requested:
             self.mqtt = connections.mqtt.MqttConnection()
             await self.mqtt.ainit()
@@ -74,6 +79,9 @@ class PyrotunPersistence:
         logger.info("Tearing down pyrotunpersistence")
         if self.tibber is not None:
             await self.tibber.aclose()
+
+        if self.skoda is not None:
+            await self.skoda.aclose()
 
         await self.websession.close()
 

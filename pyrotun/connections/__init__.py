@@ -4,6 +4,7 @@ from . import (  # noqa
     mqtt,
     openhab,
     sectoralarm,
+    skoda,
     smappee,
     tibber,
     unifiprotect,
