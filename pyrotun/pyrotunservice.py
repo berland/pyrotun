@@ -41,6 +41,7 @@ import pyrotun.yrmelding
 logger = pyrotun.getLogger(__name__)
 
 EVERY_SECOND = "* * * * * *"
+EVERY_10_SECOND = "* * * * * */10"
 EVERY_15_SECOND = "* * * * * */15"
 EVERY_MINUTE = "* * * * *"
 EVERY_5_MINUTE = "*/5 * * * *"
@@ -64,7 +65,7 @@ def setup_crontabs(pers):
             pers.unifiprotect.protect, pyrotun.unifiprotect.CAMERA_FILENAME
         )
 
-    @aiocron.crontab(EVERY_15_SECOND)
+    @aiocron.crontab(EVERY_10_SECOND)
     async def poll_homely():
         logger.info(" ** Polling Homely")
         await pyrotun.pollhomely.amain(pers)
