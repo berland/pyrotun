@@ -4,6 +4,7 @@ import datetime
 import os
 import random
 from pathlib import Path
+from typing import Union
 
 import dotenv
 import networkx
@@ -55,6 +56,16 @@ WEATHER_COMPENSATION_MULTIPLIER = 2
 BACKUPSETPOINT = 22
 
 
+def interpolate_summer_winter(
+    day: Union[int, datetime.date], summer_value: float, winter_value: float
+) -> float:
+    if isinstance(day, datetime.date):
+        day = (day - day.replace(month=1, day=1)).days
+    assert 0 < day < 366
+    interpolant = abs(day - 365 / 2) / (365 / 2)
+    return (1 - interpolant) * summer_value + interpolant * winter_value
+
+
 async def analyze_history(pers, selected_floors):
     daysago: int = 12 * 30
     skipbackwardsdays = 0 * 30
@@ -85,6 +96,9 @@ async def analyze_history(pers, selected_floors):
         pyplot.axvline(x=FLOORS[floor]["heating_rate"], color="red", linewidth=2)
         pyplot.axvline(x=0, color="black", linewidth=2)
         pyplot.axvline(x=FLOORS[floor]["cooling_rate"], color="red", linewidth=2)
+        pyplot.axvline(
+            x=FLOORS[floor]["cooling_rate_winter"], color="purple", linewidth=2
+        )
         pyplot.show()
 
 
@@ -225,6 +239,15 @@ async def main(
             - datetime.timedelta(minutes=minutesago)
         ).astimezone(tz)
 
+        if "cooling_rate_winter" in FLOORS[floor]:
+            cooling_rate_interpolated = interpolate_summer_winter(
+                datetime.datetime.today(),
+                FLOORS[floor]["cooling_rate"],
+                FLOORS[floor]["cooling_rate_winter"],
+            )
+        else:
+            cooling_rate_interpolated = FLOORS[floor]["cooling_rate"]
+
         graph = await heatreservoir_temp_cost_graph(
             starttime=starttime,
             starttemp=currenttemp,
@@ -233,7 +256,7 @@ async def main(
             maxtemp=FLOORS[floor]["maxtemp"],
             wattage=FLOORS[floor]["wattage"],
             heating_rate=FLOORS[floor]["heating_rate"],
-            cooling_rate=FLOORS[floor]["cooling_rate"],
+            cooling_rate=cooling_rate_interpolated,
             vacation=vacation,
             freq=freq,
             delta=delta,
@@ -465,7 +488,7 @@ async def heatreservoir_temp_cost_graph(
             # [  {"temp": 23.1, "cost": 0, "kwh": 0},
             #    {"temp": 25.1, "cost": 2, "kwh": 1}]
             # This function can also be called for a list of future temperatures,
-            # then it will compute andthe cost of going there.
+            # then it will compute the cost of going there.
 
             assert cooling_rate < 0
             no_heater_temp = float_temp(int_temp(temp + cooling_rate * t_delta_hours))
