@@ -15,7 +15,10 @@ import pandas as pd
 import pytz
 import yaml
 
+import pyrotun
 from pyrotun import persist
+
+logger = pyrotun.getLogger(__name__)
 
 CURRENT_POWER_ITEM = "AMSpower"
 CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
@@ -25,6 +28,8 @@ CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
 FLOORSFILE = Path(__file__).absolute().parent / "floors.yml"
 
 TZ = pytz.timezone(os.getenv("TIMEZONE"))  # type: ignore
+
+PERS = None
 
 
 def run(pers, dry=True):
@@ -56,9 +61,13 @@ async def get_powerloads(pers) -> pd.DataFrame:
                 "Verksted_varmekabler_nattsenking", unit="minutes"
             ),
             "on_need": max(
-                12 - await pers.openhab.get_item("VerkstedTemperatur", datatype=float),
+                12
+                - await pers.openhab.get_item(
+                    "Sensor_Verkstedgulv_temperatur", datatype=float
+                ),
                 0,
             ),
+            "sensor_item": "Sensor_Verkstedgulv_temperatur",
         }
     )
     loads.append(
@@ -72,10 +81,11 @@ async def get_powerloads(pers) -> pd.DataFrame:
             "on_need": max(
                 6
                 - await pers.openhab.get_item(
-                    "Sensor_Garasje_temperatur", datatype=float
+                    "Sensor_Garasjegulv_temperatur", datatype=float
                 ),
                 0,
             ),
+            "sensor_item": "Sensor_Garasjegulv_temperatur",
         }
     )
 
@@ -112,6 +122,7 @@ async def get_powerloads(pers) -> pd.DataFrame:
             meas_temp = await pers.openhab.get_item(
                 thisfloor["sensor_item"], datatype=float
             )
+            thisfloor.update({"meas_temp": meas_temp})
             target_temp = 25 + thisfloor.get("delta", 0)
             if meas_temp is not None:
                 on_need = max(target_temp - meas_temp, 0)
@@ -162,7 +173,7 @@ async def control_powerusage(pers) -> None:
 
     actions = _decide(overshoot, powerload_df)
     for action, appliance in actions.items():
-        await turn(action, appliance)
+        await turn(pers, action, appliance)
 
 
 def _decide(overshoot: int, powerload_df: pd.DataFrame):
@@ -178,6 +189,7 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
     """
     assert isinstance(overshoot, int)
     assert isinstance(powerload_df, pd.DataFrame)
+    powerload_df = pd.DataFrame(powerload_df)
     actions: List[Dict[str, dict]] = []
     if powerload_df.empty:
         return actions
@@ -205,11 +217,14 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
         remainder_overshoot = overshoot
 
         while remainder_overshoot > 0 and not powerload_df.empty:
+            print(powerload_df)
             turnmeoff = (
-                powerload_df.sort_values(["change_candidate", "on_need"])
+                powerload_df[powerload_df["is_on"] != "OFF"]
+                .sort_values(["change_candidate", "on_need"])
                 .tail(1)
                 .to_dict(orient="records")[0]
             )
+            print(turnmeoff)
             actions.append({"OFF": turnmeoff})
             powerload_df.drop(axis=0, index=turnmeoff["index"], inplace=True)
             remainder_overshoot -= turnmeoff["wattage"]
@@ -217,7 +232,8 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
         remainder_undershoot = -overshoot
         while remainder_undershoot > 0 and not powerload_df.empty:
             turnmeon = (
-                powerload_df.sort_values(["change_candidate", "on_need"])
+                powerload_df[powerload_df["is_on"] != "ON"]
+                .sort_values(["change_candidate", "on_need"])
                 .head(1)
                 .to_dict(orient="records")[0]
             )
@@ -227,7 +243,7 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
     return actions
 
 
-async def turn(action: str, device: dict) -> None:
+async def turn(pers, action: str, device: dict) -> None:
     """Perform an action on a specific power device.
 
     Will send an ON or OFF, or will adjust a setpoint, based on
@@ -237,7 +253,28 @@ async def turn(action: str, device: dict) -> None:
     garasje is 2700W
     verksted is 1600W
     """
+    import pprint
+
+    pprint.pprint(device)
     print(f" *** Turning {action} {device}")
+    if "switch_item" in device and device["switch_item"] is not np.nan:
+        # Simple switch item to flip:
+        await pers.openhab.set_item(device["switch_item"], action, log=True)
+    elif "setpoint_item" in device and device["setpoint_item"] is not np.nan:
+        if action == "ON":
+            if isinstance(device["setpoint_item"], str):
+                device["setpoint_item"] = [device["setpoint_item"]]
+            for item in device["setpoint_item"]:
+                await pers.openhab.set_item(
+                    item, device["meas_temp"] + device["setpoint_force"], log=True
+                )
+        if action == "OFF":
+            if isinstance(device["setpoint_item"], str):
+                device["setpoint_item"] = [device["setpoint_item"]]
+            for item in device["setpoint_item"]:
+                await pers.openhab.set_item(
+                    item, device["meas_temp"] - device["setpoint_force"], log=True
+                )
 
 
 async def estimate_currenthourusage(pers) -> int:
@@ -290,6 +327,17 @@ def _estimate_currenthourusage(
 async def update_effekttrinn(pers):
     effekttrinn_watt = await nettleie_maanedseffekt(pers)
     await pers.openhab.set_item(POWER_FOR_EFFEKTTRINN, str(effekttrinn_watt), log=True)
+
+
+def upperlimit_effekttrinn(watt):
+    if watt < 5000:
+        return 4950
+    if watt < 10000:
+        return 9950
+    if watt < 15000:
+        return 14950
+    if watt < 20000:
+        return 19950
 
 
 async def nettleie_maanedseffekt(
@@ -358,12 +406,24 @@ async def main() -> None:
     pers = persist.PyrotunPersistence()
     await pers.ainit(["influxdb", "openhab"])
     effekttrinn_watt = await nettleie_maanedseffekt(pers)
-    print(f"Effektverdi for effekttrinn: {effekttrinn_watt}")
+    logger.info(f"Effektverdi for effekttrinn: {effekttrinn_watt}")
+    upperlimit_watt = upperlimit_effekttrinn(effekttrinn_watt)
+    # upperlimit_watt = 1000  # for debugging..
+    logger.info(f"Vi må holde oss under: {upperlimit_watt}W denne måneden")
     est = await estimate_currenthourusage(pers)
-    print(f"Estimated power usage for current hour is: {est} Wh")
+    logger.info(f"Estimated power usage for current hour is: {est} Wh")
 
-    powerloads = await get_powerloads(pers)
-    print(powerloads)
+    powerload_df = await get_powerloads(pers)
+    print(powerload_df)
+
+    if est > upperlimit_watt:
+        logger.warning("Using too much power this hour, must turn off appliances")
+        actions = _decide(est - upperlimit_watt, powerload_df)
+        print(actions)
+        for action_dict in actions:
+            action = list(action_dict.keys())[0]
+            await turn(pers, action, action_dict[action])  # Ugly data structure
+
     await pers.aclose()
 
 
