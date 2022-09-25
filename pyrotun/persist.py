@@ -15,7 +15,6 @@ class PyrotunPersistence:
         self.mqtt = None
         self.openhab = None
         self.powermodels = None
-        self.sectoralarm = None
         self.skoda = None
         self.smappee = None
         self.tibber = None
@@ -47,10 +46,6 @@ class PyrotunPersistence:
         if "tibber" in requested or "all" in requested:
             self.tibber = connections.tibber.TibberConnection()
             await self.tibber.ainit(websession=self.websession)
-
-        if "sectoralarm" in requested or "all" in requested:
-            self.sectoralarm = connections.sectoralarm.SectorAlarmConnection()
-            await self.sectoralarm.ainit(websession=self.websession)
 
         if "smappee" in requested or "all" in requested:
             self.smappee = connections.smappee.SmappeeConnection()
