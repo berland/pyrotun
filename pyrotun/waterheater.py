@@ -640,19 +640,40 @@ async def main():
         logger.info("Will turn heater on at %s", first_on_timestamp)
 
     await pers.waterheater.estimate_savings(prices_df)
+
     fig, ax = pyplot.subplots()
     plot_graph(graph, ax=ax, show=False)
     plot_path(opt_results["opt_path"], ax=ax, show=False)
-    ax2 = ax.twinx()
-    prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
     prices_df["mintemp"] = (
         prices_df.reset_index()["index"]
         .apply(watertemp_requirement, vacation=False, prices=prices_df)
         .values
     )
     prices_df.plot(drawstyle="steps-post", ax=ax, y="mintemp", color="blue", alpha=0.4)
-    pyplot.show()
 
+    # Yesterdays temperatures shifted forward by 24h:
+    hist_temps = await pers.influxdb.get_series(
+        SENSOR_ITEM,
+        since=datetime.datetime.now() - datetime.timedelta(hours=48),
+    )
+    # Smoothen historical curve:
+    hist_temps = hist_temps.resample("15min").mean().interpolate(method="time")
+    hist_temps.index = hist_temps.index.tz_convert("Europe/Oslo") + datetime.timedelta(
+        hours=24
+    )
+    # ax.plot(
+    #   hist_temps.index,
+    #   hist_temps[SENSOR_ITEM],
+    #    color="green",
+    #    label="direct",
+    #    alpha=0.7,
+    # )
+
+    ax2 = ax.twinx()
+    prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2, alpha=0.2)
+
+    # ax.set_xlim(left=prices_df.index.min(), right=prices_df.index.max())
+    pyplot.show()
     await pers.aclose()
 
 
