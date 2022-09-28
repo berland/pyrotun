@@ -3,6 +3,7 @@ import asyncio
 import datetime
 import os
 import random
+from functools import partial
 from pathlib import Path
 from typing import Union
 
@@ -248,20 +249,23 @@ async def main(
         else:
             cooling_rate_interpolated = FLOORS[floor]["cooling_rate"]
 
-        graph = await heatreservoir_temp_cost_graph(
+        result = heatreservoir.optimize(
             starttime=starttime,
             starttemp=currenttemp,
-            prices_df=prices_df,
-            mintemp=10,
-            maxtemp=FLOORS[floor]["maxtemp"],
-            wattage=FLOORS[floor]["wattage"],
-            heating_rate=FLOORS[floor]["heating_rate"],
-            cooling_rate=cooling_rate_interpolated,
-            vacation=vacation,
+            prices=prices_df,
+            min_temp=pd.Series(min_temp),
+            max_temp=pd.Series(FLOORS[floor]["maxtemp"]),
+            temp_predictor=partial(
+                floortemp_predictor,
+                wattage=FLOORS[floor]["wattage"],
+                heating_rate=FLOORS[floor]["heating_rate"],
+                cooling_rate=cooling_rate_interpolated,
+            ),
             freq=freq,
-            delta=delta,
+            # delta??
         )
 
+        assert result
         if not graph:
             logger.warning(
                 f"Temperature ({currenttemp}) below minimum, should force on"
@@ -823,6 +827,15 @@ def find_node(graph, when, temp):
     )
     row = nodes_df.iloc[closest_temp_idx]
     return (row["index"], row["temp"])
+
+
+def floortemp_predictor(
+    temp, tstamp, t_delta_hours, wattage=0, heating_rate=0, cooling_rate=0
+):
+    return [
+        {"temp": temp + heating_rate * t_delta_hours, "kwh": wattage * t_delta_hours},
+        {"temp": temp - cooling_rate * t_delta_hours, "kwh": 0},
+    ]
 
 
 def temp_requirement(
