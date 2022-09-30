@@ -6,6 +6,7 @@ Runs continously as a service, calls underlying tools/scripts
 from asyncio at regular intervals (similar to crontab)
 """
 import asyncio
+import datetime
 from typing import Any, List
 
 import aiocron
@@ -120,6 +121,10 @@ def setup_crontabs(pers):
 
     @aiocron.crontab(EVERY_HOUR)
     async def update_thismonth_nettleie():
+        if datetime.datetime.now().hour == 0:
+            # We have a bug that prevents correct calculation
+            # the first hour of every day..
+            return
         await asyncio.sleep(30)  # Wait for AMS data to propagate to Influx
         logger.info(" ** Updating nettleie")
         await pyrotun.powercontroller.update_effekttrinn(pers)
