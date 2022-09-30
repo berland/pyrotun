@@ -179,3 +179,16 @@ def test_decide(overshoot, powerload_df, expected_actions):
         {list(act.keys())[0]: list(act.values())[0]["switch_item"]} for act in actions
     ]
     assert sliced_actions == expected_actions
+
+
+@pytest.mark.asyncio
+async def test_turn(mocker):
+    pers = persist.PyrotunPersistence()
+    pers.openhab = mocker.MagicMock()
+    # pers.openhab.set_item = AsyncMock()
+    await powercontroller.turn(
+        pers,
+        "OFF",
+        {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3},
+    )
+    pers.openhab.set_item.assert_called_once_with("termostat", 10)

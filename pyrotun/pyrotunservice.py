@@ -119,6 +119,11 @@ def setup_crontabs(pers):
         estimate = await pyrotun.powercontroller.estimate_currenthourusage(pers)
         await pers.openhab.set_item("EstimatedKWh_thishour", estimate)
 
+    @aiocron.crontab(EVERY_MINUTE)
+    async def turn_off_if_overshooting_powerusage():
+        await asyncio.sleep(15)
+        await pyrotun.powercontroller.main(pers)
+
     @aiocron.crontab(EVERY_HOUR)
     async def update_thismonth_nettleie():
         if datetime.datetime.now().hour == 0:

@@ -5,9 +5,10 @@ To be run()'ed every minute.
 """
 import asyncio
 import datetime
+import math
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiofiles
 import numpy as np
@@ -104,11 +105,10 @@ async def get_powerloads(pers) -> pd.DataFrame:
         contents = await filehandle.read()
     floors = yaml.safe_load(contents)
 
-    # Varmepumpe?
+    # Varmepumpe? Don't touch it...!
 
     for floor in floors:
         thisfloor = floors[floor].copy()  # needed?
-        print(floor)
         if isinstance(thisfloor["setpoint_item"], list):
             bryter_name = thisfloor["setpoint_item"][0].replace(
                 "SetpointHeating", "bryter"
@@ -243,7 +243,7 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
     return actions
 
 
-async def turn(pers, action: str, device: dict) -> None:
+async def turn(pers, action: str, device: Dict[str, Any]) -> None:
     """Perform an action on a specific power device.
 
     Will send an ON or OFF, or will adjust a setpoint, based on
@@ -253,12 +253,13 @@ async def turn(pers, action: str, device: dict) -> None:
     garasje is 2700W
     verksted is 1600W
     """
-    import pprint
+    assert action in {"ON", "OFF"}
 
-    pprint.pprint(device)
-    print(f" *** Turning {action} {device}")
+    logger.info(f" *** Turning {action} {device}")
     if "switch_item" in device and device["switch_item"] is not np.nan:
         # Simple switch item to flip:
+        if device.get("inverted_switch", False):
+            action = {"ON": "OFF", "OFF": "ON"}[action]
         await pers.openhab.set_item(device["switch_item"], action, log=True)
     elif "setpoint_item" in device and device["setpoint_item"] is not np.nan:
         if action == "ON":
@@ -266,14 +267,18 @@ async def turn(pers, action: str, device: dict) -> None:
                 device["setpoint_item"] = [device["setpoint_item"]]
             for item in device["setpoint_item"]:
                 await pers.openhab.set_item(
-                    item, device["meas_temp"] + device["setpoint_force"], log=True
+                    item,
+                    math.ceil(device["meas_temp"] + device["setpoint_force"]),
+                    log=True,
                 )
         if action == "OFF":
             if isinstance(device["setpoint_item"], str):
                 device["setpoint_item"] = [device["setpoint_item"]]
             for item in device["setpoint_item"]:
                 await pers.openhab.set_item(
-                    item, device["meas_temp"] - device["setpoint_force"], log=True
+                    item,
+                    math.floor(device["meas_temp"] - device["setpoint_force"]),
+                    log=True,
                 )
 
 
@@ -330,8 +335,8 @@ async def update_effekttrinn(pers):
 
 
 def upperlimit_effekttrinn(watt):
-    if watt < 5000:
-        return 4950
+    # Fordi vi har elbil-lader som står på minst 5.6kW, så er det aldri
+    # noe poeng å være under 10.
     if watt < 10000:
         return 9950
     if watt < 15000:
@@ -365,7 +370,8 @@ async def nettleie_maanedseffekt(
         )
         monthend = (
             datetime.datetime.now()
-        )  # gir problem når denne akkurat bikker et nytt døgn
+        )  # gir problem når denne akkurat bikker et nytt døgn,
+        # should we just do timezone convert??
     else:
         assert year is not None
         assert month is not None
@@ -399,22 +405,25 @@ async def nettleie_maanedseffekt(
 
     # This is the BKK rule for determining effekttrinn:
     daily_maximum = hourly_usage.resample("1d").max()
+    three_largest_daily_hourmax = daily_maximum.sort_values().tail(3)
+    logger.info(f"Max daily hourmax'es: {three_largest_daily_hourmax.values} W")
     return int(daily_maximum.sort_values().tail(3).mean())
 
 
-async def main() -> None:
-    pers = persist.PyrotunPersistence()
-    await pers.ainit(["influxdb", "openhab"])
+async def main(pers=None) -> None:
+    close_pers = False
+    if pers is None:
+        pers = persist.PyrotunPersistence()
+        await pers.ainit(["influxdb", "openhab"])
+        close_pers = True
     effekttrinn_watt = await nettleie_maanedseffekt(pers)
     logger.info(f"Effektverdi for effekttrinn: {effekttrinn_watt}")
     upperlimit_watt = upperlimit_effekttrinn(effekttrinn_watt)
-    # upperlimit_watt = 1000  # for debugging..
-    logger.info(f"Vi må holde oss under: {upperlimit_watt}W denne måneden")
+    logger.info(f"Vi må holde oss under: {upperlimit_watt} W denne måneden")
     est = await estimate_currenthourusage(pers)
     logger.info(f"Estimated power usage for current hour is: {est} Wh")
 
     powerload_df = await get_powerloads(pers)
-    print(powerload_df)
 
     if est > upperlimit_watt:
         logger.warning("Using too much power this hour, must turn off appliances")
@@ -424,7 +433,8 @@ async def main() -> None:
             action = list(action_dict.keys())[0]
             await turn(pers, action, action_dict[action])  # Ugly data structure
 
-    await pers.aclose()
+    if close_pers:
+        await pers.aclose()
 
 
 if __name__ == "__main__":
