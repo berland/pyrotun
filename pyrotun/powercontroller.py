@@ -176,7 +176,7 @@ async def control_powerusage(pers) -> None:
         await turn(pers, action, appliance)
 
 
-def _decide(overshoot: int, powerload_df: pd.DataFrame):
+def _decide(overshoot: int, powerload_df: pd.DataFrame) -> List[Dict[str, dict]]:
     """
 
     Args:
@@ -222,6 +222,7 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
                 powerload_df[powerload_df["is_on"] != "OFF"]
                 .sort_values(["change_candidate", "on_need"])
                 .tail(1)
+                .dropna("columns")
                 .to_dict(orient="records")[0]
             )
             print(turnmeoff)
@@ -235,6 +236,7 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame):
                 powerload_df[powerload_df["is_on"] != "ON"]
                 .sort_values(["change_candidate", "on_need"])
                 .head(1)
+                .dropna("columns")
                 .to_dict(orient="records")[0]
             )
             actions.append({"ON": turnmeon})
@@ -300,7 +302,7 @@ async def estimate_currenthourusage(pers) -> int:
     lastminutes: pd.DataFrame = await pers.influxdb.dframe_query(
         f"SELECT mean(*) FROM {CURRENT_POWER_ITEM} WHERE time > '{lastminute}'"
     )
-    if lastminutes.empty:
+    if isinstance(lastminutes, dict) or lastminutes.empty:
         # If last minute fails, maybe intermittently missing new data:
         lastminutes = pd.DataFrame([2000])
 
@@ -330,29 +332,64 @@ def _estimate_currenthourusage(
 
 
 async def update_effekttrinn(pers):
-    effekttrinn_watt = await nettleie_maanedseffekt(pers)
-    await pers.openhab.set_item(POWER_FOR_EFFEKTTRINN, str(effekttrinn_watt), log=True)
+    hourmaxes: List[int] = await monthly_hourmaxes(pers)
+    top_watts = sorted(hourmaxes)[-3:]
+    mean = sum(top_watts) / len(top_watts)
+    await pers.openhab.set_item(POWER_FOR_EFFEKTTRINN, str(int(mean)), log=True)
 
 
-def upperlimit_effekttrinn(watt):
-    # Fordi vi har elbil-lader som står på minst 5.6kW, så er det aldri
-    # noe poeng å være under 10.
-    if watt < 10000:
-        return 9950
-    if watt < 15000:
-        return 14950
-    if watt < 20000:
-        return 19950
+def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]):
+    """Given the three highest daily maxes, determine what we currently
+    allow as a hourly power consumption average.
+
+    Special casing for the three first days of a month.
+
+      Gjennomsnittet av de tre timene med høyest forbruk, på tre ulike dager i
+      forrige måned, vil avgjøre hva slags trinn du havner i.
+    """
+
+    baseline = 10000  # Car charger makes it meaningless to try to be below 10k
+    step = 5000
+    safeguard = 50
+
+    todays_hourmax = hourmaxes_pr_day[-1]
+    dayofmonth = len(hourmaxes_pr_day)
+    top_watts = sorted(hourmaxes_pr_day)[-3:]
+    two_largest = top_watts[-2:]
+
+    # Most of the days during the month, then we just accept the target
+    # coming from the mean consumption:
+    if dayofmonth > 3:
+        print(sum(top_watts))
+        while sum(top_watts) > 3 * baseline:
+            baseline = baseline + step
+
+        return max(
+            todays_hourmax - safeguard,
+            min(baseline - safeguard, 3 * baseline - sum(two_largest) - safeguard),
+        )
+
+    # Special casing the first three days, try to make mean below baseline:
+    if dayofmonth == 3:
+        # baseline is always 10000
+        return max(
+            todays_hourmax - safeguard,
+            min(baseline - safeguard, 3 * baseline - sum(two_largest) - safeguard),
+        )
+    if dayofmonth == 2:
+        return max(
+            todays_hourmax - safeguard,
+            min(baseline - safeguard, 2 * baseline - hourmaxes_pr_day[0] - safeguard),
+        )
+    if dayofmonth == 1:
+        return max(todays_hourmax - safeguard, baseline - safeguard)
 
 
-async def nettleie_maanedseffekt(
+async def monthly_hourmaxes(
     pers, year: Optional[int] = None, month: Optional[int] = None
-) -> int:
-    """Beregn effekttallet som brukes for å avgjøre hvilket
-    effekttrinn i nettleien som gjelder for inneværende måned.
-
-    "Gjennomsnittet av de tre timene med høyest forbruk, på tre ulike dager i
-    forrige måned, vil avgjøre hva slags trinn du havner i."
+) -> List[float]:
+    """
+    Make a list pr. day of max hourmaxes in power consumption.
 
     In Influx, this data is available at around 13 seconds after every hour.
 
@@ -403,11 +440,11 @@ async def nettleie_maanedseffekt(
     # Shift so that watt usage is valid forwards in time:
     hourly_usage = hourly_usage.shift(-1)
 
-    # This is the BKK rule for determining effekttrinn:
     daily_maximum = hourly_usage.resample("1d").max()
     three_largest_daily_hourmax = daily_maximum.sort_values().tail(3)
     logger.info(f"Max daily hourmax'es: {three_largest_daily_hourmax.values} W")
-    return int(daily_maximum.sort_values().tail(3).mean())
+
+    return list(daily_maximum.values)
 
 
 async def main(pers=None) -> None:
@@ -416,9 +453,8 @@ async def main(pers=None) -> None:
         pers = persist.PyrotunPersistence()
         await pers.ainit(["influxdb", "openhab"])
         close_pers = True
-    effekttrinn_watt = await nettleie_maanedseffekt(pers)
-    logger.info(f"Effektverdi for effekttrinn: {effekttrinn_watt}")
-    upperlimit_watt = upperlimit_effekttrinn(effekttrinn_watt)
+    hourmaxes: List[int] = await monthly_hourmaxes(pers)
+    upperlimit_watt = currentlimit_from_hourmaxes(hourmaxes)
     logger.info(f"Vi må holde oss under: {upperlimit_watt} W denne måneden")
     est = await estimate_currenthourusage(pers)
     logger.info(f"Estimated power usage for current hour is: {est} Wh")

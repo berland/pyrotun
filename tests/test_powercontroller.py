@@ -1,5 +1,8 @@
 import datetime
+from typing import List
+from unittest.mock import AsyncMock
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -18,7 +21,12 @@ from pyrotun import persist, powercontroller
         (2022, 2, 7970),
         (2022, 1, 10120),
         (2021, 12, 11520),
-        (2021, 11, 9400),
+        pytest.param(
+            2021,
+            11,
+            9400,
+            marks=pytest.mark.xfail(reason="missing data, our estimate is 8674"),
+        ),
         # (2021, 10, 9380),  # Local data hiatus!!!
         # (2021, 9, 7890),
         # (2021, 8, 6430),
@@ -26,7 +34,9 @@ from pyrotun import persist, powercontroller
         # (2021, 6, 7710),
     ],
 )
-async def test_nettleie_maanedseffekt_vs_bkk(year: int, month: int, expected_bkk: int):
+async def test_top_three_hourmax_this_month_vs_bkk(
+    year: int, month: int, expected_bkk: int
+):
     """Test that what we can calculate from local data resembles
     what BKK claims our nettleietrinn will end at.
 
@@ -34,7 +44,14 @@ async def test_nettleie_maanedseffekt_vs_bkk(year: int, month: int, expected_bkk
     we at least keep on the right side of the cost."""
     pers = persist.PyrotunPersistence()
     await pers.ainit("influxdb")
-    power = await powercontroller.nettleie_maanedseffekt(pers, year, month)
+    hourmaxes: List[int] = await powercontroller.monthly_hourmaxes(pers, year, month)
+    print(hourmaxes)
+    top_watts = [watt for watt in hourmaxes if not np.isnan(watt)]
+    print(top_watts)
+    top_watts = sorted(top_watts)[-3:]
+    power = sum(top_watts) / len(top_watts)
+    print(f"{power=}")
+    print(f"{expected_bkk=}")
     assert power < expected_bkk + 240  # We allow overestimate our own data!
     assert power >= expected_bkk - 10  # We almost never underestimate
 
@@ -182,13 +199,46 @@ def test_decide(overshoot, powerload_df, expected_actions):
 
 
 @pytest.mark.asyncio
-async def test_turn(mocker):
+@pytest.mark.parametrize(
+    "action, device, value",
+    [("OFF", {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3}, 10)],
+    [("ON", {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3}, 16)],
+)
+async def test_turn(action, device, value, mocker):
     pers = persist.PyrotunPersistence()
-    pers.openhab = mocker.MagicMock()
-    # pers.openhab.set_item = AsyncMock()
-    await powercontroller.turn(
-        pers,
-        "OFF",
-        {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3},
+    pers.openhab = AsyncMock()
+    pers.openhab.set_item = AsyncMock()
+    await powercontroller.turn(pers, action, device)
+    pers.openhab.set_item.assert_awaited_once_with(
+        device["setpoint_item"][0], value, log=True
     )
-    pers.openhab.set_item.assert_called_once_with("termostat", 10)
+
+
+baseline = 10000
+step = 5000
+safeguard = 50
+
+
+@pytest.mark.parametrize(
+    "hourmaxes, expected",
+    [
+        ([10], baseline - safeguard),
+        ([10000], baseline - safeguard),
+        ([12000], 12000 - safeguard),
+        ([12000, 5000], baseline - 2000 - safeguard),
+        ([12000, 13000], 13000 - safeguard),
+        ([9000, 13000], 13000 - safeguard),
+        ([9000, 11000], 11000 - safeguard),
+        ([2000, 3000], baseline - safeguard),
+        ([8000, 10000, 12000], 12000 - safeguard),
+        ([12000, 10000, 8000], 8000 - safeguard),
+        ([12000, 10000, 5000], 8000 - safeguard),
+        ([1, 7000, 10000, 12000], 12000 - safeguard),
+        ([1, 12000, 10000, 7000], 8000 - safeguard),
+        ([1, 15000, 10000, 7000], 15000 - safeguard),  # Up one step
+        ([1, 24000, 10000, 8000], 11000 - safeguard),  # Up one step
+        ([1, 24000, 15000, 8000], 20000 - safeguard),  # Up two steps
+    ],
+)
+def test_currentlimit_from_hourmaxes(hourmaxes, expected):
+    assert powercontroller.currentlimit_from_hourmaxes(hourmaxes) == expected

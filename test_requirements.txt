@@ -5,6 +5,7 @@ mypy
 pre-commit
 pylint
 pytest
+pytest-mock
 pytest-asyncio
 types-PyYAML
 types-aiofiles

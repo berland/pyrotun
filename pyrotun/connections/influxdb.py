@@ -1,6 +1,6 @@
 import datetime
 import os
-from typing import Optional
+from typing import Optional, Union
 
 import pandas as pd
 from aioinflux import InfluxDBClient
@@ -92,6 +92,6 @@ class InfluxDBConnection:
         resp = await self.client.query("SHOW MEASUREMENTS")
         return resp["name"].values
 
-    async def dframe_query(self, query):
+    async def dframe_query(self, query) -> Union[dict, pd.DataFrame]:
         resp = await self.client.query(query)
         return resp
