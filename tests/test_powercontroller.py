@@ -44,7 +44,7 @@ async def test_top_three_hourmax_this_month_vs_bkk(
     we at least keep on the right side of the cost."""
     pers = persist.PyrotunPersistence()
     await pers.ainit("influxdb")
-    hourmaxes: List[int] = await powercontroller.monthly_hourmaxes(pers, year, month)
+    hourmaxes: List[float] = await powercontroller.monthly_hourmaxes(pers, year, month)
     print(hourmaxes)
     top_watts = [watt for watt in hourmaxes if not np.isnan(watt)]
     print(top_watts)
@@ -200,17 +200,33 @@ def test_decide(overshoot, powerload_df, expected_actions):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "action, device, value",
-    [("OFF", {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3}, 10)],
-    [("ON", {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3}, 16)],
+    "action, deviceinfo, expected_item, expected_value",
+    [
+        (
+            "OFF",
+            {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3},
+            "termostat",
+            10,
+        ),
+        (
+            "ON",
+            {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3},
+            "termostat",
+            16,
+        ),
+        ("ON", {"switch_item": "bryter"}, "bryter", "ON"),
+        ("OFF", {"switch_item": "bryter"}, "bryter", "OFF"),
+        ("ON", {"switch_item": "bryter", "inverted_switch": True}, "bryter", "OFF"),
+        ("OFF", {"switch_item": "bryter", "inverted_switch": True}, "bryter", "ON"),
+    ],
 )
-async def test_turn(action, device, value, mocker):
+async def test_turn(action, deviceinfo, expected_item, expected_value, mocker):
     pers = persist.PyrotunPersistence()
     pers.openhab = AsyncMock()
     pers.openhab.set_item = AsyncMock()
-    await powercontroller.turn(pers, action, device)
+    await powercontroller.turn(pers, action, deviceinfo)
     pers.openhab.set_item.assert_awaited_once_with(
-        device["setpoint_item"][0], value, log=True
+        expected_item, expected_value, log=True
     )
 
 

@@ -154,28 +154,6 @@ async def get_powerloads(pers) -> pd.DataFrame:
     return pd.DataFrame(loads).drop(["cooling_rate", "heating_rate"], axis="columns")
 
 
-async def control_powerusage(pers) -> None:
-    """Run this to contain the power usage to set limits"""
-
-    # A dataframe that contains the hourly plan for power usage
-    # the coming hours, indexed by datetimes in local time zone
-    # Must have a planned_Wh column
-    powerplan = None  # pers.powerplan.get_planned_wh()
-
-    if powerplan is None:
-        powerplan = 4800
-
-    estimated_wh = pers.openhab.get_item("EstimatedKWh_thishour")
-
-    overshoot = estimated_wh - powerplan
-
-    powerload_df = await get_powerloads(pers)
-
-    actions = _decide(overshoot, powerload_df)
-    for action, appliance in actions.items():
-        await turn(pers, action, appliance)
-
-
 def _decide(overshoot: int, powerload_df: pd.DataFrame) -> List[Dict[str, dict]]:
     """
 
@@ -430,7 +408,7 @@ async def monthly_hourmaxes(
         cumulative_hour_usage_thismonth.index.tz_convert(TZ)
     )
     if cumulative_hour_usage_thismonth.empty:
-        return 0
+        return [0.0]
     hourly_usage: pd.Series = (
         cumulative_hour_usage_thismonth.resample("1h").mean().diff()
     )[CUMULATIVE_WH_ITEM]
@@ -453,7 +431,7 @@ async def main(pers=None) -> None:
         pers = persist.PyrotunPersistence()
         await pers.ainit(["influxdb", "openhab"])
         close_pers = True
-    hourmaxes: List[int] = await monthly_hourmaxes(pers)
+    hourmaxes: List[float] = await monthly_hourmaxes(pers)
     upperlimit_watt = currentlimit_from_hourmaxes(hourmaxes)
     logger.info(f"Vi må holde oss under: {upperlimit_watt} W denne måneden")
     est = await estimate_currenthourusage(pers)
@@ -464,7 +442,6 @@ async def main(pers=None) -> None:
     if est > upperlimit_watt:
         logger.warning("Using too much power this hour, must turn off appliances")
         actions = _decide(est - upperlimit_watt, powerload_df)
-        print(actions)
         for action_dict in actions:
             action = list(action_dict.keys())[0]
             await turn(pers, action, action_dict[action])  # Ugly data structure
