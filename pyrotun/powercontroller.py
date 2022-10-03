@@ -3,6 +3,7 @@
 To be run()'ed every minute.
 
 """
+import argparse
 import asyncio
 import datetime
 import math
@@ -61,12 +62,15 @@ async def get_powerloads(pers) -> pd.DataFrame:
             "lastchange": await pers.influxdb.item_age(
                 "Verksted_varmekabler_nattsenking", unit="minutes"
             ),
-            "on_need": max(
-                12
-                - await pers.openhab.get_item(
-                    "Sensor_Verkstedgulv_temperatur", datatype=float
+            "on_need": round(
+                max(
+                    12
+                    - await pers.openhab.get_item(
+                        "Sensor_Verkstedgulv_temperatur", datatype=float
+                    ),
+                    0,
                 ),
-                0,
+                5,
             ),
             "sensor_item": "Sensor_Verkstedgulv_temperatur",
         }
@@ -79,12 +83,15 @@ async def get_powerloads(pers) -> pd.DataFrame:
             "lastchange": await pers.influxdb.item_age(
                 "Garasje_varmekabler_nattsenking", unit="minutes"
             ),
-            "on_need": max(
-                6
-                - await pers.openhab.get_item(
-                    "Sensor_Garasjegulv_temperatur", datatype=float
+            "on_need": round(
+                max(
+                    6
+                    - await pers.openhab.get_item(
+                        "Sensor_Garasjegulv_temperatur", datatype=float
+                    ),
+                    0,
                 ),
-                0,
+                6,
             ),
             "sensor_item": "Sensor_Garasjegulv_temperatur",
         }
@@ -125,7 +132,7 @@ async def get_powerloads(pers) -> pd.DataFrame:
             thisfloor.update({"meas_temp": meas_temp})
             target_temp = 25 + thisfloor.get("delta", 0)
             if meas_temp is not None:
-                on_need = max(target_temp - meas_temp, 0)
+                on_need = round(max(target_temp - meas_temp, 0), 6)
                 thisfloor.update(
                     {
                         "on_need": on_need,
@@ -200,7 +207,7 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame) -> List[Dict[str, dict]]
                 powerload_df[powerload_df["is_on"] != "OFF"]
                 .sort_values(["change_candidate", "on_need"])
                 .tail(1)
-                .dropna("columns")
+                .dropna(axis="columns")
                 .to_dict(orient="records")[0]
             )
             print(turnmeoff)
@@ -223,7 +230,7 @@ def _decide(overshoot: int, powerload_df: pd.DataFrame) -> List[Dict[str, dict]]
     return actions
 
 
-async def turn(pers, action: str, device: Dict[str, Any]) -> None:
+async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
     """Perform an action on a specific power device.
 
     Will send an ON or OFF, or will adjust a setpoint, based on
@@ -240,26 +247,39 @@ async def turn(pers, action: str, device: Dict[str, Any]) -> None:
         # Simple switch item to flip:
         if device.get("inverted_switch", False):
             action = {"ON": "OFF", "OFF": "ON"}[action]
-        await pers.openhab.set_item(device["switch_item"], action, log=True)
+        if dryrun:
+            print(f"Would send {action} to {device['switch_item']}")
+        else:
+            await pers.openhab.set_item(device["switch_item"], action, log=True)
     elif "setpoint_item" in device and device["setpoint_item"] is not np.nan:
         if action == "ON":
             if isinstance(device["setpoint_item"], str):
                 device["setpoint_item"] = [device["setpoint_item"]]
             for item in device["setpoint_item"]:
-                await pers.openhab.set_item(
-                    item,
-                    math.ceil(device["meas_temp"] + device["setpoint_force"]),
-                    log=True,
-                )
+                temp_to_send = math.ceil(device["meas_temp"] + device["setpoint_force"])
+                if dryrun:
+                    print(f"Would send {temp_to_send} to {item}")
+                else:
+                    await pers.openhab.set_item(
+                        item,
+                        temp_to_send,
+                        log=True,
+                    )
         if action == "OFF":
             if isinstance(device["setpoint_item"], str):
                 device["setpoint_item"] = [device["setpoint_item"]]
             for item in device["setpoint_item"]:
-                await pers.openhab.set_item(
-                    item,
-                    math.floor(device["meas_temp"] - device["setpoint_force"]),
-                    log=True,
+                temp_to_send = math.floor(
+                    device["meas_temp"] - device["setpoint_force"]
                 )
+                if dryrun:
+                    print(f"Would send {temp_to_send} to {item}")
+                else:
+                    await pers.openhab.set_item(
+                        item,
+                        temp_to_send,
+                        log=True,
+                    )
 
 
 async def estimate_currenthourusage(pers) -> int:
@@ -425,30 +445,44 @@ async def monthly_hourmaxes(
     return list(daily_maximum.values)
 
 
-async def main(pers=None) -> None:
+async def amain(pers=None, dryrun=False, upperlimit=None) -> None:
     close_pers = False
     if pers is None:
         pers = persist.PyrotunPersistence()
         await pers.ainit(["influxdb", "openhab"])
         close_pers = True
-    hourmaxes: List[float] = await monthly_hourmaxes(pers)
-    upperlimit_watt = currentlimit_from_hourmaxes(hourmaxes)
-    logger.info(f"Vi må holde oss under: {upperlimit_watt} W denne måneden")
+
+    if upperlimit is None:
+        hourmaxes: List[float] = await monthly_hourmaxes(pers)
+        upperlimit = currentlimit_from_hourmaxes(hourmaxes)
+        logger.info(f"Vi må holde oss under: {upperlimit}W denne måneden")
+    else:
+        logger.info(f"Testkjøring for å holde oss under {upperlimit}W nå")
+
     est = await estimate_currenthourusage(pers)
     logger.info(f"Estimated power usage for current hour is: {est} Wh")
-
     powerload_df = await get_powerloads(pers)
 
-    if est > upperlimit_watt:
+    if est > upperlimit:
         logger.warning("Using too much power this hour, must turn off appliances")
-        actions = _decide(est - upperlimit_watt, powerload_df)
+        actions = _decide(est - upperlimit, powerload_df)
         for action_dict in actions:
             action = list(action_dict.keys())[0]
-            await turn(pers, action, action_dict[action])  # Ugly data structure
+            await turn(
+                pers, action, action_dict[action], dryrun=dryrun
+            )  # Ugly data structure
 
     if close_pers:
         await pers.aclose()
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dryrun", action="store_true")
+    parser.add_argument("--upperlimit", type=int, default=None)
+    args = parser.parse_args()
+    asyncio.run(amain(pers=None, dryrun=args.dryrun, upperlimit=args.upperlimit))
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
