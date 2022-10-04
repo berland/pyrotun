@@ -34,14 +34,43 @@ TZ = pytz.timezone(os.getenv("TIMEZONE"))  # type: ignore
 PERS = None
 
 
-def run(pers, dry=True):
+async def fix_powerstate(pers):
+    """Occasionally, the Heat-it thermostats do not report that they have
+    turned off their switch, and OpenHAB believes heating is still on, for
+    hours after they were switched off.
 
-    temp_plan = pers.powermodels["temperatureplan"]
-    assert isinstance(temp_plan, pd.DataFrame)
+    This is visually disturbing, and also confuses the algorithm to control
+    hourly power usage.
+
+    This code will loop over all floors and try to verify the an ON setting.
+    It does not seem necessary to verify an OFF setting.
+    """
+    async with aiofiles.open(FLOORSFILE, "r", encoding="utf-8") as filehandle:
+        contents = await filehandle.read()
+    floors = yaml.safe_load(contents)
+
+    for floor, floordata in floors.items():
+        if await pers.openhab.get_item(floordata["switch_item"], datatype=bool):
+            if (
+                await pers.influxdb.item_age(floordata["switch_item"], unit="minutes")
+                > 60
+            ):
+                sensor_series = await pers.influxdb.get_series(
+                    floordata["sensor_item"],
+                    since=datetime.datetime.utcnow() - datetime.timedelta(hours=2),
+                )
+                resampled = sensor_series.resample(rule="10min").mean()
+
+                if all(resampled.dropna().diff().values[-3:] < 0):
+                    logger.info(f"Force-turning {floordata['switch_item']} to OFF")
+                    await pers.openhab.set_item(floordata["switch_item"], "OFF")
 
 
 async def get_powerloads(pers) -> pd.DataFrame:
-    """Make a dataframe with columns:
+    """Make a dataframe to be used for decisions on what to turn
+    on or off.
+
+    Columns:
     * openhab_switch_name (none if controlled via setpoint)
     * openhab_setpoint
     * is_on (None, "YES" or "NO") guess if this is load is on
@@ -451,6 +480,8 @@ async def amain(pers=None, dryrun=False, upperlimit=None) -> None:
         pers = persist.PyrotunPersistence()
         await pers.ainit(["influxdb", "openhab"])
         close_pers = True
+
+    await fix_powerstate(pers)
 
     if upperlimit is None:
         hourmaxes: List[float] = await monthly_hourmaxes(pers)
