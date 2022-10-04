@@ -1,3 +1,5 @@
+import asyncio
+
 import aiohttp
 
 from pyrotun import connections, getLogger, powermodels, waterheater
@@ -31,7 +33,7 @@ class PyrotunPersistence:
             self.homely = connections.homely.HomelyConnection(
                 websession=self.websession
             )
-            await self.homely.ainit(websession=self.websession)
+            asyncio.create_task(self.homely.ainit(websession=self.websession))
         if "openhab" in requested or "all" in requested:
             self.openhab = connections.openhab.OpenHABConnection(
                 websession=self.websession, readonly=self.readonly
@@ -41,7 +43,7 @@ class PyrotunPersistence:
 
         if "waterheater" in requested or "all" in requested:
             self.waterheater = waterheater.WaterHeater()
-            await self.waterheater.ainit(self)
+            asyncio.create_task(self.waterheater.ainit(self))
 
         if "tibber" in requested or "all" in requested:
             self.tibber = connections.tibber.TibberConnection()
@@ -52,7 +54,7 @@ class PyrotunPersistence:
 
         if "skoda" in requested or "all" in requested:
             self.skoda = connections.skoda.SkodaConnection()
-            await self.skoda.ainit(websession=self.websession)
+            asyncio.create_task(self.skoda.ainit(websession=self.websession))
 
         if "mqtt" in requested or "all" in requested:
             self.mqtt = connections.mqtt.MqttConnection()
