@@ -9,6 +9,7 @@ Andre:
   setpoint_base: target
   setpoint_force: 8.0
   setpoint_item: Termostat_Andre_SetpointHeating
+  switch_item: Termostat_Andre_bryter
   wattage: 600.0
 Bad_Kjeller:
   backup_setpoint: 24
@@ -21,6 +22,7 @@ Bad_Kjeller:
   setpoint_base: temperature
   setpoint_force: 1
   setpoint_item: Termostat_Bad_Kjeller_SetpointHeating
+  switch_item: Termostat_Bad_Kjeller_bryter
   wattage: 1000
 Bad_Oppe:
   backup_setpoint: 24.0
@@ -32,6 +34,7 @@ Bad_Oppe:
   setpoint_base: temperature
   setpoint_force: 1.0
   setpoint_item: Termostat_Bad_Oppe_SetpointHeating
+  switch_item: Termostat_Bad_Oppe_bryter
   wattage: 600.0
 Bakgang:
   backup_setpoint: 15
@@ -44,6 +47,7 @@ Bakgang:
   setpoint_base: temperature
   setpoint_force: 3
   setpoint_item: Termostat_Bakgang_SetpointHeating
+  switch_item: Termostat_Bakgang_bryter
   wattage: 800
 Gangoppe:
   backup_setpoint: 20
@@ -56,6 +60,7 @@ Gangoppe:
   setpoint_base: temperature
   setpoint_force: 4
   setpoint_item: Termostat_Gangoppe_SetpointHeating
+  switch_item: Termostat_Gangoppe_bryter
   wattage: 600
 Inngang:
   backup_setpoint: 23
@@ -67,9 +72,21 @@ Inngang:
   sensor_item: Termostat_Inngang_SensorGulv
   setpoint_base: temperature
   setpoint_force: 6
-  setpoint_item:
-  - Termostat_Inngang_SetpointHeating
-  - Termostat_Langgang_Nede_SetpointHeating
+  setpoint_item: Termostat_Inngang_SetpointHeating
+  switch_item: Termostat_Inngang_bryter
+  wattage: 600
+Langgang:
+  backup_setpoint: 23
+  cooling_rate: -0.1
+  cooling_rate_winter: -0.6
+  delta: -2
+  heating_rate: 0.8
+  maxtemp: 32
+  sensor_item: Termostat_Inngang_SensorGulv ## Or switch to disruptive?
+  setpoint_base: temperature
+  setpoint_force: 6
+  setpoint_item: Termostat_Langgang_Nede_SetpointHeating
+  switch_item: Termostat_Langgang_Nede_bryter
   wattage: 600
 Leane:
   backup_setpoint: 20
@@ -82,6 +99,7 @@ Leane:
   setpoint_base: target
   setpoint_force: 10
   setpoint_item: Termostat_Leane_SetpointHeating
+  switch_item: Termostat_Leane_bryter
   wattage: 600
 Sofastue:
   backup_setpoint: 20
@@ -94,6 +112,7 @@ Sofastue:
   setpoint_base: temperature
   setpoint_force: 2
   setpoint_item: Termostat_Sofastue_SetpointHeating
+  switch_item: Termostat_Sofastue_bryter
   wattage: 1700
 Syrom:
   backup_setpoint: 15
@@ -106,6 +125,7 @@ Syrom:
   setpoint_base: temperature
   setpoint_force: 8
   setpoint_item: Termostat_Syrom_SetpointHeating
+  switch_item: Termostat_Syrom_bryter
   wattage: 800
 Tvstue:
   backup_setpoint: 20
@@ -118,6 +138,7 @@ Tvstue:
   setpoint_base: temperature
   setpoint_force: 3
   setpoint_item: Termostat_Tvstue_SetpointHeating
+  switch_item: Termostat_Tvstue_bryter
   wattage: 600
 Vaskegang:
   backup_setpoint: 15
@@ -130,6 +151,7 @@ Vaskegang:
   setpoint_base: temperature
   setpoint_force: 8
   setpoint_item: Termostat_Vaskegang_SetpointHeating
+  switch_item: Termostat_Vaskegang_bryter
   wattage: 800
 Vaskerom:
   backup_setpoint: 15
@@ -142,4 +164,5 @@ Vaskerom:
   setpoint_base: temperature
   setpoint_force: 8
   setpoint_item: Termostat_Vaskerom_SetpointHeating
+  switch_item: Termostat_Vaskerom_bryter
   wattage: 800
