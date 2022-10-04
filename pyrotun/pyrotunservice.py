@@ -122,7 +122,7 @@ def setup_crontabs(pers):
     @aiocron.crontab(EVERY_MINUTE)
     async def turn_off_if_overshooting_powerusage():
         await asyncio.sleep(15)
-        await pyrotun.powercontroller.main(pers)
+        await pyrotun.powercontroller.amain(pers)
 
     @aiocron.crontab(EVERY_HOUR)
     async def update_thismonth_nettleie():
