@@ -52,7 +52,7 @@ class PyrotunPersistence:
 
         if "skoda" in requested or "all" in requested:
             self.skoda = connections.skoda.SkodaConnection()
-            await self.skoda.ainit()
+            await self.skoda.ainit(websession=self.websession)
 
         if "mqtt" in requested or "all" in requested:
             self.mqtt = connections.mqtt.MqttConnection()

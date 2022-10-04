@@ -69,7 +69,7 @@ class SkodaConnection:
             await self.skodaconnect.get_vehicles()
             self.instruments = self.get_instruments()
             return True
-        except skodaconnect.SkodaAuthenticationException as ex:
+        except skodaconnect.exceptions.SkodaException as ex:
             logger.error(f"Skoda login unsuccessful: {ex}")
             return False
 
