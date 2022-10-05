@@ -5,7 +5,7 @@ import os
 import random
 from functools import partial
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import dotenv
 import networkx
@@ -16,18 +16,13 @@ import yaml
 from matplotlib import pyplot
 
 import pyrotun
-from pyrotun import persist  # noqa
+from pyrotun import heatreservoir, persist  # noqa
 from pyrotun.connections import localpowerprice
 
 logger = pyrotun.getLogger(__name__)
 
 # Positive number means colder house:
 COLDER_FOR_POWERSAVING = 1
-
-TEMPERATURE_RESOLUTION = 10000
-"""If the temperature resolution is too low, it will make the decisions
-unstable for short timespans. It is tempting to keep it low to allow
-some sort of graph collapse."""
 
 
 FLOORSFILE = "floors.yml"
@@ -103,7 +98,7 @@ async def analyze_history(pers, selected_floors):
         pyplot.show()
 
 
-async def main(
+async def amain(
     pers=None,
     dryrun=False,
     plot=False,
@@ -252,9 +247,9 @@ async def main(
         result = heatreservoir.optimize(
             starttime=starttime,
             starttemp=currenttemp,
-            prices=prices_df,
-            min_temp=pd.Series(min_temp),
-            max_temp=pd.Series(FLOORS[floor]["maxtemp"]),
+            prices=prices_df["NOK/KWh"],
+            min_temp=10,  # temp_requirement??
+            max_temp=FLOORS[floor]["maxtemp"],
             temp_predictor=partial(
                 floortemp_predictor,
                 wattage=FLOORS[floor]["wattage"],
@@ -262,7 +257,6 @@ async def main(
                 cooling_rate=cooling_rate_interpolated,
             ),
             freq=freq,
-            # delta??
         )
 
         assert result
@@ -387,54 +381,7 @@ async def main(
         await pers.aclose()
 
 
-def prediction_dframe(starttime, prices, min_temp, max_temp, freq="10min", maxhours=36):
-    """Spread prices on a time-series of the requested frequency into
-    the future"""
-    if starttime is None:
-        tz = pytz.timezone(os.getenv("TIMEZONE"))
-        starttime = datetime.datetime.now().astimezone(tz)
-
-    starttime_wholehour = starttime.replace(minute=0, second=0, microsecond=0)
-    datetimes = pd.date_range(
-        starttime_wholehour,
-        prices.index.max() + pd.Timedelta(1, unit="hour"),
-        freq=freq,
-        tz=prices.index.tz,
-    )
-
-    # Only timestamps after starttime is up for prediction:
-    datetimes = datetimes[datetimes > starttime - pd.Timedelta(freq)]
-
-    # Delete timestamps mentioned in prices, for correct merging:
-    duplicates = []
-    for tstamp in datetimes:
-        if tstamp in prices.index:
-            duplicates.append(tstamp)
-    datetimes = datetimes.drop(duplicates)
-
-    # Merge prices into the requested datetime:
-    dframe = pd.concat(
-        [
-            pd.DataFrame(index=pd.DatetimeIndex([starttime])),
-            prices,
-            pd.DataFrame(index=datetimes),
-        ],
-        axis="index",
-    )
-    dframe.columns = ["NOK/KWh"]
-    dframe = dframe.sort_index()
-    dframe["min_temp"] = min_temp
-    dframe["max_temp"] = max_temp
-    dframe = dframe[dframe.index < starttime + pd.Timedelta(maxhours, unit="hour")]
-    # Constant extrapolation of prices:
-    dframe = dframe.ffill().bfill()
-    dframe = dframe[dframe.index > starttime]
-    logger.debug("prediction_dframe")
-    # print(dframe.head())
-    return dframe
-
-
-def optimize_heatreservoir(
+def remove_this____is_now_in_heaterservoir___optimize_heatreservoir(
     starttime=None,
     starttemp=20,
     prices=None,  # pd.Series
@@ -530,15 +477,7 @@ def cheapest_path(graph, starttime):
     )
 
 
-def int_temp(temp):
-    return int(temp * TEMPERATURE_RESOLUTION)
-
-
-def float_temp(int_temp):
-    return float(int_temp / float(TEMPERATURE_RESOLUTION))
-
-
-async def heatreservoir_temp_cost_graph(
+async def floor_specific_function_heatreservoir_temp_cost_graph(
     starttemp=60,
     prices_df=None,
     mintemp=10,
@@ -735,8 +674,8 @@ async def heatreservoir_temp_cost_graph(
     min_temp = min(temps[next_tstamp])  # Make this the endpoint node
     for temp in temps[next_tstamp]:
         graph.add_edge(
-            (next_tstamp, int_temp(temp)),
-            (next_tstamp + t_delta, int_temp(min_temp)),
+            (next_tstamp, temp),
+            (next_tstamp + t_delta, min_temp),
             cost=0,
             kwh=0,
             tempdeviation=0,
@@ -759,76 +698,6 @@ def hightemp_penalty(temp, powerprice, t_delta_hours):
     return powerprice * extra_kwh * t_delta_hours
 
 
-def plot_graph(graph, ax=None, show=False):
-    if ax is None:
-        fig, ax = pyplot.subplots()
-
-    logger.info("Plotting some graph edges, wait for it..")
-    counter = 0
-    maxnodes = 400
-    for edge_0, edge_1, data in graph.edges(data=True):
-        counter += 1
-        pd.DataFrame(
-            [
-                {"index": edge_0[0], "temp": edge_0[1]},
-                {"index": edge_1[0], "temp": edge_1[1]},
-            ]
-        ).plot(x="index", y="temp", ax=ax, legend=False)
-        mid_time = edge_0[0] + (edge_1[0] - edge_0[0]) / 2
-        pyplot.text(mid_time, (edge_0[1] + edge_1[1]) / 2, str(round(data["cost"], 5)))
-        if counter > maxnodes:
-            break
-    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(maxnodes)
-
-    logger.info("Plotting all graph nodes..")
-    nodes_df.plot.scatter(x="index", y="temp", ax=ax)
-
-    if show:
-        pyplot.show()
-
-
-def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
-    if ax is None:
-        fig, ax = pyplot.subplots()
-
-    path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
-    path_dframe["temp"] = [float_temp(temp) for temp in path_dframe["temp"]]
-    # Draw a dot at starting position
-    ax.plot(
-        path_dframe.index[0],
-        path_dframe["temp"].values[0],
-        marker="o",
-        markersize=4,
-        color="red",
-    )
-
-    ax.plot(
-        path_dframe.index,
-        path_dframe["temp"],
-        label="Planned temp",
-        color=color,
-        linewidth=linewidth,
-    )
-    if show:
-        pyplot.show()
-
-
-def find_node(graph, when, temp):
-    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"])
-    # when = pd.Timestamp(when).astimezone(nodes_df["index"].dt.tz))
-    closest_time_idx = (
-        nodes_df.iloc[(nodes_df["index"] - when).abs().argsort()]
-        .head(1)
-        .index.values[0]
-    )
-    temp_df = nodes_df[nodes_df["index"] == nodes_df.iloc[closest_time_idx]["index"]]
-    closest_temp_idx = (
-        temp_df.iloc[(temp_df["temp"] - temp).abs().argsort()].head(1).index.values[0]
-    )
-    row = nodes_df.iloc[closest_temp_idx]
-    return (row["index"], row["temp"])
-
-
 def floortemp_predictor(
     temp, tstamp, t_delta_hours, wattage=0, heating_rate=0, cooling_rate=0
 ):
@@ -839,20 +708,19 @@ def floortemp_predictor(
 
 
 def temp_requirement(
-    timestamp, vacation=False, prices=None, master_correction=None, delta=0
-):
+    timestamp: pd.Timestamp,
+    vacation: bool = False,
+    master_correction: Optional[pd.Series] = None,
+    delta: float = 0,
+) -> float:
     """
     Args:
-        timestamp (pd.Timestamp)
-        vacation (bool)
-        prices (pd.DataFrame): not used
-        master_correction (pd.Series): A time-dependent correction added
+        timestamp
+        vacation
+        master_correction: A time-dependent correction added
             to the master temperature
-        delta (float): Room-dependent (constant in time) correction added
+        delta: Room-dependent (constant in time) correction added
             to master temperature. Positive value means warmer.
-
-    Return:
-        float
     """
     hour = timestamp.hour
     weekday = timestamp.weekday()  # Monday = 0, Sunday = 6
@@ -874,11 +742,6 @@ def temp_requirement(
     return 23 + delta
 
 
-def path_costs(graph, path):
-    """Compute a list of the cost along a temperature path, in NOK"""
-    return [graph.edges[path[i], path[i + 1]]["cost"] for i in range(len(path) - 1)]
-
-
 def path_onoff(path):
     """Compute a pandas series with 1 or 0 whether the heater
     should be on or off along a path (computed assuming
@@ -888,48 +751,6 @@ def path_onoff(path):
     onoff = pd.Series(temps).diff().shift(-1).dropna()
     onoff.index = timestamps
     return np.maximum(0, np.sign(onoff))
-
-
-def path_thermostat_values(path):
-    """Extract a Pandas series of thermostat values (integers) from a
-    path with temperatures"""
-    timestamps = [node[0] for node in path][:-1]  # skip the last one
-    tempvalues = [float_temp(node[1]) for node in path]
-    # Perturb temperatures, +1 when it should be on, and -1 when off:
-    onoff = pd.Series(tempvalues).diff().shift(-1).dropna().apply(np.sign)
-    onoff.index = timestamps
-    inttemp_s = pd.Series(tempvalues).astype(int)
-    inttemp_s.index = timestamps + [np.nan]
-    return (inttemp_s + onoff).dropna()
-
-
-def path_kwh(graph, path):
-    return [graph.edges[path[i], path[i + 1]]["kwh"] for i in range(len(path) - 1)]
-
-
-def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
-    """Find shortest path, and do some extra calculations for estimating
-    savings. The savings must be interpreted carefully, and is
-    probably only correct if start and endtemp is equal"""
-
-    if starttime is None:
-        starttime = datetime.datetime.now()
-
-    startnode = find_node(graph, starttime, starttemp)
-    logger.debug(f"startnode is {startnode}")
-    endnode = find_node(graph, starttime + pd.Timedelta("48h"), endtemp)
-    logger.debug(f"endnode is {endnode}")
-    path = networkx.shortest_path(
-        graph, source=startnode, target=endnode, weight="cost"
-    )
-    opt_cost = sum(path_costs(graph, path))
-    kwh = sum(path_kwh(graph, path))
-    # timespan = (endnode[0] - startnode[0]).value / 1e9 / 60 / 60  # from nanoseconds
-    return {
-        "opt_cost": opt_cost,
-        "kwh": kwh,
-        "opt_path": path,
-    }
 
 
 def get_parser():
@@ -961,7 +782,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     asyncio.run(
-        main(
+        amain(
             pers=None,
             dryrun=not args.set,
             plot=args.plot,

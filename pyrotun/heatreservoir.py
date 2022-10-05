@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
 import networkx
 import numpy as np
@@ -13,9 +13,9 @@ logger = pyrotun.getLogger(__name__)
 
 def prediction_dframe(
     starttime: datetime.datetime,
-    prices: pd.DataFrame,  # datetime-tz index, one column with prices
-    min_temp: float = None,
-    max_temp: float = None,
+    prices: pd.Series,
+    min_temp: Optional[Union[pd.Series, float]] = None,
+    max_temp: Optional[Union[pd.Series, float]] = None,
     freq: str = "10min",
     maxhours: int = 36,
 ) -> pd.DataFrame:
@@ -25,8 +25,6 @@ def prediction_dframe(
     Returned dataframe has a datetime with timezone as index, at requested
     frequency. Columns are:
 
-    * NOK/KWh (prices)
-    * mintemp (min temperature requiremend, valid forward in time)
     * maxtemp (max temperature requiremend, valid forward in time)
     """
     starttime_wholehour = starttime.replace(minute=0, second=0, microsecond=0)
@@ -50,22 +48,38 @@ def prediction_dframe(
     # Merge prices into the requested datetime:
     dframe = pd.concat(
         [
-            prices,
+            pd.DataFrame(prices),
             pd.DataFrame(index=datetimes),
         ],
         axis="index",
     )
     dframe.columns = ["NOK/KWh"]
     dframe = dframe.sort_index()
+
     if min_temp is not None:
-        dframe["min_temp"] = min_temp
+        if isinstance(min_temp, pd.Series):
+            # TODO: INTERPOLATE IN TEMPERATURES
+            dframe["min_temp"] = min_temp
+        else:
+            dframe["min_temp"] = min_temp
+    else:
+        dframe["min_temp"] = -100
+
     if max_temp is not None:
-        dframe["max_temp"] = max_temp
+        if isinstance(max_temp, pd.Series):
+            # TODO: INTERPOLATE IN TEMPERATURES
+            dframe["max_temp"] = max_temp
+        else:
+            dframe["max_temp"] = max_temp
+    else:
+        dframe["max_temp"] = 999
+
     dframe = dframe[dframe.index < starttime + pd.Timedelta(maxhours, unit="hour")]
     # Constant extrapolation of prices:
     dframe = dframe.ffill().bfill()
     # Is is a rounding error we solve by the one second delta?
     dframe = dframe[dframe.index > starttime - pd.Timedelta(freq)]
+    print(dframe)
     return dframe
 
 
@@ -92,13 +106,12 @@ def interpolate_predictor(
 def optimize(
     starttime: datetime.datetime,
     starttemp: float = 20,
-    prices=None,  # pd.Series
-    min_temp=None,  # pd.Series
-    max_temp=None,  # pd.Series
+    prices: pd.Series = None,  #
+    min_temp: Optional[Union[pd.Series, float]] = None,
+    max_temp: Optional[Union[pd.Series, float]] = None,
     maxhours: int = 36,
-    temp_predictor: Callable = None,  # function handle
+    temp_predictor: Callable = None,
     freq: str = "10min",  # pd.date_range frequency
-    temp_resolution: int = 10000,
 ) -> Dict[str, Any]:
     """Build a networkx Directed 2D ~lattice Graph, with
     datetime on the x-axis and temperatures on the y-axis.
@@ -226,6 +239,7 @@ def optimize(
     if result["onoff"].empty or len(result["path"]) < len(pred_dframe):
         # If there is no graph or if it is not reached the very end,
         # we have either started too cold or too hot.
+        plot_graph(graph, path=result["path"], show=True)
         if starttemp > pred_dframe.loc[starttime, "max_temp"]:
             result.update(never_dict)
         else:
@@ -247,8 +261,12 @@ def optimize(
 
 
 def cost_from_predictor(
-    predictor, temp1, temp2, t_delta_hours, tstamp=datetime.datetime.now()
-):
+    predictor: Callable,
+    temp1: float,
+    temp2: float,
+    t_delta_hours: float,
+    tstamp: datetime.datetime = datetime.datetime.now(),
+) -> Optional[float]:
     """Given a temperature predictor, predict the cost of going
     to a specific temperature within the predicted span"""
     prediction = predictor(temp1, tstamp, t_delta_hours)
@@ -262,7 +280,7 @@ def cost_from_predictor(
     return None
 
 
-def cheapest_path(graph, starttime):
+def cheapest_path(graph, starttime: datetime.datetime):
     if not graph:
         return []
     startnode = find_node(graph, starttime, 0)
@@ -272,7 +290,9 @@ def cheapest_path(graph, starttime):
     )
 
 
-def plot_graph(graph, path=None, ax=None, show=False, maxnodes=2000):
+def plot_graph(
+    graph, path=None, ax=None, show: bool = False, maxnodes: int = 2000
+) -> None:
     if ax is None:
         _fig, ax = pyplot.subplots()
     cmap = pyplot.get_cmap("viridis")
@@ -320,7 +340,9 @@ def plot_graph(graph, path=None, ax=None, show=False, maxnodes=2000):
         pyplot.show()
 
 
-def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
+def plot_path(
+    path, ax=None, show: bool = False, linewidth: int = 2, color: str = "red"
+) -> None:
     if ax is None:
         _, ax = pyplot.subplots()
 
@@ -343,7 +365,7 @@ def plot_path(path, ax=None, show=False, linewidth=2, color="red"):
         pyplot.show()
 
 
-def find_node(graph, when, temp):
+def find_node(graph, when: datetime.datetime, temp: float) -> tuple:
     nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"])
     if nodes_df.empty:
         return (None, None)
@@ -361,7 +383,12 @@ def find_node(graph, when, temp):
     return (row["index"], row["temp"])
 
 
-def temp_requirement(timestamp, vacation=False, prices=None, delta=0):
+def temp_requirement(
+    timestamp: datetime.datetime,
+    vacation: bool = False,
+    prices: Optional[pd.DataFrame] = None,
+    delta: float = 0,
+) -> float:
     hour = timestamp.hour
 
     if vacation:
@@ -387,13 +414,13 @@ def path_onoff(path):
     return np.maximum(0, np.sign(onoff))
 
 
-def path_values(path):
+def path_values(path: Iterable[Any]) -> pd.Series:
     timestamps = [node[0] for node in path]
     temps = [node[1] for node in path]
     return pd.Series(index=timestamps, data=temps)
 
 
-def path_thermostat_values(path):
+def path_thermostat_values(path: Iterable[Any]) -> pd.Series:
     """Extract a Pandas series of thermostat values (integers) from a
     path with temperatures"""
     timestamps = [node[0] for node in path][:-1]  # skip the last one
@@ -410,7 +437,12 @@ def path_kwh(graph, path):
     return [graph.edges[path[i], path[i + 1]]["kwh"] for i in range(len(path) - 1)]
 
 
-def analyze_graph(graph, starttemp=60, endtemp=60, starttime=None):
+def analyze_graph(
+    graph,
+    starttemp: float = 60,
+    endtemp: float = 60,
+    starttime: datetime.datetime = None,
+) -> Dict[str, Any]:
     """Find shortest path, and do some extra calculations for estimating
     savings. The savings must be interpreted carefully, and is
     probably only correct if start and endtemp is equal"""

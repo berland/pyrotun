@@ -137,7 +137,7 @@ def setup_crontabs(pers):
     @aiocron.crontab(EVERY_8_MINUTE)
     async def floors_controller():
         logger.info(" ** Floor controller")
-        await pyrotun.floors.main(pers)
+        await pyrotun.floors.amain(pers)
 
     @aiocron.crontab(EVERY_8_MINUTE)
     async def waterheater_controller():
