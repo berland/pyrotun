@@ -2,13 +2,11 @@ import argparse
 import asyncio
 import datetime
 import os
-import random
 from functools import partial
 from pathlib import Path
 from typing import Optional, Union
 
 import dotenv
-import networkx
 import numpy as np
 import pandas as pd
 import pytz
@@ -219,7 +217,7 @@ async def amain(
             logger.info("Floor is above allowed maxtemp, turning OFF")
             if not dryrun:
                 min_temp = temp_requirement(
-                    datetime.datetime.now(), vacation=vacation, prices=None, delta=delta
+                    datetime.datetime.now(), vacation=vacation, delta=delta
                 )
                 await pers.openhab.set_item(
                     FLOORS[floor]["setpoint_item"],
@@ -248,7 +246,9 @@ async def amain(
             starttime=starttime,
             starttemp=currenttemp,
             prices=prices_df["NOK/KWh"],
-            min_temp=10,  # temp_requirement??
+            min_temp=pd.Series(
+                [temp_requirement(time, vacation=vacation) for time in prices_df.index]
+            ),
             max_temp=FLOORS[floor]["maxtemp"],
             temp_predictor=partial(
                 floortemp_predictor,
@@ -258,15 +258,13 @@ async def amain(
             ),
             freq=freq,
         )
-
-        assert result
-        if not graph:
+        if not result["graph"]:
             logger.warning(
                 f"Temperature ({currenttemp}) below minimum, should force on"
             )
             if not dryrun:
                 min_temp = temp_requirement(
-                    datetime.datetime.now(), vacation=vacation, prices=None, delta=delta
+                    datetime.datetime.now(), vacation=vacation, delta=delta
                 )
                 await pers.openhab.set_item(
                     FLOORS[floor]["setpoint_item"],
@@ -275,43 +273,39 @@ async def amain(
                 )
             continue
 
+        plotnodes = True
         if plotnodes:
-            plot_graph(graph, ax=None, show=True)  # Plots all nodes in graph.
+            heatreservoir.plot_graph(
+                result["graph"], path=result["path"], ax=None, show=True
+            )  # Plots all nodes in graph.
 
-        logger.debug("Finding shortest path in the graph for %s", floor)
-        opt_results = analyze_graph(
-            graph, starttemp=currenttemp, endtemp=0, starttime=starttime
-        )
         logger.info(
-            f"Cost for floor {floor} is {opt_results['opt_cost']:.2f}, "
-            f"KWh is {opt_results['kwh']:.2f}"
+            f"Cost for floor {floor} is {result['cost']:.2f}, "
+            f"KWh is {result['cost']:.2f}"
         )
-
-        onoff = path_onoff(opt_results["opt_path"])
-        thermostat_values = path_thermostat_values(opt_results["opt_path"])
 
         # Calculate new setpoint
         if FLOORS[floor]["setpoint_base"] == "temperature":
-            setpoint_base = thermostat_values.values[0]
+            # This means we trust the sensor works fine together with the thermostat
+            setpoint_base = result["temperature_values"].values[0]
         elif FLOORS[floor]["setpoint_base"] == "target":
             setpoint_base = temp_requirement(
                 starttime,
                 vacation=vacation,
-                prices=None,
                 delta=delta,
             )
         else:
             logger.error("Wrong configuration for floor %s", floor)
             setpoint_base = 20
 
-        if onoff[0]:
+        if result["on_now"]:
             setpoint = setpoint_base + FLOORS[floor]["setpoint_force"]
-            logger.info("Turning floor %s ON now", floor)
+            logger.info(f"Turning floor {floor} ON now")
         else:
             setpoint = setpoint_base - FLOORS[floor]["setpoint_force"]
-            logger.info("Turning floor %s OFF now", floor)
+            logger.info(f"Turning floor {floor} OFF now")
 
-        setpoint = max(11, int(setpoint))
+        setpoint = max(11, int(setpoint))  # This is Heat-it thermostat specific
 
         if not dryrun:
             await pers.openhab.set_item(
@@ -320,21 +314,17 @@ async def amain(
                 log=True,
             )
         try:
-            first_on_timestamp = onoff[onoff == 1].head(1).index.values[0]
             logger.info(
-                "Will turn floor %s on at %s",
-                floor,
-                np.datetime_as_string(first_on_timestamp, unit="m", timezone=tz),
+                f"Will turn floor {floor} on at {result['on_at']}",
             )
         except IndexError:
             logger.info(
-                "Will not turn floor %s on in price-future",
-                floor,
+                f"Will not turn floor {floor} on in price-future",
             )
 
         if plot:
             fig, ax = pyplot.subplots()
-            plot_path(opt_results["opt_path"], ax=ax, show=False)
+            heatreservoir.plot_path(result["path"], ax=ax, show=False)
             pyplot.title(floor)
 
             # Yesterdays temperatures shifted forward by 24h:
@@ -357,9 +347,7 @@ async def amain(
 
             prices_df["mintemp"] = (
                 prices_df.reset_index()["index"]
-                .apply(
-                    temp_requirement, vacation=vacation, prices=prices_df, delta=delta
-                )
+                .apply(temp_requirement, vacation=vacation, delta=delta)
                 .values
             )
             ax.step(
@@ -381,309 +369,6 @@ async def amain(
         await pers.aclose()
 
 
-def remove_this____is_now_in_heaterservoir___optimize_heatreservoir(
-    starttime=None,
-    starttemp=20,
-    prices=None,  # pd.Series
-    min_temp=None,  # pd.Series
-    max_temp=None,  # pd.Series
-    maxhours=36,
-    temp_predictor=None,  # function handle
-    freq="10min",  # pd.date_range frequency
-    temp_resolution=10000,
-):
-    """Build a networkx Directed 2D ~lattice Graph, with
-    datetime on the x-axis and temperatures on the y-axis.
-
-    Edges from nodes determined by (time, temp) has an associated
-    cost in NOK and energy need in kwh
-
-    Returns a dict.
-         result = {"now": True,
-                   "next_on": datetime.datetime, if now is True, then this could be in the past.
-                   "cost": 2.1,  # NOK
-                   "kwh":  3.3 # KWh
-                   "path": path # Cheapest path to lowest and latest temperature.
-                   "on_in_minutes":  float
-                   "off_in_Minutes": float
-          }
-    """
-    # Get a series with prices at the datetimes we want to optimize at:
-    pred_dframe = prediction_dframe(
-        starttime, prices, min_temp, max_temp, freq, maxhours
-    )
-
-    logger.info("Building graph for future floor temperatures")
-
-    # Build Graph, starting with current temperature
-    graph = networkx.DiGraph()
-    temps = {}  # timestamps are keys, values are lists of scaled integer temps.
-
-    # Initial point/node:
-    temps[pred_dframe.index[0]] = [int_temp(starttemp)]
-
-    # We allow only constant timesteps:
-    assert (
-        len(set(pd.Series(pred_dframe.index).diff()[1:])) == 1
-    ), "Only constant timestemps allowed"
-    t_delta_hours = (
-        float((pred_dframe.index[1] - pred_dframe.index[0]).value) / 1e9 / 60 / 60
-    )  # convert from nanoseconds to hours.
-
-    # Loop over time:
-    for tstamp, next_tstamp in zip(pred_dframe.index, pred_dframe.index[1:]):
-        # print(tstamp)
-        temps[next_tstamp] = []
-
-        min_temp = 19
-        max_temp = 27
-        # Loop over available temperature nodes until now:
-        for temp in temps[tstamp]:
-            # print(f"At {tstamp} with temp {temp}")
-            # print(temp_predictor(float_temp(temp), tstamp, t_delta_hours))
-            for pred in temp_predictor(float_temp(temp), tstamp, t_delta_hours):
-                if min_temp < pred["temp"] < max_temp:
-                    graph.add_edge(
-                        (tstamp, temp),
-                        (next_tstamp, int_temp(pred["temp"])),
-                        cost=pred["kwh"] * pred_dframe.loc[tstamp, "NOK/KWh"],
-                        kwh=pred["kwh"],
-                    )
-                    temps[next_tstamp].append(int_temp(pred["temp"]))
-            # Collapse next temperatures according to resolution
-            temps[next_tstamp] = list(set(temps[next_tstamp]))
-            # print(f"Next temperatures are {temps[next_tstamp]}")
-
-    # Build result dictionary:
-    result = {
-        "graph": graph,
-        "path": cheapest_path(graph, pred_dframe.index[0]),
-    }
-    result["cost"] = path_costs(graph, result["path"])
-    result["onoff"] = path_onoff(result["path"])
-    if result["onoff"].max() > 0:
-        result["on_at"] = result["onoff"][result["onoff"] == 1].index.values[0]
-    else:
-        result["on_at"] = None
-    result["on_now"] = result["onoff"].values[0] == 1
-    return result
-
-
-def cheapest_path(graph, starttime):
-    startnode = find_node(graph, starttime, 0)
-    endnode = find_node(graph, starttime + pd.Timedelta(hours=72), 0)
-    return networkx.shortest_path(
-        graph, source=startnode, target=endnode, weight="cost"
-    )
-
-
-async def floor_specific_function_heatreservoir_temp_cost_graph(
-    starttemp=60,
-    prices_df=None,
-    mintemp=10,
-    maxtemp=35,
-    wattage=1000,
-    heating_rate=2,
-    cooling_rate=0.1,
-    vacation=False,
-    maxhours=36,
-    starttime=None,
-    delta=0,
-    freq="10min",
-):
-    """Build the networkx Directed 2D ~lattice  Graph, with
-    datetime on the x-axis and water-temperatur on the y-axis.
-
-    Edges from nodes determined by (time, temp) has an associated
-    cost in NOK.
-    """
-    logger.info("Building graph for future floor temperatures")
-    if starttime is None:
-        tz = pytz.timezone(os.getenv("TIMEZONE"))
-        starttime = datetime.datetime.now().astimezone(tz)
-    starttime_wholehour = starttime.replace(minute=0, second=0, microsecond=0)
-    datetimes = pd.date_range(
-        starttime_wholehour,
-        prices_df.index.max() + pd.Timedelta(1, unit="hour"),
-        freq=freq,
-        tz=prices_df.index.tz,
-    )
-
-    # Only timestamps after starttime is up for prediction:
-    datetimes = datetimes[datetimes > starttime]
-
-    # Delete timestamps mentioned in prices, for correct merging:
-    duplicates = []
-    for tstamp in datetimes:
-        if tstamp in prices_df.index:
-            duplicates.append(tstamp)
-    datetimes = datetimes.drop(duplicates)
-    # Merge prices into the requested datetime:
-    dframe = pd.concat(
-        [
-            pd.DataFrame(index=pd.DatetimeIndex([starttime])),
-            prices_df,
-            pd.DataFrame(index=datetimes),
-        ],
-        axis="index",
-    )
-    dframe = dframe.sort_index()
-
-    dframe = dframe[dframe.index < starttime + pd.Timedelta(maxhours, unit="hour")]
-    dframe = dframe.ffill().bfill()
-    dframe = dframe[dframe.index > starttime]
-    logger.debug(dframe.head())
-
-    # Yield..
-    await asyncio.sleep(0.001)
-
-    # Build Graph, starting with current temperature
-    graph = networkx.DiGraph()
-
-    # Temperatures in the graph are always integers, and for that reason scaled up.
-
-    # dict of timestamp to list of reachable temperatures:
-    temps = {}
-    temps[dframe.index[0]] = [starttemp]
-    first_tstamp = dframe.index[0]
-    logger.debug(f"First timestamp in graph is {first_tstamp}")
-    # Loop over all datetimes, and inject nodes and possible edges
-    for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
-        # Yield..
-        await asyncio.sleep(0.001)
-        temps[next_tstamp] = []
-
-        # Collapse similar temperatures
-        temps[tstamp] = list(set(temps[tstamp]))
-
-        powerprice = dframe.loc[tstamp]["NOK/KWh"]
-        t_delta = next_tstamp - tstamp
-        t_delta_hours = float(t_delta.value) / 1e9 / 60 / 60  # from nanoseconds
-
-        logger.debug(
-            " (graph building at %s, %d temps)", str(tstamp), len(temps[tstamp])
-        )
-        for temp in temps[tstamp]:
-
-            # This is Explicit Euler solution of the underlying
-            # differential equation, predicting future temperature:
-
-            #  future_temps_callback(temp, t_delta_hours, powerprice,
-            #           wattage, cooling_rate, heating_rate)
-            # Returns list of dict:
-            # [  {"temp": 23.1, "cost": 0, "kwh": 0},
-            #    {"temp": 25.1, "cost": 2, "kwh": 1}]
-            # This function can also be called for a list of future temperatures,
-            # then it will compute the cost of going there.
-
-            assert cooling_rate < 0
-            no_heater_temp = float_temp(int_temp(temp + cooling_rate * t_delta_hours))
-            min_temp = max(
-                temp_requirement(
-                    tstamp, vacation=vacation, prices=prices_df, delta=delta
-                ),
-                mintemp,
-            )
-            if no_heater_temp > min_temp:
-                # Add an edge for the no-heater-scenario:
-                temps[next_tstamp].append(no_heater_temp)
-                graph.add_edge(
-                    (tstamp, int_temp(temp)),
-                    (next_tstamp, int_temp(no_heater_temp)),
-                    cost=0,
-                    kwh=0,
-                    tempdeviation=abs(no_heater_temp - starttemp),
-                )
-                if tstamp == first_tstamp:
-                    logger.debug(f"Adding edge for no-heater to temp {no_heater_temp}")
-            heater_on_temp = float_temp(int_temp(temp + heating_rate * t_delta_hours))
-            if min_temp < heater_on_temp < maxtemp:
-                kwh = wattage / 1000 * t_delta_hours
-                cost = kwh * powerprice + hightemp_penalty(
-                    heater_on_temp, powerprice, t_delta_hours
-                )  # Unit NOK
-
-                # Add edge for heater-on:
-                temps[next_tstamp].append(heater_on_temp)
-                graph.add_edge(
-                    (tstamp, int_temp(temp)),
-                    (next_tstamp, int_temp(heater_on_temp)),
-                    cost=cost,
-                    kwh=kwh,
-                    tempdeviation=abs(heater_on_temp - starttemp),
-                )
-                if tstamp == first_tstamp:
-                    logger.debug(
-                        f"Adding edge for heater-on at cost {cost} to "
-                        f"temp {heater_on_temp}"
-                    )
-
-        # Yield..
-        await asyncio.sleep(0.001)
-        # For every temperature node, we need to link up with other nodes
-        # between its corresponding no-heater and heater-temp, as we
-        # should regard these as "reachable" for algorithm stability.
-        for temp in temps[tstamp]:
-            no_heater_temp = float_temp(int_temp(temp + cooling_rate * t_delta_hours))
-            heater_on_temp = float_temp(int_temp(temp + heating_rate * t_delta_hours))
-
-            inter_temps = [
-                t for t in temps[next_tstamp] if no_heater_temp < t < heater_on_temp
-            ]
-            if not inter_temps:
-                continue
-            if len(inter_temps) > 7:
-                # When we are "far" out in the graph, we don't need
-                # every possible choice. It is the first three or
-                # four steps that matter for stability
-                inter_temps = random.sample(inter_temps, 7)
-            full_kwh = wattage / 1000 * t_delta_hours
-            for inter_temp in inter_temps:
-                rel_temp_inc = (inter_temp - no_heater_temp) / (
-                    heater_on_temp - no_heater_temp
-                )
-                assert 0 < rel_temp_inc < 1
-                rel_kwh = rel_temp_inc * full_kwh
-                cost = rel_kwh * powerprice + hightemp_penalty(
-                    inter_temp, powerprice, t_delta_hours
-                )
-                # logger.info(
-                #    f"Adding extra edge {temp} to {inter_temp} at cost {cost}, "
-                #    "full cost is {full_kwh*powerprice}"
-                # )
-                graph.add_edge(
-                    (tstamp, int_temp(temp)),
-                    (next_tstamp, int_temp(inter_temp)),
-                    cost=cost,
-                    kwh=kwh,
-                    tempdeviation=abs(inter_temp - temp),
-                )
-
-    logger.info(
-        f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
-    )
-
-    # If we currently below accepted temperatures, graph is empty
-    if not graph:
-        return graph
-
-    # After graph is built, add an extra (dummy) node (at zero cost) collecting all
-    # nodes. This is necessary as we don't know exactly which end-node we should
-    # find the path to, because 23.34 degrees at endpoint might be cheaper to
-    # go to than 23.31, due to the discrete nature of the optimization.
-    min_temp = min(temps[next_tstamp])  # Make this the endpoint node
-    for temp in temps[next_tstamp]:
-        graph.add_edge(
-            (next_tstamp, temp),
-            (next_tstamp + t_delta, min_temp),
-            cost=0,
-            kwh=0,
-            tempdeviation=0,
-        )
-
-    return graph
-
-
 def hightemp_penalty(temp, powerprice, t_delta_hours):
     # Add cost of 160W pr degree, spread on all heaters, say 10, so 16 watt pr degree.
     # Positive values for all values > 15 degrees.
@@ -701,9 +386,10 @@ def hightemp_penalty(temp, powerprice, t_delta_hours):
 def floortemp_predictor(
     temp, tstamp, t_delta_hours, wattage=0, heating_rate=0, cooling_rate=0
 ):
+    # cooling_rate must be negative for cooling to occur
     return [
         {"temp": temp + heating_rate * t_delta_hours, "kwh": wattage * t_delta_hours},
-        {"temp": temp - cooling_rate * t_delta_hours, "kwh": 0},
+        {"temp": temp + cooling_rate * t_delta_hours, "kwh": 0},
     ]
 
 

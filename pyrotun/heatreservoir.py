@@ -58,8 +58,7 @@ def prediction_dframe(
 
     if min_temp is not None:
         if isinstance(min_temp, pd.Series):
-            # TODO: INTERPOLATE IN TEMPERATURES
-            dframe["min_temp"] = min_temp
+            dframe["min_temp"] = min_temp.values
         else:
             dframe["min_temp"] = min_temp
     else:
@@ -68,7 +67,7 @@ def prediction_dframe(
     if max_temp is not None:
         if isinstance(max_temp, pd.Series):
             # TODO: INTERPOLATE IN TEMPERATURES
-            dframe["max_temp"] = max_temp
+            dframe["max_temp"] = max_temp.values
         else:
             dframe["max_temp"] = max_temp
     else:
