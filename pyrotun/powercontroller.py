@@ -272,15 +272,7 @@ async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
     assert action in {"ON", "OFF"}
 
     logger.info(f" *** Turning {action} {device}")
-    if "switch_item" in device and device["switch_item"] is not np.nan:
-        # Simple switch item to flip:
-        if device.get("inverted_switch", False):
-            action = {"ON": "OFF", "OFF": "ON"}[action]
-        if dryrun:
-            print(f"Would send {action} to {device['switch_item']}")
-        else:
-            await pers.openhab.set_item(device["switch_item"], action, log=True)
-    elif "setpoint_item" in device and device["setpoint_item"] is not np.nan:
+    if "setpoint_item" in device and device["setpoint_item"] is not np.nan:
         if action == "ON":
             if isinstance(device["setpoint_item"], str):
                 device["setpoint_item"] = [device["setpoint_item"]]
@@ -309,6 +301,15 @@ async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
                         temp_to_send,
                         log=True,
                     )
+
+    elif "switch_item" in device and device["switch_item"] is not np.nan:
+        # Simple switch item to flip:
+        if device.get("inverted_switch", False):
+            action = {"ON": "OFF", "OFF": "ON"}[action]
+        if dryrun:
+            print(f"Would send {action} to {device['switch_item']}")
+        else:
+            await pers.openhab.set_item(device["switch_item"], action, log=True)
 
 
 async def estimate_currenthourusage(pers) -> int:
@@ -365,7 +366,7 @@ async def update_effekttrinn(pers):
     await pers.openhab.set_item(POWER_FOR_EFFEKTTRINN, str(int(mean)), log=True)
 
 
-def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]):
+def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]) -> float:
     """Given the three highest daily maxes, determine what we currently
     allow as a hourly power consumption average.
 
@@ -410,6 +411,7 @@ def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]):
         )
     if dayofmonth == 1:
         return max(todays_hourmax - safeguard, baseline - safeguard)
+    raise ValueError()  # If datetiem gives negative day
 
 
 async def monthly_hourmaxes(
@@ -474,7 +476,9 @@ async def monthly_hourmaxes(
     return list(daily_maximum.values)
 
 
-async def amain(pers=None, dryrun=False, upperlimit=None) -> None:
+async def amain(
+    pers=None, dryrun: bool = False, upperlimit: Optional[float] = None
+) -> None:
     close_pers = False
     if pers is None:
         pers = persist.PyrotunPersistence()
@@ -490,13 +494,13 @@ async def amain(pers=None, dryrun=False, upperlimit=None) -> None:
     else:
         logger.info(f"Testkjøring for å holde oss under {upperlimit}W nå")
 
-    est = await estimate_currenthourusage(pers)
+    est: int = await estimate_currenthourusage(pers)
     logger.info(f"Estimated power usage for current hour is: {est} Wh")
-    powerload_df = await get_powerloads(pers)
+    powerload_df: pd.DataFrame = await get_powerloads(pers)
 
     if est > upperlimit:
         logger.warning("Using too much power this hour, must turn off appliances")
-        actions = _decide(est - upperlimit, powerload_df)
+        actions = _decide(est - int(upperlimit), powerload_df)
         for action_dict in actions:
             action = list(action_dict.keys())[0]
             await turn(

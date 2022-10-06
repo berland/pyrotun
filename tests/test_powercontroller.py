@@ -214,6 +214,17 @@ def test_decide(overshoot, powerload_df, expected_actions):
             "termostat",
             16,
         ),
+        (
+            "ON",
+            {
+                "setpoint_item": "termostat",
+                "meas_temp": 13,
+                "setpoint_force": 3,
+                "switch_item": "termostat_status",
+            },
+            "termostat",
+            16,
+        ),
         ("ON", {"switch_item": "bryter"}, "bryter", "ON"),
         ("OFF", {"switch_item": "bryter"}, "bryter", "OFF"),
         ("ON", {"switch_item": "bryter", "inverted_switch": True}, "bryter", "OFF"),
