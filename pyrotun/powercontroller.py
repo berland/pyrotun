@@ -388,7 +388,6 @@ def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]) -> float:
     # Most of the days during the month, then we just accept the target
     # coming from the mean consumption:
     if dayofmonth > 3:
-        print(sum(top_watts))
         while sum(top_watts) > 3 * baseline:
             baseline = baseline + step
 
