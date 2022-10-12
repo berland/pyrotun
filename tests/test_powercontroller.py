@@ -93,11 +93,12 @@ def test_estimate_currenthourusage_athourstart():
 
 @pytest.mark.asyncio
 async def test_estimate_currenthourusage_for_real():
+    """Assert that the current/live usage for the house is estimatable
+    and that it follows within a quite broad range."""
     pers = persist.PyrotunPersistence()
     await pers.ainit("influxdb")
     est = await powercontroller.estimate_currenthourusage(pers)
-    print(est)
-    assert 600 < est < 10000
+    assert 600 < est < 20000
     await pers.aclose()
 
 
@@ -204,9 +205,15 @@ def test_decide(overshoot, powerload_df, expected_actions):
     [
         (
             "OFF",
-            {"setpoint_item": "termostat", "meas_temp": 13, "setpoint_force": 3},
+            {"setpoint_item": "termostat", "meas_temp": 20, "setpoint_force": 3},
             "termostat",
-            10,
+            17,
+        ),
+        (
+            "OFF",
+            {"setpoint_item": "termostat", "meas_temp": 15, "setpoint_force": 8},
+            "termostat",
+            11,  # lower limit for heat-it thermostats
         ),
         (
             "ON",
@@ -264,7 +271,12 @@ safeguard = 50
         ([1, 12000, 10000, 7000], 8000 - safeguard),
         ([1, 15000, 10000, 7000], 15000 - safeguard),  # Up one step
         ([1, 24000, 10000, 8000], 11000 - safeguard),  # Up one step
-        ([1, 24000, 15000, 8000], 20000 - safeguard),  # Up two steps
+        pytest.param([1, 24000, 15000, 8000], 20000 - safeguard, id="up-two_steps"),
+        pytest.param([np.nan], baseline - safeguard, id="only-one-nan-hour"),
+        pytest.param(
+            [9000, 10500, 10100], 10100 - safeguard, id="keep-allowing-todays-max"
+        ),
+        pytest.param([9000, 10500, 10100, np.nan], 9950, id="lasthour-is-nan"),
     ],
 )
 def test_currentlimit_from_hourmaxes(hourmaxes, expected):

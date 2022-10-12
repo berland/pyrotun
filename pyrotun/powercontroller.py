@@ -270,7 +270,7 @@ async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
     verksted is 1600W
     """
     assert action in {"ON", "OFF"}
-
+    mintemp_for_thermostats = 11
     logger.info(f" *** Turning {action} {device}")
     if "setpoint_item" in device and device["setpoint_item"] is not np.nan:
         if action == "ON":
@@ -290,8 +290,9 @@ async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
             if isinstance(device["setpoint_item"], str):
                 device["setpoint_item"] = [device["setpoint_item"]]
             for item in device["setpoint_item"]:
-                temp_to_send = math.floor(
-                    device["meas_temp"] - device["setpoint_force"]
+                temp_to_send = max(
+                    math.floor(device["meas_temp"] - device["setpoint_force"]),
+                    mintemp_for_thermostats,
                 )
                 if dryrun:
                     print(f"Would send {temp_to_send} to {item}")
@@ -315,6 +316,8 @@ async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
 async def estimate_currenthourusage(pers) -> int:
     """Estimates what the hour usage in Wh will be for the current hour (at end
     of the hour)"""
+    # TODO: This does not use the cumulative estimate, which would
+    # be smart in case of hiatuses in the live data!
     lasthour: datetime.datetime = datetime.datetime.utcnow().replace(
         second=0, minute=0, microsecond=0
     )
@@ -325,6 +328,9 @@ async def estimate_currenthourusage(pers) -> int:
     query = f"SELECT * FROM {CURRENT_POWER_ITEM} WHERE time > '{lasthour}'"
 
     lasthour_df = await pers.influxdb.dframe_query(query)
+    if "value" not in lasthour_df:
+        # Happens around midnight
+        return np.nan
 
     # Use last minute for extrapolation:
     lastminutes: pd.DataFrame = await pers.influxdb.dframe_query(
@@ -381,6 +387,13 @@ def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]) -> float:
     safeguard = 50
 
     todays_hourmax = hourmaxes_pr_day[-1]
+    if np.isnan(todays_hourmax):
+        todays_hourmax = baseline
+
+    hourmaxes_pr_day = [value for value in hourmaxes_pr_day if not np.isnan(value)]
+    if not hourmaxes_pr_day:
+        return baseline - safeguard
+
     dayofmonth = len(hourmaxes_pr_day)
     top_watts = sorted(hourmaxes_pr_day)[-3:]
     two_largest = top_watts[-2:]
