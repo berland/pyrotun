@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Callable, Dict, Iterable, List, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import networkx
 import numpy as np
@@ -14,8 +14,8 @@ logger = pyrotun.getLogger(__name__)
 def prediction_dframe(
     starttime: datetime.datetime,
     prices: pd.Series,
-    min_temp: Optional[Union[pd.Series, float]] = None,
-    max_temp: Optional[Union[pd.Series, float]] = None,
+    min_temp: Optional[Union[float, Callable]] = None,
+    max_temp: Optional[Union[float, Callable]] = None,
     freq: str = "10min",
     maxhours: int = 36,
 ) -> pd.DataFrame:
@@ -57,19 +57,18 @@ def prediction_dframe(
     dframe = dframe.sort_index()
 
     if min_temp is not None:
-        if isinstance(min_temp, pd.Series):
-            dframe["min_temp"] = min_temp.values
-        else:
+        if isinstance(min_temp, float):
             dframe["min_temp"] = min_temp
+        else:
+            dframe["min_temp"] = pd.Series(dframe.index).apply(min_temp).values
     else:
         dframe["min_temp"] = -100
 
     if max_temp is not None:
-        if isinstance(max_temp, pd.Series):
-            # TODO: INTERPOLATE IN TEMPERATURES
-            dframe["max_temp"] = max_temp.values
-        else:
+        if isinstance(max_temp, float):
             dframe["max_temp"] = max_temp
+        else:
+            dframe["min_temp"] = pd.Series(dframe.index).apply(max_temp).values
     else:
         dframe["max_temp"] = 999
 
@@ -106,8 +105,8 @@ def optimize(
     starttime: datetime.datetime,
     starttemp: float = 20,
     prices: pd.Series = None,  #
-    min_temp: Optional[Union[pd.Series, float]] = None,
-    max_temp: Optional[Union[pd.Series, float]] = None,
+    min_temp: Optional[Union[Callable, float]] = None,
+    max_temp: Optional[Union[Callable, float]] = None,
     maxhours: int = 36,
     temp_predictor: Callable = None,
     freq: str = "10min",  # pd.date_range frequency
@@ -290,7 +289,12 @@ def cheapest_path(graph, starttime: datetime.datetime):
 
 
 def plot_graph(
-    graph, path=None, ax=None, show: bool = False, maxnodes: int = 2000
+    graph: networkx.DiGraph,
+    path: Optional[List[Tuple[pd.Timestamp, float]]] = None,
+    ax=None,  # matplotlib.axies_subplots.AxesSubplot
+    plot_edges: bool = True,
+    show: bool = False,
+    maxnodes: int = 200,
 ) -> None:
     if ax is None:
         _fig, ax = pyplot.subplots()
@@ -298,6 +302,7 @@ def plot_graph(
 
     if path is not None:
         path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
+        logger.info("Drawing optimal path")
         path_dframe.reset_index().plot(
             x="index",
             y="temp",
@@ -308,31 +313,32 @@ def plot_graph(
             legend=False,
         )
 
-    logger.info("Plotting some graph edges, wait for it..")
-    counter = 0
-    for edge_0, edge_1, data in graph.edges(data=True):
-        counter += 1
-        edge_frame = pd.DataFrame(
-            [
-                {"index": edge_0[0], "temp": edge_0[1]},
-                {"index": edge_1[0], "temp": edge_1[1]},
-            ]
-        )
+    if plot_edges:
+        logger.info("Plotting the graph edges (with costs) involved in optimization")
+        counter = 0
+        for edge_0, edge_1, data in graph.edges(data=True):
+            counter += 1
+            edge_frame = pd.DataFrame(
+                [
+                    {"index": edge_0[0], "temp": edge_0[1]},
+                    {"index": edge_1[0], "temp": edge_1[1]},
+                ]
+            )
 
-        edge_frame.plot(x="index", y="temp", ax=ax, legend=False)
-        mid_time = edge_0[0] + (edge_1[0] - edge_0[0]) / 2
-        pyplot.text(
-            mid_time,
-            (edge_0[1] + edge_1[1]) / 2,
-            str(round(data["cost"], 5)),
-        )
-        pyplot.gcf().autofmt_xdate()
+            edge_frame.plot(x="index", y="temp", ax=ax, legend=False)
+            mid_time = edge_0[0] + (edge_1[0] - edge_0[0]) / 2
+            pyplot.text(
+                mid_time,
+                (edge_0[1] + edge_1[1]) / 2,
+                str(round(data["cost"], 5)),
+            )
+            pyplot.gcf().autofmt_xdate()
 
-        if counter > maxnodes:
-            break
-    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(maxnodes)
+            if counter > maxnodes:
+                break
 
     logger.info("Plotting all graph nodes..")
+    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(maxnodes)
     nodes_df.plot.scatter(x="index", y="temp", ax=ax)
 
     if show:

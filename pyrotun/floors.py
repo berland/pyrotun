@@ -216,12 +216,12 @@ async def amain(
         if currenttemp > FLOORS[floor]["maxtemp"]:
             logger.info("Floor is above allowed maxtemp, turning OFF")
             if not dryrun:
-                min_temp = temp_requirement(
+                min_temp_now = temp_requirement(
                     datetime.datetime.now(), vacation=vacation, delta=delta
                 )
                 await pers.openhab.set_item(
                     FLOORS[floor]["setpoint_item"],
-                    str(max(10, min_temp - FLOORS[floor]["setpoint_force"])),
+                    str(max(10, min_temp_now - FLOORS[floor]["setpoint_force"])),
                     log=True,
                 )
             continue
@@ -246,9 +246,7 @@ async def amain(
             starttime=starttime,
             starttemp=currenttemp,
             prices=prices_df["NOK/KWh"],
-            min_temp=pd.Series(
-                [temp_requirement(time, vacation=vacation) for time in prices_df.index]
-            ),
+            min_temp=partial(temp_requirement, vacation=vacation, delta=delta),
             max_temp=FLOORS[floor]["maxtemp"],
             temp_predictor=partial(
                 floortemp_predictor,
