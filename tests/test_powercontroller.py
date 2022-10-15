@@ -269,7 +269,7 @@ safeguard = 50
         ([12000, 10000, 5000], 8000 - safeguard),
         ([1, 7000, 10000, 12000], 12000 - safeguard),
         ([1, 12000, 10000, 7000], 8000 - safeguard),
-        ([1, 15000, 10000, 7000], 15000 - safeguard),  # Up one step
+        ([1, 15000, 10000, 7000], baseline + step - safeguard),  # Up one step
         ([1, 24000, 10000, 8000], 11000 - safeguard),  # Up one step
         pytest.param([1, 24000, 15000, 8000], 20000 - safeguard, id="up-two_steps"),
         pytest.param([np.nan], baseline - safeguard, id="only-one-nan-hour"),
@@ -277,6 +277,12 @@ safeguard = 50
             [9000, 10500, 10100], 10100 - safeguard, id="keep-allowing-todays-max"
         ),
         pytest.param([9000, 10500, 10100, np.nan], 9950, id="lasthour-is-nan"),
+        pytest.param(
+            [10000, 12000, 11000],
+            baseline + step - safeguard,
+            id="not_offensive_at_one_step_up",
+            # this scenario allows for one daymax at 22000, but we opt not to go there
+        ),
     ],
 )
 def test_currentlimit_from_hourmaxes(hourmaxes, expected):
