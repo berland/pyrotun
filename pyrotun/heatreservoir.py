@@ -14,8 +14,8 @@ logger = pyrotun.getLogger(__name__)
 def prediction_dframe(
     starttime: datetime.datetime,
     prices: pd.Series,
-    min_temp: Optional[Union[float, Callable]] = None,
-    max_temp: Optional[Union[float, Callable]] = None,
+    min_temp: Optional[Union[float, int, Callable]] = None,
+    max_temp: Optional[Union[float, int, Callable]] = None,
     freq: str = "10min",
     maxhours: int = 36,
 ) -> pd.DataFrame:
@@ -57,7 +57,7 @@ def prediction_dframe(
     dframe = dframe.sort_index()
 
     if min_temp is not None:
-        if isinstance(min_temp, float):
+        if isinstance(min_temp, (float, int)):
             dframe["min_temp"] = min_temp
         else:
             dframe["min_temp"] = pd.Series(dframe.index).apply(min_temp).values
@@ -65,7 +65,7 @@ def prediction_dframe(
         dframe["min_temp"] = -100
 
     if max_temp is not None:
-        if isinstance(max_temp, float):
+        if isinstance(max_temp, (float, int)):
             dframe["max_temp"] = max_temp
         else:
             dframe["min_temp"] = pd.Series(dframe.index).apply(max_temp).values
@@ -77,7 +77,6 @@ def prediction_dframe(
     dframe = dframe.ffill().bfill()
     # Is is a rounding error we solve by the one second delta?
     dframe = dframe[dframe.index > starttime - pd.Timedelta(freq)]
-    print(dframe)
     return dframe
 
 
@@ -219,7 +218,9 @@ def optimize(
                         kwh=kwh,
                     )
         temps[next_tstamp] = list(set(next_temps))
-
+    logger.info(
+        f"Built graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges"
+    )
     result = {
         "graph": graph,
         "path": cheapest_path(graph, pred_dframe.index[0]),
@@ -294,25 +295,18 @@ def plot_graph(
     ax=None,  # matplotlib.axies_subplots.AxesSubplot
     plot_edges: bool = True,
     show: bool = False,
-    maxnodes: int = 200,
+    maxnodes: int = 2000,
 ) -> None:
     if ax is None:
         _fig, ax = pyplot.subplots()
+
     cmap = pyplot.get_cmap("viridis")
 
-    if path is not None:
-        path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
-        logger.info("Drawing optimal path")
-        path_dframe.reset_index().plot(
-            x="index",
-            y="temp",
-            linewidth=7,
-            color=cmap(0.5),
-            alpha=0.4,
-            ax=ax,
-            legend=False,
-        )
-
+    edge_costs = set(edge[2]["cost"] for edge in graph.edges(data=True))
+    above_zero_edge_costs = set(cost for cost in edge_costs if cost > 0.01)
+    min_cost = min(above_zero_edge_costs)
+    max_cost = max(above_zero_edge_costs)
+    plot_costs_as_text = len(graph.edges) < 100
     if plot_edges:
         logger.info("Plotting the graph edges (with costs) involved in optimization")
         counter = 0
@@ -325,47 +319,81 @@ def plot_graph(
                 ]
             )
 
-            edge_frame.plot(x="index", y="temp", ax=ax, legend=False)
-            mid_time = edge_0[0] + (edge_1[0] - edge_0[0]) / 2
-            pyplot.text(
-                mid_time,
-                (edge_0[1] + edge_1[1]) / 2,
-                str(round(data["cost"], 5)),
+            if data["cost"] < min_cost:
+                color = "gray"
+                alpha = 0.2
+            else:
+                color = (cmap((data["cost"] - min_cost) / (max_cost - min_cost)),)
+                alpha = 1
+
+            edge_frame.plot(
+                x="index",
+                y="temp",
+                ax=ax,
+                color=color,
+                alpha=alpha,
+                legend=False,
             )
+            if plot_costs_as_text:
+                mid_time = edge_0[0] + (edge_1[0] - edge_0[0]) / 2
+                pyplot.text(
+                    mid_time,
+                    (edge_0[1] + edge_1[1]) / 2,
+                    str(round(data["cost"], 5)),
+                )
             pyplot.gcf().autofmt_xdate()
 
             if counter > maxnodes:
                 break
 
-    logger.info("Plotting all graph nodes..")
-    nodes_df = pd.DataFrame(data=graph.nodes, columns=["index", "temp"]).head(maxnodes)
-    nodes_df.plot.scatter(x="index", y="temp", ax=ax)
+    if path is not None:
+        path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
+        logger.info("Drawing optimal path")
+        ax.plot(
+            path_dframe.index.to_pydatetime(),
+            path_dframe["temp"],
+            linewidth=7,
+            color="red",
+            alpha=0.4,
+        )
 
     if show:
         pyplot.show()
 
 
 def plot_path(
-    path, ax=None, show: bool = False, linewidth: int = 2, color: str = "red"
+    path: List[Tuple[datetime.datetime, float]],
+    ax=None,
+    show: bool = False,
+    linewidth: int = 2,
+    color: str = "red",
 ) -> None:
     if ax is None:
         _, ax = pyplot.subplots()
 
     path_dframe = pd.DataFrame(path, columns=["index", "temp"]).set_index("index")
-    # path_dframe["temp"] = [float_temp(temp) for temp in path_dframe["temp"]]
 
-    # pyplot.plot(
-    #    path_dframe.index[0],
-    #    path_dframe["temp"].values[0],
-    #    marker="o",
-    #    markersize=3,
-    #    color="red",
-    # )
+    # Plot starting position
+    ax.plot(
+        path_dframe.index.to_pydatetime()[0],
+        path_dframe["temp"].values[0],
+        marker="o",
+        markersize=3,
+        color=color,
+    )
+
+    # Plot line
+    ax.plot(
+        path_dframe.index.to_pydatetime(),
+        path_dframe["temp"].values,
+        linewidth=linewidth,
+        color=color,
+    )
 
     # BUG: Circumvent unresolved plotting bug that messes up index in plot:
-    path_dframe = path_dframe.iloc[1:]
+    # path_dframe = path_dframe.iloc[1:]
 
-    path_dframe.plot(y="temp", linewidth=linewidth, color=color, ax=ax)
+    # path_dframe.plot.line(y="temp", linewidth=linewidth, color=color, ax=ax)
     if show:
         pyplot.show()
 

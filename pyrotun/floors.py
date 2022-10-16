@@ -20,7 +20,7 @@ from pyrotun.connections import localpowerprice
 logger = pyrotun.getLogger(__name__)
 
 # Positive number means colder house:
-COLDER_FOR_POWERSAVING = 1
+COLDER_FOR_POWERSAVING = 0
 
 
 FLOORSFILE = "floors.yml"
@@ -189,9 +189,7 @@ async def amain(
             or str(currenttemp) == "UNDEF"
             or not (12 < currenttemp < 40)
         ):
-            logger.error(
-                "Currenttemp was %s, can't be right, giving up" % str(currenttemp)
-            )
+            logger.error(f"Currenttemp was {currenttemp}, can't be right, giving up")
             # Backup temperature:
             if not dryrun:
                 await pers.openhab.set_item(
@@ -271,7 +269,6 @@ async def amain(
                 )
             continue
 
-        plotnodes = True
         if plotnodes:
             heatreservoir.plot_graph(
                 result["graph"], path=result["path"], ax=None, show=True
@@ -285,7 +282,7 @@ async def amain(
         # Calculate new setpoint
         if FLOORS[floor]["setpoint_base"] == "temperature":
             # This means we trust the sensor works fine together with the thermostat
-            setpoint_base = result["temperature_values"].values[0]
+            setpoint_base = result["path"][0][1]
         elif FLOORS[floor]["setpoint_base"] == "target":
             setpoint_base = temp_requirement(
                 starttime,
@@ -311,17 +308,17 @@ async def amain(
                 str(setpoint),
                 log=True,
             )
-        try:
+        if "on_at" in result and result["on_at"] is not None:
             logger.info(
                 f"Will turn floor {floor} on at {result['on_at']}",
             )
-        except IndexError:
+        else:
             logger.info(
                 f"Will not turn floor {floor} on in price-future",
             )
 
         if plot:
-            fig, ax = pyplot.subplots()
+            _fig, ax = pyplot.subplots()
             heatreservoir.plot_path(result["path"], ax=ax, show=False)
             pyplot.title(floor)
 
@@ -336,7 +333,7 @@ async def amain(
                 "Europe/Oslo"
             ) + datetime.timedelta(hours=24)
             ax.plot(
-                hist_temps.index,
+                hist_temps.index.to_pydatetime(),
                 hist_temps[FLOORS[floor]["sensor_item"]],
                 color="green",
                 label="direct",
@@ -349,7 +346,7 @@ async def amain(
                 .values
             )
             ax.step(
-                prices_df.index,
+                prices_df.index.to_pydatetime(),
                 prices_df["mintemp"],
                 where="post",
                 color="blue",
@@ -358,9 +355,17 @@ async def amain(
 
             # Prices on a secondary y-axis:
             ax2 = ax.twinx()
-            ax2.step(prices_df.index, prices_df["NOK/KWh"], where="post", alpha=0.2)
+            ax2.step(
+                prices_df.index.to_pydatetime(),
+                prices_df["NOK/KWh"],
+                where="post",
+                alpha=0.2,
+            )
 
-            ax.set_xlim(left=prices_df.index.min(), right=prices_df.index.max())
+            ax.set_xlim(
+                left=prices_df.index.to_pydatetime().min(),
+                right=prices_df.index.to_pydatetime().max(),
+            )
             pyplot.show()
 
     if closepers:
