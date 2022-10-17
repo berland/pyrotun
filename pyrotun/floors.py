@@ -21,7 +21,7 @@ from pyrotun.connections import localpowerprice
 logger = pyrotun.getLogger(__name__)
 
 # Positive number means colder house:
-COLDER_FOR_POWERSAVING = 1
+COLDER_FOR_POWERSAVING = -1  # No heat pump from oct 17...
 
 TEMPERATURE_RESOLUTION = 10000
 """If the temperature resolution is too low, it will make the decisions
@@ -701,15 +701,14 @@ def temp_requirement(
     hour = timestamp.hour
     weekday = timestamp.weekday()  # Monday = 0, Sunday = 6
     friday = 4
-    corona = False
+    dagsenking = False
     if vacation:
         # Ferie
         return 15 + delta
     if hour < 6 or hour > 21:
         # Natt:
         return 18 + delta
-    if corona is False and (hour > 7 and hour < 13 and weekday <= friday):
-        # Dagsenking:
+    if dagsenking and (hour > 7 and hour < 13 and weekday <= friday):
         return 18 + delta
     if hour > 16 and hour < 22:
         # Ettermiddag
