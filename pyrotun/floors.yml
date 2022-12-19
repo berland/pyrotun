@@ -26,6 +26,7 @@ Bad_Kjeller:
   wattage: 1000
 Bad_Oppe:
   backup_setpoint: 24.0
+  delta: 2
   cooling_rate: -0.1
   cooling_rate_winter: -1.0
   heating_rate: 3.0
@@ -105,7 +106,7 @@ Sofastue:
   backup_setpoint: 20
   cooling_rate: -0.3
   cooling_rate_winter: -0.35
-  delta: -7
+  delta: -1
   heating_rate: 1
   maxtemp: 25
   sensor_item: Termostat_Sofastue_SensorGulv
@@ -131,7 +132,7 @@ Tvstue:
   backup_setpoint: 20
   cooling_rate: -0.02
   cooling_rate_winter: -0.5
-  delta: -5
+  delta: -3
   heating_rate: 0.9
   maxtemp: 26
   sensor_item: Termostat_Tvstue_SensorGulv

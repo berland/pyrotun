@@ -21,7 +21,7 @@ from pyrotun.connections import localpowerprice
 logger = pyrotun.getLogger(__name__)
 
 # Positive number means colder house:
-COLDER_FOR_POWERSAVING = -1  # No heat pump from oct 17...
+COLDER_FOR_POWERSAVING = 1
 
 TEMPERATURE_RESOLUTION = 10000
 """If the temperature resolution is too low, it will make the decisions

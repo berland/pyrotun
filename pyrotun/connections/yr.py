@@ -193,7 +193,6 @@ def crop_svg_meteogram(svg) -> str:
     assert meteo.getAttribute("transform") == "translate(0, 84.86)"
     meteo.setAttribute("transform", "translate(0, 0)")
 
-    assert "Vindkast" in meteo.childNodes[11].toxml()
     meteo.childNodes[11].unlink()
 
     return doc.toxml()
