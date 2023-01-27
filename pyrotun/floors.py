@@ -21,7 +21,7 @@ from pyrotun.connections import localpowerprice
 logger = pyrotun.getLogger(__name__)
 
 # Positive number means colder house:
-COLDER_FOR_POWERSAVING = 2
+COLDER_FOR_POWERSAVING = 3
 
 TEMPERATURE_RESOLUTION = 10000
 """If the temperature resolution is too low, it will make the decisions
@@ -227,7 +227,7 @@ async def main(
                 )
                 await pers.openhab.set_item(
                     FLOORS[floor]["setpoint_item"],
-                    str(max(10, min_temp - FLOORS[floor]["setpoint_force"])),
+                    str(max(11, min_temp - FLOORS[floor]["setpoint_force"])),
                     log=True,
                 )
             continue
