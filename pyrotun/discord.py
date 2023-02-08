@@ -2,6 +2,7 @@
 import asyncio
 import os
 
+import asyncio_mqtt
 import dotenv
 
 import pyrotun
@@ -11,45 +12,30 @@ logger = pyrotun.getLogger(__name__)
 
 dotenv.load_dotenv()
 
+assert os.getenv("MQTT_HOST"), "You must proviode MQTT_HOST as an env variable"
 
-async def main(pers=None, gather=False):
+
+async def main(pers=None):
     if pers is None:
         dotenv.load_dotenv()
         pers = pyrotun.persist.PyrotunPersistence()
-        await pers.ainit(["mqtt", "websession"])
-    assert pers.mqtt is not None
+        await pers.ainit(["websession"])
     assert pers.websession is not None
 
-    # Add MQTT listener:
-    manager = pers.mqtt.client.filtered_messages("discordmessage/send")
-    # Get message generator from context manager:
-    messages = await manager.__aenter__()
-    # Add a task to process the message generator:
-    task = asyncio.create_task(push_many_to_discord(messages, pers))
-
-    await pers.mqtt.client.subscribe("discordmessage/#")
-
-    if gather:
-        await asyncio.gather(task)
-    else:
-        return [task]
-
-
-async def push_many_to_discord(messages, pers):
-    """Loop over an async generator that provides messages from mqtt
-    to push to Discord"""
-    logger.info("Ready to publish from mqtt to Discord")
-    async for message in messages:
-        await push_to_discord(message.payload.decode(), pers)
+    async with asyncio_mqtt.Client(os.getenv("MQTT_HOST")) as client:
+        async with client.messages() as messages:
+            await client.subscribe("discordmessage/send")
+            async for message in messages:
+                await push_to_discord(message.payload.decode(), pers)
 
 
 async def push_to_discord(message, pers):
-    logger.info("Sending to discord: %s", message)
-    url = os.getenv("DISCORD_WEBHOOK")
-    data = {"content": message}
-    await pers.websession.post(url=str(url), data=data)
+    logger.info(f"Sending to discord: {message}")
+    await pers.websession.post(
+        url=os.getenv("DISCORD_WEBHOOK"), data={"content": message}
+    )
 
 
 if __name__ == "__main__":
     assert os.getenv("DISCORD_WEBHOOK"), "You must set the env variable DISCORD_WEBHOOK"
-    asyncio.run(main(gather=True))
+    asyncio.run(main())

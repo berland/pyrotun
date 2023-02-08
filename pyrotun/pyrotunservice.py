@@ -14,7 +14,6 @@ import dotenv
 
 import pyrotun
 import pyrotun.connections.homely
-import pyrotun.connections.mqtt
 import pyrotun.connections.openhab
 import pyrotun.connections.skoda
 import pyrotun.connections.smappee
@@ -194,13 +193,8 @@ async def at_startup(pers) -> List[Any]:
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.powercontroller.update_effekttrinn(pers)))
-    # discord.main() returns a list of tasks, the task is an async generator.
-    tasks.extend(await pyrotun.discord.main(pers, gather=False))
-
-    # disruptive.main() starts its own executor to run a sync function, but
-    # it will never finish.
+    tasks.append(asyncio.create_task(pyrotun.discord.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.disruptive.main(pers)))
-
     tasks.append(
         asyncio.create_task(pyrotun.unifiprotect.main(pers, waitforever=False))
     )

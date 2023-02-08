@@ -14,7 +14,6 @@ class PyrotunPersistence:
 
         self.homely = None
         self.influxdb = None
-        self.mqtt = None
         self.openhab = None
         self.powermodels = None
         self.skoda = None
@@ -56,10 +55,6 @@ class PyrotunPersistence:
             self.skoda = connections.skoda.SkodaConnection()
             asyncio.create_task(self.skoda.ainit(websession=self.websession))
 
-        if "mqtt" in requested or "all" in requested:
-            self.mqtt = connections.mqtt.MqttConnection()
-            await self.mqtt.ainit()
-
         if "yr" in requested or "all" in requested:
             self.yr = connections.yr.YrConnection()
             await self.yr.ainit(websession=self.websession)
@@ -81,6 +76,3 @@ class PyrotunPersistence:
             await self.skoda.aclose()
 
         await self.websession.close()
-
-        if self.mqtt is not None:
-            await self.mqtt.aclose()
