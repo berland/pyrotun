@@ -1,33 +1,37 @@
 import asyncio
 import logging
 import os
+import pprint
 from pathlib import Path
 
 import aiohttp
-import websockets
+import socketio
 import yaml
 from websockets.datastructures import Headers
-
+from typing import Awaitable, Optional
 import pyrotun
 import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
+SIO = socketio.AsyncClient(logger=logger, reconnection_attempts=3)
 
 SERVER = "sdk.iotiliti.cloud"
 BASE_URL = f"https://{SERVER}/homely/"
 CONFIG_FILE = "homelyopenhab.yml"
-logger.setLevel(logging.DEBUG)
 
 
 class HomelyConnection:
-    def __init__(self, websession=None):
+    def __init__(self, websession=None, message_handler: Optional[Awaitable] = None):
         self.websession = websession
+        self.message_handler = message_handler
         self.access_token = None
+        self.refresh_token = None
         self.location_id = None
         self.config = None  # Defines the link to OpenHAB
 
-        self.websocket = None
+        self.websocket_client = None
         self._close_websession_in_aclose = False
 
     async def ainit(self, websession=None):
@@ -41,6 +45,7 @@ class HomelyConnection:
 
         if self.access_token is None:
             await self.acquire_token()
+            asyncio.create_task(self.token_manager())
 
         if self.location_id is None:
             await self.acquire_location_id()
@@ -50,6 +55,7 @@ class HomelyConnection:
 
     async def aclose(self):
         logger.info("closing")
+
         if self._close_websession_in_aclose:
             await self.websession.close()
 
@@ -85,7 +91,21 @@ class HomelyConnection:
         ) as resp:
             json_response = await resp.json()
             self.access_token = json_response["access_token"]
+            self.refresh_token = json_response["refresh_token"]
             logger.info("Acquired homely token")
+
+    async def token_manager(self) -> None:
+        """Run as a task"""
+        while True:
+            await asyncio.sleep(1000)
+            async with self.websession.post(
+                BASE_URL + "oauth/refresh-token",
+                json={"refresh_token": self.refresh_token},
+            ) as resp:
+                json_response = await resp.json()
+                self.access_token = json_response["access_token"]
+                self.refresh_token = json_response["refresh_token"]
+                logger.info("Refreshed homely token")
 
     async def acquire_location_id(self, index=0):
         async with self.websession.get(
@@ -112,26 +132,34 @@ class HomelyConnection:
                 data = await response.json()
                 return data
 
-    async def setup_websocket(self):
-        _e_headers = Headers()
-        _e_headers["token"] = f"Bearer {self.access_token}"
-        _e_headers["locationId"] = self.location_id
-        async with websockets.connect(
-            # f"wss://{server}:443",
-            f"wss://{SERVER}",
-            # open_timeout=None,
-            extra_headers=_e_headers
-            # {
-            # "locationId": location_id,
-            # "token": f"Bearer {access_token}",
-            # },
-        ) as websocket:
-            print(websocket)
-            await websocket.recv()
+    async def run_websocket(self):
+        disconnects = 0
+        @SIO.event
+        async def connect():
+            logger.info("Connected to homely websocket server")
+            if disconnects > 0:
+                logger.warning(f"(after {disconnects} disconnects")
 
+        @SIO.event
+        async def disconnect():
+            logger.warning("Disconnected to homely websocket server")
+            disconnects += 1
 
-def find(path: str, data: dict):
-    value = data
-    for key in path.split("/"):
-        value = value[key]
-    return value
+        @SIO.on("event")
+        async def on_message(data):
+            if self.message_handler is not None:
+                await self.message_handler(data)
+            else:
+                pprint.pprint(data)
+
+        url = (
+            f"https://{SERVER}"
+            f"?locationId={self.location_id}"
+            f"&token=Bearer%20{self.access_token}"
+        )
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "locationId": self.location_id,
+        }
+        await SIO.connect(url, headers)
+        await SIO.wait()

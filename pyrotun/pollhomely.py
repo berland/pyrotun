@@ -1,38 +1,91 @@
 import argparse
 import asyncio
 import pprint
+from functools import partial
 
 import dotenv
 
 import pyrotun
 import pyrotun.persist
 
+from typing import Any
+
 logger = pyrotun.getLogger(__name__)
 
 ALARM_ARMED_ITEM = "AlarmArmert"
+
+PERS = None
 
 
 async def amain(pers=None, dryrun=False, debug=False):
     close_pers = False
     if pers is None:
-        pers = pyrotun.persist.PyrotunPersistence()
+        PERS = pyrotun.persist.PyrotunPersistence()
         dotenv.load_dotenv()
         close_pers = True
-    if pers.homely is None:
-        await pers.ainit(["homely"])
-    if pers.openhab is None:
-        await pers.ainit(["openhab"])
+    else:
+        PERS = pers
+    if PERS.homely is None:
+        await PERS.ainit(["homely", "openhab"])
+        assert PERS is not None
+        PERS.homely.message_handler = partial(
+            update_openhab_from_websocket_message, PERS
+        )
 
-    data = await pers.homely.get_data()
+    # if pers.openhab is None:
+    #    await pers.ainit(["openhab"])
+
+    data = await PERS.homely.get_data()
 
     if debug:
         pprint.pprint(data)
 
     if not dryrun:
-        await update_openhab(pers, data)
+        await update_openhab(PERS, data)
 
+    websocket_supervisor = asyncio.create_task(supervise_websocket(PERS))
+
+    await asyncio.wait([websocket_supervisor])
     if close_pers:
-        await pers.aclose()
+        await PERS.aclose()
+
+
+async def supervise_websocket(pers):
+    """Retry the websocket indefinetely..."""
+    while True:
+        ws_task = asyncio.create_task(pers.homely.run_websocket())
+        await asyncio.wait([ws_task])
+        logger.warning("Websocket died, re-establishing in 2 seconds")
+        await asyncio.sleep(2)
+
+
+async def update_openhab_from_websocket_message(pers, data):
+    if data["type"] == "device-state-changed":
+        # A device may link to multiple openhab items.
+        oh_items = [
+            conf_item
+            for conf_item in pers.homely.config
+            if conf_item.get("id") == data["data"]["deviceId"]
+        ]
+        for change in data["data"]["changes"]:
+            oh_item = [
+                conf_item
+                for conf_item in oh_items
+                if conf_item.get("featurepath", "").startswith(change.get("feature"))
+            ]
+            if len(oh_item) > 1:
+                logger.error("Too many openhab_items found for data change from homely")
+                logger.error("That is a bug, fix")
+            if len(oh_item) == 1:
+                oh_item = oh_item[0]
+                await pers.openhab.set_item(
+                    oh_item["openhab_item"],
+                    str(change["value"]),
+                    log=True,
+                    method="post",
+                )
+    else:
+        pprint.pprint(data)
 
 
 async def update_openhab(pers, data):
@@ -79,10 +132,10 @@ async def update_openhab(pers, data):
         )
 
 
-def fold(path: str, data: dict):
+def fold(path: str, data: dict, separator: str = "/") -> Any:
     """Lookup in deep dictionary, a 'fold'"""
     value = data
-    for key in path.split("/"):
+    for key in path.split(separator):
         value = value[key]
     return value
 

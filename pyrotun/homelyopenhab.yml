@@ -1,34 +1,43 @@
 - name: Røyksensor gang oppe
   openhab_item: Sensor_Gangoppe_taktemperatur_brannvarsler
   featurepath: temperature/states/temperature/value
+  id: fb4cf235-3c52-4710-9686-a6c6e826f6e9
+
 - name: Røyksensor gang oppe
   openhab_item: Sensor_Gangoppe_brann
   featurepath: alarm/states/fire/value
   type: bool
+  id: fb4cf235-3c52-4710-9686-a6c6e826f6e9
 
 - name: Røyksensor gang nede
   openhab_item: Sensor_Gangnede_taktemperatur_brannvarsler
   featurepath: temperature/states/temperature/value
+  id: ce4bbac5-d7e9-498e-ac47-2aa0582447dc
 - name: Røyksensor gang nede
   openhab_item: Sensor_Gangnede_brann
   featurepath: alarm/states/fire/value
   type: bool
+  id: ce4bbac5-d7e9-498e-ac47-2aa0582447dc
 
 - name: Bevegelse gang nede
   openhab_item: Sensor_Gangnede_taktemperatur_homely
   featurepath: temperature/states/temperature/value
+  id: 495dab28-889d-459f-8a40-f9d335822963
 - name: Bevegelse gang nede
   openhab_item: Sensor_Gangnede_bevegelse_homely
   featurepath: alarm/states/alarm/value
   type: bool
+  id: 495dab28-889d-459f-8a40-f9d335822963
 
 - name: Bevegelse stue
   openhab_item: Sensor_Stue_taktemperatur_homely
   featurepath: temperature/states/temperature/value
+  id: 55d9546f-0581-4ff5-8717-c9b0ecf20e27
 - name: Bevegelse stue
   openhab_item: Sensor_Stue_bevegelse
   featurepath: alarm/states/alarm/value
   type: bool
+  id: 55d9546f-0581-4ff5-8717-c9b0ecf20e27
 
 - name: Dør gjesterom
   openhab_item: TerrassedorGjesterom
