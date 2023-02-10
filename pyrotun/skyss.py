@@ -56,7 +56,10 @@ async def get_departures(pers, stop_id: int, hours: int = 12) -> str:
         SKYSSAPI + "departures",
         params={"Hours": hours, "StopIdentifiers": stop_id},
     ) as response:
-        return json.loads(_fix_strange_json(await response.text()))
+        if response.ok:
+            return json.loads(_fix_strange_json(await response.text()))
+        logger.error(f"Got {response.status} on url {response.real_url}")
+        return ""
 
 
 def _fix_strange_json(almostjson: str) -> str:
