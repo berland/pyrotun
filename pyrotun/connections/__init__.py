@@ -4,6 +4,7 @@ from . import (  # noqa
     openhab,
     skoda,
     smappee,
+    solis,
     tibber,
     unifiprotect,
     yr,

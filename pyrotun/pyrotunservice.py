@@ -17,6 +17,7 @@ import pyrotun.connections.homely
 import pyrotun.connections.openhab
 import pyrotun.connections.skoda
 import pyrotun.connections.smappee
+import pyrotun.connections.solis
 import pyrotun.connections.tibber
 import pyrotun.connections.unifiprotect
 import pyrotun.dataspike_remover
@@ -31,6 +32,7 @@ import pyrotun.polar_dump
 import pyrotun.pollhomely
 import pyrotun.pollskoda
 import pyrotun.pollsmappee
+import pyrotun.pollsolis
 import pyrotun.polltibber
 import pyrotun.poweranalysis
 import pyrotun.powercontroller
@@ -87,6 +89,12 @@ def setup_crontabs(pers):
         await asyncio.sleep(5)  # No need to overlap with ventilation
         logger.info(" ** Polling skyss")
         await pyrotun.skyss.main(pers)
+
+    @aiocron.crontab(EVERY_MINUTE)
+    async def pollsolis():
+        await asyncio.sleep(2)
+        logger.info(" ** Pollsolis")
+        await pyrotun.pollsolis.post_solisdata_to_openhab(pers)
 
     @aiocron.crontab(EVERY_5_MINUTE)
     async def pollsmappe():
