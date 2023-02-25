@@ -14,12 +14,10 @@ async def amain(pers=None, debug=False):
         pers = pyrotun.persist.PyrotunPersistence()
         dotenv.load_dotenv()
         close_pers = True
-    if pers.skoda is None:
-        await pers.ainit(["skoda"])
-    if pers.openhab is None:
-        await pers.ainit(["openhab"])
+    if pers.skoda is None or pers.openhab is None:
+        await pers.ainit(["skoda", "openhab"])
 
-    await post_to_openhab(pers, debug=debug)
+    await post_to_openhab(pers, debug=True)
 
     if close_pers:
         await pers.aclose()
@@ -28,6 +26,7 @@ async def amain(pers=None, debug=False):
 async def post_to_openhab(pers, debug):
     await pers.skoda.get_data()
     logger.info("Posting Skoda data to OpenHAB")
+    breakpoint()
     for instrument in pers.skoda.instruments:
         if debug:
             print(f"{instrument.attr} {instrument.state}")

@@ -18,6 +18,7 @@ class PyrotunPersistence:
         self.powermodels = None
         self.skoda = None
         self.smappee = None
+        self.solis = None
         self.tibber = None
         self.unifiprotect = None
         self.waterheater = None
@@ -53,7 +54,11 @@ class PyrotunPersistence:
 
         if "skoda" in requested or "all" in requested:
             self.skoda = connections.skoda.SkodaConnection()
-            asyncio.create_task(self.skoda.ainit(websession=self.websession))
+            await self.skoda.ainit(websession=self.websession)
+
+        if "solis" in requested or "all" in requested:
+            self.solis = connections.solis.SolisConnection()
+            await self.solis.ainit(websession=self.websession)
 
         if "yr" in requested or "all" in requested:
             self.yr = connections.yr.YrConnection()
