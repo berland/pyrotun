@@ -12,10 +12,11 @@ logger = pyrotun.getLogger(__name__)
 
 dotenv.load_dotenv()
 
-assert os.getenv("MQTT_HOST"), "You must proviode MQTT_HOST as an env variable"
 
 
 async def main(pers=None):
+    assert os.getenv("MQTT_HOST"), "You must proviode MQTT_HOST as an env variable"
+    assert os.getenv("DISCORD_WEBHOOK"), "You must set the env variable DISCORD_WEBHOOK"
     if pers is None:
         dotenv.load_dotenv()
         pers = pyrotun.persist.PyrotunPersistence()
@@ -23,7 +24,9 @@ async def main(pers=None):
     assert pers.websession is not None
 
     async with asyncio_mqtt.Client(os.getenv("MQTT_HOST")) as client:
+        logger.info("MQTT client ready for discord messages")
         async with client.messages() as messages:
+            logger.info("Subscribing to discord messages from mqtt")
             await client.subscribe("discordmessage/send")
             async for message in messages:
                 await push_to_discord(message.payload.decode(), pers)
@@ -37,5 +40,4 @@ async def push_to_discord(message, pers):
 
 
 if __name__ == "__main__":
-    assert os.getenv("DISCORD_WEBHOOK"), "You must set the env variable DISCORD_WEBHOOK"
     asyncio.run(main())
