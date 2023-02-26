@@ -38,15 +38,15 @@ Bad_Oppe:
   switch_item: Termostat_Bad_Oppe_bryter
   wattage: 600.0
 Bakgang:
-  backup_setpoint: 15
-  cooling_rate: -0.03
-  cooling_rate_winter: -0.5
-  delta: -12
+  backup_setpoint: 12
+  cooling_rate: -0.1
+  cooling_rate_winter: -0.6
+  delta: -13
   heating_rate: 1.5
-  maxtemp: 30
+  maxtemp: 20
   sensor_item: Termostat_Bakgang_SensorGulv # Sensor_Bakganggulv_temperatur
   setpoint_base: temperature
-  setpoint_force: 3
+  setpoint_force: 2
   setpoint_item: Termostat_Bakgang_SetpointHeating
   switch_item: Termostat_Bakgang_bryter
   wattage: 800
@@ -160,7 +160,7 @@ Vaskerom:
   cooling_rate_winter: -0.5
   delta: -8
   heating_rate: 1.0
-  maxtemp: 30
+  maxtemp: 25
   sensor_item: Termostat_Vaskerom_SensorGulv
   setpoint_base: temperature
   setpoint_force: 8
