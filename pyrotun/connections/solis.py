@@ -88,6 +88,11 @@ class SolisConnection:
             INVERTER_DETAIL,
             json.dumps({"id": self.inverter_id, "sn": self.inverter_sn}),
         )
+        # Fix units
+        if "data" in data and "apparentPowerStr" in data["data"]:
+            if data["data"]["apparentPowerStr"] == "kVA":
+                data["data"]["apparentPower"] *= 1000
+                data["data"]["apparentPowerStr"] = "VA"
         pprint.pprint(data)
         return data
 
