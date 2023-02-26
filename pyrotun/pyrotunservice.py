@@ -208,6 +208,7 @@ async def at_startup(pers) -> List[Any]:
     tasks.append(asyncio.create_task(pyrotun.waterheater.controller(pers)))
     tasks.append(asyncio.create_task(pyrotun.yrmelding.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.helligdager.main(pers)))
+    # tasks.append(asyncio.create_task(pyrotun.pollhomely.supervise_websocket(pers)))
 
     return tasks
 

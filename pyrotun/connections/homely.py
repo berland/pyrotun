@@ -5,7 +5,7 @@ import pprint
 from pathlib import Path
 
 import aiohttp
-import socketio
+# import socketio
 import yaml
 from websockets.datastructures import Headers
 from typing import Awaitable, Optional
@@ -15,7 +15,7 @@ import pyrotun.persist
 logger = pyrotun.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-SIO = socketio.AsyncClient(logger=logger, reconnection_attempts=3)
+SIO = None # socketio.AsyncClient(logger=logger, reconnection_attempts=3)
 
 SERVER = "sdk.iotiliti.cloud"
 BASE_URL = f"https://{SERVER}/homely/"

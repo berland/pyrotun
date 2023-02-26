@@ -17,7 +17,7 @@ ALARM_ARMED_ITEM = "AlarmArmert"
 PERS = None
 
 
-async def amain(pers=None, dryrun=False, debug=False):
+async def amain(pers=None, dryrun=False, debug=False, do_websocket=False):
     close_pers = False
     if pers is None:
         PERS = pyrotun.persist.PyrotunPersistence()
@@ -32,9 +32,6 @@ async def amain(pers=None, dryrun=False, debug=False):
             update_openhab_from_websocket_message, PERS
         )
 
-    # if pers.openhab is None:
-    #    await pers.ainit(["openhab"])
-
     data = await PERS.homely.get_data()
 
     if debug:
@@ -43,18 +40,24 @@ async def amain(pers=None, dryrun=False, debug=False):
     if not dryrun:
         await update_openhab(PERS, data)
 
-    websocket_supervisor = asyncio.create_task(supervise_websocket(PERS))
+    if do_websocket:
+        websocket_supervisor = asyncio.create_task(supervise_websocket(PERS))
+        await asyncio.wait([websocket_supervisor])
 
-    await asyncio.wait([websocket_supervisor])
     if close_pers:
         await PERS.aclose()
 
 
 async def supervise_websocket(pers):
     """Retry the websocket indefinetely..."""
+    errors = 0
     while True:
         ws_task = asyncio.create_task(pers.homely.run_websocket())
         await asyncio.wait([ws_task])
+        errors += 1
+        if errors > 10:
+            logger.error("Giving up on homely websocket, failed 10 times")
+            return
         logger.warning("Websocket died, re-establishing in 2 seconds")
         await asyncio.sleep(2)
 
