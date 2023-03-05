@@ -2,7 +2,7 @@ Andre:
   backup_setpoint: 20.0
   cooling_rate: -0.08
   cooling_rate_winter: -0.7
-  delta: -3.0
+  delta: -5.0
   heating_rate: 1.5
   maxtemp: 26.0
   sensor_item: Sensor_Andre_gulv_temperatur
