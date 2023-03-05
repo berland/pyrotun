@@ -29,7 +29,7 @@ PERS = None
 SWITCH_ITEMS: Dict[str, Dict[str, Union[str, bool]]] = {
     "is_dark": {"item": "Sensor_Garasje_Opplyst", "inverted": True},
     "is_motion_detected": {
-        "item": "Sensor_Garasje_bevegelse",
+        "item": "Sensor_Garasje_bevegelse_raw",
         "inverted": False,
     },
 }
