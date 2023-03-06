@@ -13,6 +13,7 @@ import aiocron
 import dotenv
 
 import pyrotun
+import pyrotun.connections.hass
 import pyrotun.connections.homely
 import pyrotun.connections.openhab
 import pyrotun.connections.skoda
@@ -25,6 +26,7 @@ import pyrotun.discord
 import pyrotun.disruptive
 import pyrotun.exercise_uploader
 import pyrotun.floors
+import pyrotun.hasslink
 import pyrotun.helligdager
 import pyrotun.houseshadow
 import pyrotun.persist
@@ -60,6 +62,12 @@ def setup_crontabs(pers):
     """Registers coroutines for execution via crontab syntax.
 
     Requires the persistence object to be initialized."""
+
+    @aiocron.crontab(EVERY_15_SECOND)
+    async def do_hasslink():
+        await asyncio.sleep(0.5)
+        logger.pyrotun("Linking Homeassistant")
+        await pyrotun.hasslink.link_hass_states_to_openhab(pers)
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def poll_unifiprotect():

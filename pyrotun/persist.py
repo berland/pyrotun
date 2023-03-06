@@ -12,6 +12,7 @@ class PyrotunPersistence:
         logger.info("Initializing PyrotunPersistence")
         self.websession = aiohttp.ClientSession()
 
+        self.hass = None
         self.homely = None
         self.influxdb = None
         self.openhab = None
@@ -29,6 +30,8 @@ class PyrotunPersistence:
 
     async def ainit(self, requested="all"):
         logger.info("PyrotunPersistence.ainit()")
+        if "hass" in requested or "all" in requested:
+            self.hass = connections.hass.HassConnection(websession=self.websession)
         if "homely" in requested or "all" in requested:
             self.homely = connections.homely.HomelyConnection(
                 websession=self.websession

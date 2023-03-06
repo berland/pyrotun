@@ -1,4 +1,5 @@
 from . import (  # noqa
+    hass,
     homely,
     influxdb,
     openhab,

@@ -10,7 +10,6 @@ logger = pyrotun.getLogger(__name__)
 
 class OpenHABConnection:
     def __init__(self, openhab_url="", websession=None, readonly=False):
-
         self.readonly = readonly
 
         if not openhab_url:
@@ -51,7 +50,7 @@ class OpenHABConnection:
                 else:
                     return False
 
-    async def set_item(self, item_names, new_state, log=None, method="post"):
+    async def set_item(self, item_names, new_state, log=None, method="post", send_no_change=True):
         if self.readonly:
             logger.info(
                 "OpenHAB: Would have set %s to %s", str(item_names), str(new_state)
@@ -61,7 +60,7 @@ class OpenHABConnection:
             item_names = [item_names]
         for item_name in item_names:
             current_state = await self.get_item(item_name)
-            if str(current_state) == str(new_state):
+            if str(current_state) == str(new_state) and send_no_change is True:
                 logger.info(
                     "OpenHAB: No change in %s, value %s, still sending command",
                     item_name,
