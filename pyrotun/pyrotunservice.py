@@ -66,7 +66,7 @@ def setup_crontabs(pers):
     @aiocron.crontab(EVERY_15_SECOND)
     async def do_hasslink():
         await asyncio.sleep(0.5)
-        logger.pyrotun("Linking Homeassistant")
+        logger.info("Linking Homeassistant")
         await pyrotun.hasslink.link_hass_states_to_openhab(pers)
 
     @aiocron.crontab(EVERY_15_SECOND)

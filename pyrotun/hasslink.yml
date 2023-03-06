@@ -27,6 +27,9 @@ sensors:
 - attribute: signed_meter_value_kwh
   entity_id: sensor.zaptec_charger_zap021299
   openhab_item: ZaptecCumulativeKwh
+- attribute: total_charge_power_session
+  entity_id: sensor.zaptec_charger_zap021299
+  openhab_item: ZaptecTotalChargePowerSession
 - attribute: temperature_internal5
   entity_id: sensor.zaptec_charger_zap021299
   openhab_item: ZaptecInternalTemperature
