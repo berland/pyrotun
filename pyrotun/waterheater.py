@@ -606,6 +606,9 @@ async def main():
     # Make the weekly water usage profile, and persist it:
     await pers.ainit(["tibber", "waterheater", "influxdb", "openhab"])
     prices_df = await pers.tibber.get_prices()
+    while pers.waterheater.waterusageprofile is None:
+        # waterheater.ainit() is executed in a task.
+        await asyncio.sleep(0.1)
     # Grid rental is time dependent:
     prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
 
