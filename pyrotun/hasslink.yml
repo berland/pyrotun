@@ -36,8 +36,17 @@ sensors:
 - attribute: temperature_internal6
   entity_id: sensor.zaptec_charger_zap021299
   openhab_item: ZaptecInternalTemperatureLow
+
+- entity_id: sensor.kjellerpumpe_daily_heat_energy_consumption
+  openhab_item: Kjeller_varmepumpe_dagsforbruk_oppvarming
+- entity_id: sensor.kjellerpumpe_daily_cool_energy_consumption
+  openhab_item: Kjeller_varmepumpe_dagsforbruk_kjoling
+- entity_id: sensor.stuepumpe_daily_heat_energy_consumption
+  openhab_item: Stue_varmepumpe_dagsforbruk_oppvarming
+- entity_id: sensor.stuepumpe_daily_cool_energy_consumption
+  openhab_item: Stue_varmepumpe_dagsforbruk_kjoling
 services:
 - attribute: temperature
   entity_id: climate.stuepumpe
-  openhab_item: Stue_varmepumpe_termostat
+  openhab_item: Stue_varmepumpe_termostat_reell
   service_path: climate/set_temperature
