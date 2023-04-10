@@ -115,6 +115,14 @@ def setup_crontabs(pers):
         await pers.openhab.set_item("Smappee_day_cumulative", 0)
 
     @aiocron.crontab(EVERY_HOUR)
+    async def update_public_ip():
+        logger.info(" ** Public IP")
+        async with pers.websession.get("https://api.ipify.org") as response:
+            if response.ok:
+                ip = await response.content.read()
+                await pers.openhab.set_item("PublicIP", ip.decode("utf-8"))
+
+    @aiocron.crontab(EVERY_HOUR)
     async def helligdager():
         logger.info(" ** Helligdager")
         await pyrotun.helligdager.main(pers)
