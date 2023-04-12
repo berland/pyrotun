@@ -2,7 +2,6 @@
   openhab_item: Sensor_Gangoppe_taktemperatur_brannvarsler
   featurepath: temperature/states/temperature/value
   id: fb4cf235-3c52-4710-9686-a6c6e826f6e9
-
 - name: Røyksensor gang oppe
   openhab_item: Sensor_Gangoppe_brann
   featurepath: alarm/states/fire/value
@@ -39,11 +38,26 @@
   type: bool
   id: 55d9546f-0581-4ff5-8717-c9b0ecf20e27
 
-- name: Dør gjesterom
+- name: Terrassedør gjesterom
   openhab_item: TerrassedorGjesterom
   featurepath: alarm/states/alarm/value
   type: door
-
-- name: Dør gjesterom
+- name: Terrassedør gjesterom
   openhab_item: Sensor_TerrassedorGjesterom_temperatur
+  featurepath: temperature/states/temperature/value
+
+- name: Inngangsdør
+  openhab_item: Inngangsdor
+  featurepath: alarm/states/alarm/value
+  type: door
+- name: Inngangsdør
+  openhab_item: Sensor_Inngangsdor_temperatur
+  featurepath: temperature/states/temperature/value
+
+- name: Verksteddør
+  openhab_item: BakdorVerksted
+  featurepath: alarm/states/alarm/value
+  type: door
+- name: Verksteddør
+  openhab_item: Sensor_BakdorVerksted_temperatur
   featurepath: temperature/states/temperature/value
