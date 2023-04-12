@@ -142,6 +142,8 @@ class YrConnection:
             auth=aiohttp.BasicAuth(MET_CLIENT_ID, ""),
             headers={"User-Agent": "Custom smarthouse using OpenHAB"},
         ) as response:
+            if response.ok is False:
+                return None
             result = await response.json()
             time_index = [x["referenceTime"] for x in result["data"]]
             cloud_fractions = [x["observations"][0]["value"] for x in result["data"]]

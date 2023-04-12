@@ -138,6 +138,9 @@ async def make_heatingmodel(
     sunheight[sunheight < 5] = 0
 
     cloud_area_fraction = await pers.yr.get_historical_cloud_fraction()
+    if cloud_area_fraction is None:
+        logger.error("Not able to get cloud fraction from yr")
+        return {"powermodel": None, "tempmodel": None}
     sun_cloud = (
         pd.concat([cloud_area_fraction, sunheight], axis=1)
         .sort_index()
