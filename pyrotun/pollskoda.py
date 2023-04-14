@@ -17,7 +17,7 @@ async def amain(pers=None, debug=False):
     if pers.skoda is None or pers.openhab is None:
         await pers.ainit(["skoda", "openhab"])
 
-    await post_to_openhab(pers, debug=True)
+    await post_to_openhab(pers, debug=debug)
 
     if close_pers:
         await pers.aclose()
