@@ -45,8 +45,15 @@ sensors:
   openhab_item: Stue_varmepumpe_dagsforbruk_oppvarming
 - entity_id: sensor.stuepumpe_daily_cool_energy_consumption
   openhab_item: Stue_varmepumpe_dagsforbruk_kjoling
+
 services:
+  # http://raaserv.r40:8123/developer-tools/service
+  # NB: temperatur sendes ikke i retur til OpenHAB
 - attribute: temperature
   entity_id: climate.stuepumpe
   openhab_item: Stue_varmepumpe_termostat_reell
   service_path: climate/set_temperature
+- attribute: hvac_mode  # verdier kan være 'heat', 'cool', 'off'. Case sensitive
+  entity_id: climate.stuepumpe
+  openhab_item: Stue_varmepumpe_modus
+  service_path: climate/set_hvac_mode

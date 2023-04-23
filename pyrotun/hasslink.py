@@ -43,6 +43,7 @@ async def link_hass_states_to_openhab(pers):
     # OpenHAB to Homeassistant:
     for service in config["services"]:
         state = await pers.openhab.get_item(service["openhab_item"])
+        logger.info(f"Sending {service} with value {state} to HASS")
         await pers.hass.set_item(
             service["service_path"],
             service["entity_id"],
