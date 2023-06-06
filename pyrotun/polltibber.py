@@ -18,7 +18,13 @@ async def main(pers=PERS):
     if pers is None:
         pers = pyrotun.persist.PyrotunPersistence(readonly=False)
     if pers.tibber is None:
-        await pers.ainit(["tibber", "smappee", "openhab"])
+        await pers.ainit(["tibber", "openhab"])
+
+    # Reset smappee connections since reauthentication stopped to
+    # work in june 2023 (smappy package stale on pypi since 2018)
+    pers.smappee = None
+    await pers.ainit(["smappee"])
+
     prices_df = await pers.tibber.get_prices()
     logger.info("Got Tibber prices")  # , str(prices_df))
 
