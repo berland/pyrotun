@@ -50,7 +50,9 @@ class OpenHABConnection:
                 else:
                     return False
 
-    async def set_item(self, item_names, new_state, log=None, method="post", send_no_change=True):
+    async def set_item(
+        self, item_names, new_state, log=None, method="post", send_no_change=True
+    ):
         if self.readonly:
             logger.info(
                 "OpenHAB: Would have set %s to %s", str(item_names), str(new_state)

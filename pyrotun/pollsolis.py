@@ -1,10 +1,11 @@
 import asyncio
+from pathlib import Path
 
 import dotenv
-from pathlib import Path
+import yaml
+
 import pyrotun
 import pyrotun.persist
-import yaml
 
 logger = pyrotun.getLogger(__name__)
 
@@ -39,6 +40,7 @@ async def post_solisdata_to_openhab(pers) -> None:
             str(data["data"][conf_item["solisname"]]),
             log=True,
         )
+
 
 if __name__ == "__main__":
     asyncio.run(amain())

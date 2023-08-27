@@ -3,19 +3,23 @@ import logging
 import os
 import pprint
 from pathlib import Path
+from typing import Awaitable, Optional
 
 import aiohttp
+
 # import socketio
 import yaml
-from websockets.datastructures import Headers
-from typing import Awaitable, Optional
+
 import pyrotun
 import pyrotun.persist
+
+# from websockets.datastructures import Headers
+
 
 logger = pyrotun.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-SIO = None # socketio.AsyncClient(logger=logger, reconnection_attempts=3)
+SIO = None  # socketio.AsyncClient(logger=logger, reconnection_attempts=3)
 
 SERVER = "sdk.iotiliti.cloud"
 BASE_URL = f"https://{SERVER}/homely/"
@@ -35,7 +39,6 @@ class HomelyConnection:
         self._close_websession_in_aclose = False
 
     async def ainit(self, websession=None):
-
         if websession is not None:
             self.websession = websession
 
@@ -134,6 +137,7 @@ class HomelyConnection:
 
     async def run_websocket(self):
         disconnects = 0
+
         @SIO.event
         async def connect():
             logger.info("Connected to homely websocket server")
@@ -143,7 +147,7 @@ class HomelyConnection:
         @SIO.event
         async def disconnect():
             logger.warning("Disconnected to homely websocket server")
-            disconnects += 1
+            disconnects += 1  # noqa
 
         @SIO.on("event")
         async def on_message(data):

@@ -13,7 +13,6 @@ logger = pyrotun.getLogger(__name__)
 dotenv.load_dotenv()
 
 
-
 async def main(pers=None):
     assert os.getenv("MQTT_HOST"), "You must proviode MQTT_HOST as an env variable"
     assert os.getenv("DISCORD_WEBHOOK"), "You must set the env variable DISCORD_WEBHOOK"

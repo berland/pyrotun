@@ -2,13 +2,12 @@ import argparse
 import asyncio
 import pprint
 from functools import partial
+from typing import Any
 
 import dotenv
 
 import pyrotun
 import pyrotun.persist
-
-from typing import Any
 
 logger = pyrotun.getLogger(__name__)
 
