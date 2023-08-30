@@ -45,9 +45,9 @@ async def main(pers=PERS):
     else:
         dframe["cost"] = 0  # Every day at 00:00
 
-    todayscost = round(dframe["cost"].sum(), 1)  # i kroner
-    logger.info("Strømkostnad til nå i dag: %s NOK", todayscost)
-    await pers.openhab.set_item("Tibber_day_cumcost", todayscost)
+    # todayscost = round(dframe["cost"].sum(), 1)  # i kroner
+    # logger.info("Strømkostnad til nå i dag: %s NOK", todayscost)
+    # await pers.openhab.set_item("Tibber_day_cumcost", todayscost)
 
     logger.info(
         "Gjennomsnittspris til nå i dag: %s øre",
