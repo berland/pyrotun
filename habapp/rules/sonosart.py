@@ -1,8 +1,7 @@
-import requests
-
 import HABApp
+import requests
+from HABApp.core.events import ValueUpdateEvent, ValueUpdateEventFilter
 from HABApp.openhab.items import StringItem
-from HABApp.core.events import ValueChangeEvent
 
 SONOSART_STATICFILE = "/etc/openhab/html/sonosart.png"
 
@@ -12,10 +11,9 @@ class UpdateSonosArt(HABApp.Rule):
         super().__init__()
 
         self.sonosart_item = StringItem.get_item("SonosKjokkenAlbumArtUrl")
+        self.sonosart_item.listen_event(self.on_change, ValueUpdateEventFilter())
 
-        self.listen_event(self.sonosart_item, self.on_change, ValueChangeEvent)
-
-    def on_change(self, event: ValueChangeEvent) -> None:
+    def on_change(self, event: ValueUpdateEvent) -> None:
         if event.value.startswith("http"):
             try:
                 png_bytes = requests.get(event.value).content

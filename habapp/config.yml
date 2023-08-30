@@ -11,32 +11,33 @@ location:
 mqtt:
   connection:
     client_id: HABApp
-    host: ''
-    port: 8883
-    user: ''
+    host: 'localhost'
+    port: 81883
+    user: 'r'
     password: ''
-    tls: true
-    tls_ca_cert: ''  # Path to a CA certificate that will be treated as trusted
-    tls_insecure: false
+    tls:
+      enabled: false
+      ca cert: .  # Path to a CA certificate that will be treated as trusted
+      insecure: false
+  subscribe:
+    qos: 0
+    topics:
+    - - '#'
+      -
+  publish:
+    qos: 0
+    retain: false
   general:
     listen_only: false  # If True HABApp will not publish any value to the broker
-  publish:
-    qos: 0  # Default QoS when publishing values
-    retain: false # Default retain flag when publishing values
-  subscribe:
-    qos: 0  # Default QoS for subscribing
-    topics:
-    - '#'
-    - 0
 openhab:
   connection:
-    host: raaserv.r40
-    port: 8090
-    user: ''
-    password: ''
+    url: http://192.168.1.20:8090
+    user: 'berland'
+    password: 'olsesenopenhab'
+    verify_ssl: false
   general:
     listen_only: false  # If True HABApp will not change anything on the openHAB instance.
-    wait_for_openhab: true # If True HABApp will wait for items from the openHAB instance before loading any rules on startup
+    wait_for_openhab: false # If True HABApp will wait for items from the openHAB instance before loading any rules on startup
   ping:
     enabled: false  # If enabled the configured item will show how long it takes to send an update from HABApp and get the updated value back from openhabin milliseconds
     item: HABApp_Ping # Name of the Numberitem
