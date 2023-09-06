@@ -8,7 +8,6 @@ from aioinflux import InfluxDBClient
 
 class InfluxDBConnection:
     def __init__(self, host=""):
-
         if host:
             self.host = host
         else:
@@ -53,7 +52,6 @@ class InfluxDBConnection:
     async def get_series_grouped(
         self, item, aggregator="mean", time="1h", condition=""
     ) -> pd.DataFrame:
-
         resp = await self.client.query(
             (
                 f"SELECT {aggregator}(value) FROM {item} {condition} "

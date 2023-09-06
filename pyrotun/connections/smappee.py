@@ -13,7 +13,6 @@ logger = pyrotun.getLogger(__name__)
 
 class SmappeeConnection:
     def __init__(self):
-
         self.mysmappee = None  # will be set by authenticate()
         self.locationid = None
 
@@ -42,7 +41,6 @@ class SmappeeConnection:
         return False
 
     def get_recent_df(self, minutes, aggregation=1):
-
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         now = datetime.datetime.now().astimezone(tz)
         earlier = now - datetime.timedelta(minutes=minutes)

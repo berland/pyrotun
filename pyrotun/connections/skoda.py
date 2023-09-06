@@ -39,7 +39,6 @@ class SkodaConnection:
         self.config = None  # Mapping to OpenHAB
 
     async def ainit(self, websession=None):
-
         if websession is not None:
             self.websession = websession
 

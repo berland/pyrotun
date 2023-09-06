@@ -5,7 +5,6 @@ logger = pyrotun.getLogger(__name__)
 
 
 def main():
-
     polar = Polar()
 
     polar.get_user_information()

@@ -15,7 +15,6 @@ class SectorAlarmConnection:
     """Setup and maintain a connection to SectorAlarm web API"""
 
     def __init__(self):
-
         self.authenticated = None
         self.username = os.getenv("SECTORALARM_USER")
         self.pword = os.getenv("SECTORALARM_PW")

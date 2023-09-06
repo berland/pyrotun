@@ -478,7 +478,6 @@ async def heatreservoir_temp_cost_graph(
             " (graph building at %s, %d temps)", str(tstamp), len(temps[tstamp])
         )
         for temp in temps[tstamp]:
-
             # This is Explicit Euler solution of the underlying
             # differential equation, predicting future temperature:
 

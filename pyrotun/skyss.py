@@ -25,7 +25,6 @@ HTTP_HEADERS = {
 
 
 async def main(pers=None):
-
     close_pers_here: bool = False
     if pers is None:
         pers = persist.PyrotunPersistence()

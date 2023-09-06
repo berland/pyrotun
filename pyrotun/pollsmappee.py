@@ -9,7 +9,6 @@ PERS = None
 
 
 async def main(pers=PERS):
-
     if pers.smappee is None or pers.openhab is None:
         await pers.ainit(["smappee", "openhab"])
 
