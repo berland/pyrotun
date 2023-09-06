@@ -24,7 +24,6 @@ METEOGRAM_SVG_FILENAME = Path("/etc/openhab/html/meteogram.svg")
 
 
 async def main(pers=None):
-
     close_pers_here = False
     if pers is None:
         pers = persist.PyrotunPersistence()
@@ -80,15 +79,6 @@ async def main(pers=None):
         await pers.openhab.set_item(
             "Yr_" + yr_item, forecast_df.iloc[0][yr_item], log=True
         )
-
-    # YrmeldingNaa (legacy item):
-    await pers.openhab.set_item(
-        "YrmeldingNaa",
-        pers.yr.symbolcodedict[forecast_df.iloc[0]["symbol_code"].split("_")[0]][
-            "old_id"
-        ],
-        log=True,
-    )
 
     # YrMaksTempNeste6timer
     await pers.openhab.set_item(

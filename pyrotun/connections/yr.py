@@ -19,9 +19,6 @@ MET_CLIENT_ID = os.getenv("FROST_CLIENT_ID")
 
 class YrConnection:
     def __init__(self):
-        self.symbolsframe = None
-        self.old_id_to_symbols = None
-        self.symbolcodedict = None
         self.websession = None
 
     async def ainit(self, websession=None):
@@ -29,12 +26,6 @@ class YrConnection:
         self.websession = websession
         if self.websession is None:
             self.websession = aiohttp.ClientSession()
-
-        symbols_result = await self._symbols()
-
-        self.symbolsframe = symbols_result["dataframe"]
-        self.old_id_to_symbols = symbols_result["id_to_symbol"]
-        self.symbolcodedict = symbols_result["symbolcodedict"]
 
     async def nowcast_precipitation_rates(self):
         """Returns a Pandas series with the 5 minute precipitation forecast"""
@@ -65,23 +56,6 @@ class YrConnection:
             assert response.status == 200
             svg = await response.text()
             return svg
-
-    async def _symbols(self):
-        """Return weather symbol information, as a dict with three views of the data"""
-        async with self.websession.get(
-            "https://api.met.no/weatherapi/weathericon/2.0/legends",
-            auth=aiohttp.BasicAuth(MET_CLIENT_ID, ""),
-            headers={"User-Agent": "Custom smarthouse using OpenHAB"},
-        ) as response:
-            result = await response.json()
-            dframe = pd.DataFrame([{"symbol_code": x, **result[x]} for x in result])
-            return {
-                "symbolcodedict": result,
-                "dataframe": dframe,
-                "id_to_symbol": dframe[["old_id", "symbol_code"]]
-                .set_index("old_id")
-                .to_dict(),
-            }
 
     async def forecast(self):
         """Returns a dataframe with the current forecast"""
