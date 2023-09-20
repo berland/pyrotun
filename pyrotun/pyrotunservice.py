@@ -7,6 +7,8 @@ from asyncio at regular intervals (similar to crontab)
 """
 import asyncio
 import datetime
+import json
+from pathlib import Path
 from typing import Any, List
 
 import aiocron
@@ -47,6 +49,7 @@ import pyrotun.yrmelding
 logger = pyrotun.getLogger(__name__)
 
 EVERY_SECOND = "* * * * * *"
+EVERY_2_SECOND = "* * * * * */2"
 EVERY_10_SECOND = "* * * * * */10"
 EVERY_15_SECOND = "* * * * * */15"
 EVERY_MINUTE = "* * * * *"
@@ -58,10 +61,56 @@ EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
 
 
+def get_alexa_serial_to_devicename() -> dict:
+    lines = [
+        line
+        for line in Path("/etc/openhab/things/amazonechocontrol.things")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if "Thing" in line
+    ]
+    themap = {}
+    for line in lines:
+        tokens = (
+            line.replace("=", " ")
+            .replace("[", "")
+            .replace("]", "")
+            .replace('"', "")
+            .split()
+        )
+        themap[tokens[4]] = tokens[2]
+    return themap
+
+
+ALEXA_SERIAL_TO_DEVICENAME = get_alexa_serial_to_devicename()
+
+
 def setup_crontabs(pers):
     """Registers coroutines for execution via crontab syntax.
 
     Requires the persistence object to be initialized."""
+
+    @aiocron.crontab(EVERY_2_SECOND)
+    async def get_alexa_last_command():
+        # Band-aid until alexa binding is updated.
+        async with pers.websession.get(
+            "http://raaserv.r40:8090/amazonechocontrol/berlandaccount/"
+            "PROXY/api/activities?startTime=&size=1&offset=1"
+        ) as response:
+            if response.ok:
+                jsondata = await response.json(content_type="text/html;charset=utf-8")
+                serialnumber = jsondata["activities"][0]["sourceDeviceIds"][0][
+                    "serialNumber"
+                ]
+                devicename = ALEXA_SERIAL_TO_DEVICENAME[serialnumber]
+                json_inside_json = jsondata["activities"][0]["description"]
+                command = json.loads(json_inside_json)["summary"].lstrip("echo ")
+                itemname = devicename.title() + "Alexa_lastCommand"
+                currentlastcommand = await pers.openhab.get_item(itemname)
+                if command and not currentlastcommand.startswith(command):
+                    await pers.openhab.set_item(
+                        itemname, command, log=True, send_no_change=False
+                    )
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def do_hasslink():
