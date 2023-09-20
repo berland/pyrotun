@@ -104,7 +104,7 @@ def setup_crontabs(pers):
                 ]
                 devicename = ALEXA_SERIAL_TO_DEVICENAME[serialnumber]
                 json_inside_json = jsondata["activities"][0]["description"]
-                command = json.loads(json_inside_json)["summary"].lstrip("echo ")
+                command = json.loads(json_inside_json)["summary"].removeprefix("echo ")
                 itemname = devicename.title() + "Alexa_lastCommand"
                 currentlastcommand = await pers.openhab.get_item(itemname)
                 if command and not currentlastcommand.startswith(command):
