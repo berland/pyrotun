@@ -368,9 +368,15 @@ def _estimate_currenthourusage(
 
 async def update_effekttrinn(pers):
     hourmaxes: List[int] = await monthly_hourmaxes(pers)
-    top_watts = sorted(hourmaxes)[-3:]
+    top_watts = hourmaxes.sort_values(ascending=False)[0:3]
     mean = sum(top_watts) / len(top_watts)
     await pers.openhab.set_item(POWER_FOR_EFFEKTTRINN, str(int(mean)), log=True)
+    for idx in [1, 2, 3]:
+        await pers.openhab.set_item(
+            MONTHLYHOURMAX + str(idx),
+            f"{top_watts.index[idx-1]}: {top_watts.values[idx-1]*1000:g} W",
+            log=True,
+        )
 
 
 def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]) -> float:
@@ -429,7 +435,7 @@ def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]) -> float:
 
 async def monthly_hourmaxes(
     pers, year: Optional[int] = None, month: Optional[int] = None
-) -> List[float]:
+) -> pd.DataFrame:
     """
     Make a list pr. day of max hourmaxes in power consumption.
 
@@ -486,7 +492,7 @@ async def monthly_hourmaxes(
     three_largest_daily_hourmax = daily_maximum.sort_values().tail(3)
     logger.info(f"Max daily hourmax'es: {three_largest_daily_hourmax.values} W")
 
-    return list(daily_maximum.values)
+    return daily_maximum
 
 
 async def amain(
@@ -501,8 +507,10 @@ async def amain(
     await fix_powerstate(pers)
 
     if upperlimit is None:
-        hourmaxes: List[float] = await monthly_hourmaxes(pers)
+        hourmaxes_df = await monthly_hourmaxes(pers)
+        hourmaxes: List[float] = list(hourmaxes_df.values)
         upperlimit = currentlimit_from_hourmaxes(hourmaxes)
+        await update_effekttrinn(pers)
         logger.info(f"Vi må holde oss under: {upperlimit}W denne måneden")
     else:
         logger.info(f"Testkjøring for å holde oss under {upperlimit}W nå")
