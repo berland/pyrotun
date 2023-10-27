@@ -49,7 +49,7 @@ import pyrotun.yrmelding
 logger = pyrotun.getLogger(__name__)
 
 EVERY_SECOND = "* * * * * *"
-EVERY_2_SECOND = "* * * * * */2"
+EVERY_4_SECOND = "* * * * * */4"
 EVERY_10_SECOND = "* * * * * */10"
 EVERY_15_SECOND = "* * * * * */15"
 EVERY_MINUTE = "* * * * *"
@@ -90,7 +90,7 @@ def setup_crontabs(pers):
 
     Requires the persistence object to be initialized."""
 
-    @aiocron.crontab(EVERY_2_SECOND)
+    @aiocron.crontab(EVERY_4_SECOND)
     async def get_alexa_last_command():
         # Band-aid until alexa binding is updated.
         async with pers.websession.get(
@@ -104,12 +104,16 @@ def setup_crontabs(pers):
                 ]
                 devicename = ALEXA_SERIAL_TO_DEVICENAME[serialnumber]
                 json_inside_json = jsondata["activities"][0]["description"]
-                command = json.loads(json_inside_json)["summary"].removeprefix("echo ")
+                command = (
+                    json.loads(json_inside_json)["summary"]
+                    .removeprefix("echo ")
+                    .removeprefix("alexa ")
+                )
                 itemname = devicename.title() + "Alexa_lastCommand"
                 currentlastcommand = await pers.openhab.get_item(itemname)
                 if command and not currentlastcommand.startswith(command):
                     await pers.openhab.set_item(
-                        itemname, command, log=True, send_no_change=False
+                        itemname, command, method="put", log=True, send_no_change=False
                     )
 
     @aiocron.crontab(EVERY_15_SECOND)

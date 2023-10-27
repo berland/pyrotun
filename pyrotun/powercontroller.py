@@ -27,6 +27,7 @@ CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
 HOURUSAGE_ESTIMATE_ITEM = "WattHourEstimate"
 POWER_FOR_EFFEKTTRINN = "NettleieWatt"
 CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
+MONTHLYHOURMAX = "MonthlyHourmax"  # integer 1,2,3 is to be added to this.
 FLOORSFILE = Path(__file__).absolute().parent / "floors.yml"
 
 TZ = pytz.timezone(os.getenv("TIMEZONE"))  # type: ignore
@@ -95,7 +96,7 @@ async def get_powerloads(pers) -> pd.DataFrame:
                 max(
                     12
                     - await pers.openhab.get_item(
-                        "Sensor_Verkstedgulv_temperatur", datatype=float
+                        "Sensor_Verkstedgulv_temperatur", datatype=float, backupvalue=15
                     ),
                     0,
                 ),
@@ -116,7 +117,7 @@ async def get_powerloads(pers) -> pd.DataFrame:
                 max(
                     6
                     - await pers.openhab.get_item(
-                        "Sensor_Garasjegulv_temperatur", datatype=float
+                        "Sensor_Garasjegulv_temperatur", datatype=float, backupvalue=10
                     ),
                     0,
                 ),

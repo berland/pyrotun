@@ -29,7 +29,7 @@ class OpenHABConnection:
         # This is not async..
         self.client = openhab.openHAB(self.openhab_url)
 
-    async def get_item(self, item_name, datatype=str):
+    async def get_item(self, item_name, datatype=str, backupvalue=None):
         async with self.websession.get(
             self.openhab_url + "/items/" + str(item_name)
         ) as resp:
@@ -43,7 +43,7 @@ class OpenHABConnection:
                     return float(resp["state"])
                 except ValueError:
                     logger.error(f"{item_name} was UNDEF")
-                    return None
+                    return backupvalue
             elif datatype == bool:
                 if resp["state"] == "ON":
                     return True
