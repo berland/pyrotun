@@ -10,7 +10,6 @@ import hmac
 import json
 import logging
 import os
-import pprint
 
 import dotenv
 
@@ -93,7 +92,6 @@ class SolisConnection:
             if data["data"]["apparentPowerStr"] == "kVA":
                 data["data"]["apparentPower"] *= 1000
                 data["data"]["apparentPowerStr"] = "VA"
-        pprint.pprint(data)
         return data
 
     async def get_inverter_id_sn(self) -> dict:
