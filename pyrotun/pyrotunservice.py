@@ -90,7 +90,7 @@ def setup_crontabs(pers):
 
     Requires the persistence object to be initialized."""
 
-    @aiocron.crontab(EVERY_4_SECOND)
+    # @aiocron.crontab(EVERY_4_SECOND)
     async def get_alexa_last_command():
         # Band-aid until alexa binding is updated.
         async with pers.websession.get(
@@ -195,10 +195,10 @@ def setup_crontabs(pers):
         estimate = await pyrotun.powercontroller.estimate_currenthourusage(pers)
         await pers.openhab.set_item("EstimatedKWh_thishour", estimate)
 
-    @aiocron.crontab(EVERY_MINUTE)
-    async def turn_off_if_overshooting_powerusage():
-        await asyncio.sleep(15)
-        await pyrotun.powercontroller.amain(pers)
+    #    @aiocron.crontab(EVERY_MINUTE)
+    #    async def turn_off_if_overshooting_powerusage():
+    #        await asyncio.sleep(15)
+    #        await pyrotun.powercontroller.amain(pers)
 
     @aiocron.crontab(EVERY_HOUR)
     async def update_thismonth_nettleie():
@@ -215,11 +215,11 @@ def setup_crontabs(pers):
         logger.info(" ** Floor controller")
         await pyrotun.floors.main(pers)
 
-    @aiocron.crontab(EVERY_8_MINUTE)
-    async def waterheater_controller():
-        await asyncio.sleep(60)  # No need to overlap with floors_controller
-        logger.info(" ** Waterheater controller")
-        await pyrotun.waterheater.controller(pers)
+    # @aiocron.crontab(EVERY_8_MINUTE)
+    # async def waterheater_controller():
+    #     await asyncio.sleep(60)  # No need to overlap with floors_controller
+    #     logger.info(" ** Waterheater controller")
+    #     await pyrotun.waterheater.controller(pers)
 
     @aiocron.crontab(EVERY_HOUR)
     async def estimate_savings():
