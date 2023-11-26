@@ -35,7 +35,7 @@ REQUIREMENTS = [
     "scikit-learn",
     "skodaconnect",
     "smappy",
-    "watchgod",
+    "watchfiles",
 ]
 
 SETUP_REQUIREMENTS = [

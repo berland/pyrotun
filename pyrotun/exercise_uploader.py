@@ -10,7 +10,7 @@ import dotenv
 import gpxpy
 import isodate
 import pandas as pd
-import watchgod
+import watchfiles
 from geopy import distance
 
 import pyrotun
@@ -216,7 +216,7 @@ async def main(pers=None, dryrun=False):
     assert pers.websession is not None
 
     logger.info("Starting watching %s for exercises", EXERCISE_DIR)
-    async for changes in watchgod.awatch(EXERCISE_DIR):
+    async for changes in watchfiles.awatch(EXERCISE_DIR):
         logger.info("Detected filesystem change: %s", str(changes))
         dirnames = set([Path(change[1]).parent for change in changes])
         logger.info("Will process directories %s", str(dirnames))
