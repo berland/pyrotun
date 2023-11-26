@@ -210,10 +210,10 @@ def setup_crontabs(pers):
         logger.info(" ** Updating nettleie")
         await pyrotun.powercontroller.update_effekttrinn(pers)
 
-    @aiocron.crontab(EVERY_8_MINUTE)
-    async def floors_controller():
-        logger.info(" ** Floor controller")
-        await pyrotun.floors.main(pers)
+    # @aiocron.crontab(EVERY_8_MINUTE)
+    # async def floors_controller():
+    #    logger.info(" ** Floor controller")
+    #    await pyrotun.floors.main(pers)
 
     # @aiocron.crontab(EVERY_8_MINUTE)
     # async def waterheater_controller():
@@ -281,8 +281,8 @@ async def at_startup(pers) -> List[Any]:
 
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
 
-    tasks.append(asyncio.create_task(pyrotun.floors.main(pers)))
-    tasks.append(asyncio.create_task(pyrotun.waterheater.controller(pers)))
+    # tasks.append(asyncio.create_task(pyrotun.floors.main(pers)))
+    # tasks.append(asyncio.create_task(pyrotun.waterheater.controller(pers)))
     tasks.append(asyncio.create_task(pyrotun.yrmelding.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.helligdager.main(pers)))
     # tasks.append(asyncio.create_task(pyrotun.pollhomely.supervise_websocket(pers)))
