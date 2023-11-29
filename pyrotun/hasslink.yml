@@ -61,3 +61,7 @@ services:
   entity_id: climate.stuepumpe
   openhab_item: Stue_varmepumpe_modus
   service_path: climate/set_hvac_mode
+- attribute: fan_mode  # verdier kan være 'auto', 'silence, '1'...'5'
+  entity_id: climate.stuepumpe
+  openhab_item: Stue_varmepumpe_vifte
+  service_path: climate/set_fan_mode
