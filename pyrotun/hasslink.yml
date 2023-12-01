@@ -49,10 +49,10 @@ sensors:
 services:
   # http://raaserv.r40:8123/developer-tools/service
   # NB: temperatur sendes ikke i retur til OpenHAB
-- attribute: command
-  entity_id: vacuum.roborock_s7
-  openhab_item: RoborockS7ActionControl
-  service_path: vacuum/start
+  #- attribute: command
+  #entity_id: vacuum.roborock_s7
+  #openhab_item: RoborockS7ActionControl
+  #service_path: vacuum/start
 - attribute: temperature
   entity_id: climate.stuepumpe
   openhab_item: Stue_varmepumpe_termostat_reell

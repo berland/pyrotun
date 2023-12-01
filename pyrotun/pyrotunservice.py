@@ -221,12 +221,12 @@ def setup_crontabs(pers):
     #     logger.info(" ** Waterheater controller")
     #     await pyrotun.waterheater.controller(pers)
 
-    @aiocron.crontab(EVERY_HOUR)
-    async def estimate_savings():
-        # 3 minutes after every hour
-        await asyncio.sleep(60 * 3)
-        logger.info(" ** Waterheater 24h saving estimation")
-        await pyrotun.waterheater.estimate_savings(pers)
+    # @aiocron.crontab(EVERY_HOUR)
+    # async def estimate_savings():
+    #    # 3 minutes after every hour
+    #    await asyncio.sleep(60 * 3)
+    #    logger.info(" ** Waterheater 24h saving estimation")
+    #    await pyrotun.waterheater.estimate_savings(pers)
 
     @aiocron.crontab(EVERY_HOUR)
     async def yrmelding():

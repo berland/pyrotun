@@ -2,7 +2,7 @@ import asyncio
 
 import aiohttp
 
-from pyrotun import connections, getLogger, powermodels, waterheater
+from pyrotun import connections, getLogger, powermodels
 
 logger = getLogger(__name__)
 
@@ -44,9 +44,9 @@ class PyrotunPersistence:
         if "influxdb" in requested or "all" in requested:
             self.influxdb = connections.influxdb.InfluxDBConnection()
 
-        if "waterheater" in requested or "all" in requested:
-            self.waterheater = waterheater.WaterHeater()
-            asyncio.create_task(self.waterheater.ainit(self))
+        # if "waterheater" in requested or "all" in requested:
+        #    self.waterheater = waterheater.WaterHeater()
+        #    asyncio.create_task(self.waterheater.ainit(self))
 
         if "tibber" in requested or "all" in requested:
             self.tibber = connections.tibber.TibberConnection()
