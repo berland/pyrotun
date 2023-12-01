@@ -168,13 +168,12 @@ def make_http_post_data(dirname):
     return post_data
 
 
-async def process_dir(dirname, pers=None, dryrun=False, force=False):
+async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
     dirname = Path(dirname)
-    logger.info("in process_dir()")
     try:
         dateutil.parser.isoparse(dirname.name)
     except ValueError:
-        logger.warning("Skipping strange-looking directory %s", str(dirname))
+        logger.warning(f"Skipping strange-looking directory {dirname}")
         return
     if (dirname / "exercise_summary").is_file() and (
         dirname / "heart_rate_zones"
@@ -215,14 +214,15 @@ async def main(pers=None, dryrun=False):
         await pers.ainit(["websession"])
     assert pers.websession is not None
 
-    logger.info("Starting watching %s for exercises", EXERCISE_DIR)
+    logger.info(f"Starting watching {EXERCISE_DIR} for exercises")
     async for changes in watchfiles.awatch(EXERCISE_DIR):
-        logger.info("Detected filesystem change: %s", str(changes))
-        dirnames = set([Path(change[1]).parent for change in changes])
-        logger.info("Will process directories %s", str(dirnames))
+        # changes is set of tuples
+        logger.info(f"Detected filesystem change: {changes}")
+        dirnames = set([Path(change[1]) for change in changes])
+        logger.info(f"Will process directories {dirnames}")
         # dirnames are timestamps
         for dirname in dirnames:
-            logger.info("Processing dir %s", str(dirname))
+            logger.info(f"Processing dir {dirname}")
             await process_dir(dirname, pers, dryrun)
 
 
