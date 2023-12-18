@@ -137,7 +137,7 @@ def crop_svg_meteogram(svg) -> str:
     """Removes logos and stuff from yr's meteogram"""
     doc = defusedxml.minidom.parseString(svg)
 
-    root = doc.childNodes[0]
+    root = doc.childNodes[1]
     # Remove all whitespace nodes:
     for node in root.childNodes:
         if node.toxml().strip() == "":
