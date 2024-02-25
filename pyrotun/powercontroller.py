@@ -374,7 +374,7 @@ async def update_effekttrinn(pers):
     for idx in [1, 2, 3]:
         await pers.openhab.set_item(
             MONTHLYHOURMAX + str(idx),
-            f"{top_watts.index[idx-1]}: {top_watts.values[idx-1]*1000:g} W",
+            f"{str(top_watts.index[idx-1])[0:16]}: {top_watts.values[idx-1]*1000:g} W",
             log=True,
         )
 
