@@ -1,0 +1,10 @@
+- myuplinkname: Setpoint
+  openhab_item: Varmtvannsbereder_temperaturtarget
+- myuplinkname: Stored energy
+  openhab_item: Varmtvannsbereder_energiinnhold
+- myuplinkname: Estimated power
+  openhab_item: Varmtvannsbereder_effekt
+- myuplinkname: Total energy used
+  openhab_item: Varmtvannsbereder_kwh_sum
+- myuplinkname: Temperature
+  openhab_item: Varmtvannsbereder_temperatur

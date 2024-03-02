@@ -1,4 +1,5 @@
 import asyncio
+from typing import List, Union
 
 import aiohttp
 
@@ -16,6 +17,7 @@ class PyrotunPersistence:
         self.homely = None
         self.influxdb = None
         self.openhab = None
+        self.myuplink = None
         self.powermodels = None
         self.skoda = None
         self.smappee = None
@@ -28,7 +30,7 @@ class PyrotunPersistence:
         # If true, no values are ever sent anywhere
         self.readonly = readonly
 
-    async def ainit(self, requested="all"):
+    async def ainit(self, requested: Union[str, List[str]] = "all"):
         logger.info("PyrotunPersistence.ainit()")
         if "hass" in requested or "all" in requested:
             self.hass = connections.hass.HassConnection(websession=self.websession)
@@ -37,6 +39,11 @@ class PyrotunPersistence:
                 websession=self.websession
             )
             asyncio.create_task(self.homely.ainit(websession=self.websession))
+        if "myuplink" in requested or "all" in requested:
+            self.myuplink = connections.myuplink.MyuplinkConnection(
+                websession=self.websession
+            )
+            asyncio.create_task(self.myuplink.ainit(websession=self.websession))
         if "openhab" in requested or "all" in requested:
             self.openhab = connections.openhab.OpenHABConnection(
                 websession=self.websession, readonly=self.readonly
