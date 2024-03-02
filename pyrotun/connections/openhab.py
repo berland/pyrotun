@@ -27,7 +27,7 @@ class OpenHABConnection:
             self.websession = aiohttp.ClientSession()
 
         # This is not async..
-        self.client = openhab.openHAB(self.openhab_url)
+        self.client = openhab.OpenHAB(self.openhab_url)
 
     async def get_item(self, item_name, datatype=str, backupvalue=None):
         async with self.websession.get(

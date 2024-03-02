@@ -2,6 +2,7 @@ from . import (  # noqa
     hass,
     homely,
     influxdb,
+    myuplink,
     openhab,
     skoda,
     smappee,

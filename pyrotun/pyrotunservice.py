@@ -5,6 +5,7 @@ than Jython (inside OpenHAB).
 Runs continously as a service, calls underlying tools/scripts
 from asyncio at regular intervals (similar to crontab)
 """
+
 import asyncio
 import datetime
 import json
@@ -34,6 +35,7 @@ import pyrotun.houseshadow
 import pyrotun.persist
 import pyrotun.polar_dump
 import pyrotun.pollhomely
+import pyrotun.pollmyuplink
 import pyrotun.pollskoda
 import pyrotun.pollsmappee
 import pyrotun.pollsolis
@@ -62,6 +64,9 @@ EVERY_MIDNIGHT = EVERY_DAY
 
 
 def get_alexa_serial_to_devicename() -> dict:
+    thingsfile = Path("/etc/openhab/things/amazonechocontrol.things")
+    if not thingsfile.exists():
+        return {}
     lines = [
         line
         for line in Path("/etc/openhab/things/amazonechocontrol.things")
@@ -115,6 +120,12 @@ def setup_crontabs(pers):
                     await pers.openhab.set_item(
                         itemname, command, method="put", log=True, send_no_change=False
                     )
+
+    @aiocron.crontab(EVERY_15_SECOND)
+    async def do_myuplink():
+        await asyncio.sleep(0.2)
+        logger.info("Linking Myuplink")
+        await pyrotun.pollmyuplink.update_openhab(pers)
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def do_hasslink():
