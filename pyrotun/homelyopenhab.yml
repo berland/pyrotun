@@ -1,3 +1,6 @@
+- name: Varmesensor verksted
+  openhab_item: Sensor_Verksted_taktemperatur_brannvarsler
+  featurepath: temperature/states/temperature/value
 - name: Røyksensor gang oppe
   openhab_item: Sensor_Gangoppe_taktemperatur_brannvarsler
   featurepath: temperature/states/temperature/value
