@@ -61,7 +61,7 @@ class OpenHABConnection:
         for item_name in item_names:
             current_state = await self.get_item(item_name)
             if str(current_state) == str(new_state) and send_no_change is True:
-                logger.info(
+                logger.debug(
                     "OpenHAB: No change in %s, value %s, still sending command",
                     item_name,
                     str(new_state),

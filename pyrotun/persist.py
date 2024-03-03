@@ -3,7 +3,7 @@ from typing import List, Union
 
 import aiohttp
 
-from pyrotun import connections, getLogger, powermodels, waterheater
+from pyrotun import connections, getLogger, waterheater
 
 logger = getLogger(__name__)
 
@@ -74,9 +74,9 @@ class PyrotunPersistence:
             self.yr = connections.yr.YrConnection()
             await self.yr.ainit(websession=self.websession)
 
-        if "powermodels" in requested or "all" in requested:
-            self.powermodels = powermodels.Powermodels()
-            await self.powermodels.ainit(pers=self)
+        # if "powermodels" in requested or "all" in requested:
+        #    self.powermodels = powermodels.Powermodels()
+        #    await self.powermodels.ainit(pers=self)
 
         if "unifiprotect" in requested or "all" in requested:
             self.unifiprotect = connections.unifiprotect.UnifiProtectConnection()
