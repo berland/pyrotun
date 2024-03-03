@@ -77,12 +77,9 @@ def diffgpxdf(gpxdf):
 def timedeltaformatter(t_delta):
     # Produce HH:MM from timedelta objects or numerical seconds
     # Later round to nearest 5 min.
-    if not isinstance(t_delta, (int, float)):
-        ts = t_delta.total_seconds()
-    else:
-        ts = t_delta
+    ts = t_delta if isinstance(t_delta, (int, float)) else t_delta.total_seconds()
     hours, remainder = divmod(ts, 3600)
-    minutes, seconds = divmod(remainder, 60)
+    minutes, _ = divmod(remainder, 60)
     return ("{}:{:02d}").format(int(hours), int(minutes))
 
 
@@ -138,10 +135,13 @@ def make_http_post_data(dirname):
         if duration < 120:
             logger.warning("Skipping too short exercise %s", dirname)
             return
-    if "duration" in exercise_summary and "distance" in exercise_summary:
-        if gpxfile.is_file():
-            details += f"{moving_speed} min/km. "
-            details += f"Tid: {prettyprintseconds(move_time)}. "
+    if (
+        "duration" in exercise_summary
+        and "distance" in exercise_summary
+        and gpxfile.is_file()
+    ):
+        details += f"{moving_speed} min/km. "
+        details += f"Tid: {prettyprintseconds(move_time)}. "
 
     if "heart-rate" in exercise_summary:
         avg_beat = "-"

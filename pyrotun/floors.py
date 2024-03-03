@@ -141,10 +141,7 @@ async def main(
         await pers.ainit(["tibber", "influxdb", "openhab"])
         closepers = True
 
-    if floors is None:
-        selected_floors = FLOORS.keys()
-    else:
-        selected_floors = floors
+    selected_floors = FLOORS.keys() if floors is None else floors
 
     if hoursago > 0 or minutesago > 0:
         assert dryrun is True, "Only dryrun when jumping back in history"
@@ -163,13 +160,12 @@ async def main(
 
     if not vacation or vacation == "auto":
         vacation = await pers.openhab.get_item(VACATION_ITEM, datatype=bool)
+    elif vacation.lower() == "on":
+        vacation = True
+        logger.info("Vacation forced to on")
     else:
-        if vacation.lower() == "on":
-            vacation = True
-            logger.info("Vacation forced to on")
-        else:
-            logger.info("Vacation forced to off")
-            vacation = False
+        logger.info("Vacation forced to off")
+        vacation = False
 
     # Summer mode; truncate maxtemp to two degrees above setpoint:
     if 4 < datetime.datetime.now().month < 10:
@@ -207,10 +203,7 @@ async def main(
                 )
             continue
 
-        if "delta" in FLOORS[floor]:
-            delta = FLOORS[floor]["delta"]
-        else:
-            delta = 0
+        delta = FLOORS[floor].get("delta", 0)
 
         # Deduct more in to correct for good weather:
         weathercompensation = (
@@ -616,10 +609,8 @@ def plot_graph(graph, ax=None, show=False):
         fig, ax = pyplot.subplots()
 
     logger.info("Plotting some graph edges, wait for it..")
-    counter = 0
     maxnodes = 400
-    for edge_0, edge_1, data in graph.edges(data=True):
-        counter += 1
+    for counter, (edge_0, edge_1, data) in enumerate(graph.edges(data=True)):
         pd.DataFrame(
             [
                 {"index": edge_0[0], "temp": edge_0[1]},

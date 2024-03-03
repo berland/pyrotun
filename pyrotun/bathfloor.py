@@ -26,14 +26,18 @@ async def main(
     dryrun=False,
     plot=False,
     sensor_item="Termostat_Bad_Oppe_SensorGulv",
-    thermostat_items=[
-        "Termostat_Bad_Oppe_SetpointHeating",
-        "Termostat_Bad_Kjeller_SetpointHeating",
-    ],
+    thermostat_items=None,
     wattage=600,
     maxtemp=30,
 ):
     """Called from service or interactive"""
+    if thermostat_items is None:
+        thermostat_items = (
+            [
+                "Termostat_Bad_Oppe_SetpointHeating",
+                "Termostat_Bad_Kjeller_SetpointHeating",
+            ],
+        )
 
     closepers = False
     if pers is None:
@@ -303,7 +307,7 @@ def plot_graph(graph, ax=None, show=False):
         fig, ax = pyplot.subplots()
 
     if len(graph.edges) < 1000:
-        for edge_0, edge_1, data in graph.edges(data=True):
+        for edge_0, edge_1, _data in graph.edges(data=True):
             pd.DataFrame(
                 [
                     {"index": edge_0[0], "temp": edge_0[1]},

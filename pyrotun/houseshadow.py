@@ -179,10 +179,7 @@ class shadow:
                 + " "
             )
             p = p + "A" + str(dist) + " " + str(dist) + " 0 "
-            if angle < 180:
-                p = p + "0 1 "
-            else:
-                p = p + "1 1 "
+            p = p + "0 1 " if angle < 180 else p + "1 1 "
             p = (
                 p
                 + str(self.degreesToPoint(end, dist)["x"])
@@ -191,10 +188,7 @@ class shadow:
                 + '"'
             )
             p = p + ' stroke="' + stroke + '"'
-            if fill is not None:
-                p = p + ' fill="' + fill + '" '
-            else:
-                p = p + ' fill="none" '
+            p = p + ' fill="' + fill + '" ' if fill is not None else p + ' fill="none" '
             if attrs is not None:
                 p = p + " " + attrs + " "
             else:
@@ -277,14 +271,14 @@ class shadow:
         while True:
             if side1Done is False:
                 side1Distance = side1Distance + SHAPE[i]["distance"]
-                if i != minPoint and i != maxPoint:
+                if i not in (minPoint, maxPoint):
                     SHAPE[i]["side"] = 1
                 if i == maxPoint:
                     side1Done = True
                 side1.append({"x": SHAPE[i]["x"], "y": SHAPE[i]["y"]})
             if side1Done is True:
                 side2Distance = side2Distance + SHAPE[i]["distance"]
-                if i != minPoint and i != maxPoint:
+                if i not in (minPoint, maxPoint):
                     SHAPE[i]["side"] = 2
                 if i == minPoint:
                     side2Done = True
@@ -400,10 +394,7 @@ class shadow:
         )
 
         for i in range(0, len(DEGS)):
-            if i == len(DEGS) - 1:
-                j = 0
-            else:
-                j = i + 1
+            j = 0 if i == len(DEGS) - 1 else i + 1
             if i % 2 == 0:
                 svg = svg + self.generateArc(
                     int(WIDTH / 2) + 8,

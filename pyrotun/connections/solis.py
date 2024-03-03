@@ -50,6 +50,9 @@ class SolisConnection:
         self.inverter_sn = id_sn["sn"]
 
     async def get_solis_cloud_data(self, url_part, data) -> dict:
+        assert self.api_secret is not None
+        assert self.api_id is not None
+        assert self.websession is not None
         md5 = base64.b64encode(hashlib.md5(data.encode("utf-8")).digest()).decode(
             "utf-8"
         )
@@ -88,13 +91,17 @@ class SolisConnection:
             json.dumps({"id": self.inverter_id, "sn": self.inverter_sn}),
         )
         # Fix units
-        if "data" in data and "apparentPowerStr" in data["data"]:
-            if data["data"]["apparentPowerStr"] == "kVA":
-                data["data"]["apparentPower"] *= 1000
-                data["data"]["apparentPowerStr"] = "VA"
+        if (
+            "data" in data
+            and "apparentPowerStr" in data["data"]
+            and data["data"]["apparentPowerStr"] == "kVA"
+        ):
+            data["data"]["apparentPower"] *= 1000
+            data["data"]["apparentPowerStr"] = "VA"
         return data
 
     async def get_inverter_id_sn(self) -> dict:
+        assert self.api_id is not None
         content: dict = await self.get_solis_cloud_data(
             USER_STATION_LIST, '{"userid":"' + self.api_id + '"}'
         )

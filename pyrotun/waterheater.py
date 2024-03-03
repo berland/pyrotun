@@ -312,7 +312,7 @@ def plot_graph(graph, ax=None, show=False):
         fig, ax = pyplot.subplots()
 
     if len(graph.edges) < 1000:
-        for edge_0, edge_1, data in graph.edges(data=True):
+        for edge_0, edge_1, _data in graph.edges(data=True):
             pd.DataFrame(
                 [
                     {"index": edge_0[0], "temp": edge_0[1]},
@@ -366,9 +366,8 @@ def watertemp_requirement(timestamp, vacation=False, prices=None):
         cheapest_hours = prices.index[
             (prices["weekday"] == legionelladay) & (prices["dayrank"] == 1)
         ].tolist()
-        if cheapest_hours:
-            if hour == (cheapest_hours[0] + pd.Timedelta(hours=1)).hour:
-                return 80
+        if cheapest_hours and hour == (cheapest_hours[0] + pd.Timedelta(hours=1)).hour:
+            return 80
     if 16 <= hour <= 18:
         return 60  # For doing the dishes
     if vacation:

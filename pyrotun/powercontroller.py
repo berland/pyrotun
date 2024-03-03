@@ -3,6 +3,7 @@
 To be run()'ed every minute.
 
 """
+
 import argparse
 import asyncio
 import datetime
@@ -50,21 +51,19 @@ async def fix_powerstate(pers):
         contents = await filehandle.read()
     floors = yaml.safe_load(contents)
 
-    for floor, floordata in floors.items():
-        if await pers.openhab.get_item(floordata["switch_item"], datatype=bool):
-            if (
-                await pers.influxdb.item_age(floordata["switch_item"], unit="minutes")
-                > 60
-            ):
-                sensor_series = await pers.influxdb.get_series(
-                    floordata["sensor_item"],
-                    since=datetime.datetime.utcnow() - datetime.timedelta(hours=2),
-                )
-                resampled = sensor_series.resample(rule="10min").mean()
+    for _floor, floordata in floors.items():
+        if await pers.openhab.get_item(floordata["switch_item"], datatype=bool) and (
+            await pers.influxdb.item_age(floordata["switch_item"], unit="minutes") > 60
+        ):
+            sensor_series = await pers.influxdb.get_series(
+                floordata["sensor_item"],
+                since=datetime.datetime.utcnow() - datetime.timedelta(hours=2),
+            )
+            resampled = sensor_series.resample(rule="10min").mean()
 
-                if all(resampled.dropna().diff().values[-3:] < 0):
-                    logger.info(f"Force-turning {floordata['switch_item']} to OFF")
-                    await pers.openhab.set_item(floordata["switch_item"], "OFF")
+            if all(resampled.dropna().diff().values[-3:] < 0):
+                logger.info(f"Force-turning {floordata['switch_item']} to OFF")
+                await pers.openhab.set_item(floordata["switch_item"], "OFF")
 
 
 async def get_powerloads(pers) -> pd.DataFrame:
@@ -155,7 +154,7 @@ async def get_powerloads(pers) -> pd.DataFrame:
                 "SetpointHeating", "bryter"
             )
 
-        if "sensor_item" in thisfloor.keys():
+        if "sensor_item" in thisfloor:
             meas_temp = await pers.openhab.get_item(
                 thisfloor["sensor_item"], datatype=float
             )

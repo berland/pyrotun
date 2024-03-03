@@ -11,7 +11,7 @@ class Users(Resource):
     https://www.polar.com/accesslink-api/?http#users
     """
 
-    def register(self, access_token, member_id=uuid.uuid4().hex):
+    def register(self, access_token, member_id=None):
         """Registration
 
         Once partner has been authorized by user, partner must register user
@@ -20,6 +20,8 @@ class Users(Resource):
         :param access_token: access token of the user
         :param member_id: unique client-specific identifier for the user
         """
+        if member_id is None:
+            member_id = uuid.uuid4().hex
         return self._post(
             endpoint="/users", access_token=access_token, json={"member-id": member_id}
         )

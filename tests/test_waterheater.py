@@ -125,7 +125,7 @@ def test_predict_tempincrease():
 def test_waterheatercost():
     assumed_watts = 2600
     assumed_kwatts = assumed_watts / 1000
-    assert waterheater.WATTAGE == assumed_watts
+    assert assumed_watts == waterheater.WATTAGE
 
     # Price in NOK/KWh, gives result in NOK:
     assert waterheater.waterheatercost(1, pd.Timedelta(1, unit="h")) == (

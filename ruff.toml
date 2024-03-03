@@ -1,0 +1,18 @@
+[lint]
+select = [
+  "W",   # pycodestyle
+  "I",   # isort
+  "B",   # flake-8-bugbear
+  "SIM", # flake-8-simplify
+  "F",   # pyflakes
+  "PL",  # pylint
+]
+
+ignore = [
+  "PLR2004", # magic value used
+  "PLR0912", # too many branches
+  "PLR0913", # too many arguments in function def
+  "PLR0915", # too many statements
+  "PLW0602", # global statement
+  "PLW0603", # global statement
+]

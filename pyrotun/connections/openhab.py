@@ -30,10 +30,11 @@ class OpenHABConnection:
         self.client = openhab.OpenHAB(self.openhab_url)
 
     async def get_item(self, item_name, datatype=str, backupvalue=None):
+        assert self.openhab_url is not None
         async with self.websession.get(
             self.openhab_url + "/items/" + str(item_name)
-        ) as resp:
-            resp = await resp.json()
+        ) as response:
+            resp = await response.json()
             if datatype == str:
                 if "state" not in resp:
                     raise KeyError(f"{item_name} not found in response {resp}")
@@ -45,10 +46,7 @@ class OpenHABConnection:
                     logger.error(f"{item_name} was UNDEF")
                     return backupvalue
             elif datatype == bool:
-                if resp["state"] == "ON":
-                    return True
-                else:
-                    return False
+                return resp["state"] == "ON"
 
     async def set_item(
         self, item_names, new_state, log=None, method="post", send_no_change=True

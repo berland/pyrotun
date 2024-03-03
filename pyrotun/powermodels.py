@@ -209,12 +209,12 @@ async def non_heating_powerusage(pers):
     cum_item = "Varmtvannsbereder_kwh_sum"
     cum_usage = (await pers.influxdb.get_series(cum_item))[cum_item]
     cum_usage_rawdiff = cum_usage.diff()
-    cum_usage = cum_usage[(0 < cum_usage_rawdiff) & (cum_usage_rawdiff < 1000)].dropna()
+    cum_usage = cum_usage[(cum_usage_rawdiff > 0) & (cum_usage_rawdiff < 1000)].dropna()
 
     cum_usage_hourly = (
         cum_usage.resample("1h").mean().interpolate(method="linear").diff().shift(-1)
     )
-    return cum_usage_hourly[(0 < cum_usage_hourly) & (cum_usage_hourly < 3.0)]
+    return cum_usage_hourly[(cum_usage_hourly > 0) & (cum_usage_hourly < 3.0)]
 
 
 async def main(pers=None):

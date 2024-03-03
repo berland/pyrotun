@@ -64,7 +64,7 @@ async def update_openhab(pers):
             point["parameterName"]: point["value"] for point in json.loads(result)
         }
         for p_name, value in datapoints.items():
-            if p_name in pers.myuplink.config.keys():
+            if p_name in pers.myuplink.config:
                 await pers.openhab.set_item(
                     pers.myuplink.config[p_name], value, log=True
                 )

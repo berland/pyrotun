@@ -80,17 +80,21 @@ class YrConnection:
             )
 
             dframe["symbol_code"] = [
-                x["data"]["next_1_hours"]["summary"]["symbol_code"]
-                if "next_1_hours" in x["data"]
-                else ""
+                (
+                    x["data"]["next_1_hours"]["summary"]["symbol_code"]
+                    if "next_1_hours" in x["data"]
+                    else ""
+                )
                 for x in result["properties"]["timeseries"]
             ]
             prec_frame = pd.DataFrame(
                 index=dframe.index,
                 data=[
-                    x["data"]["next_1_hours"]["details"]
-                    if "next_1_hours" in x["data"]
-                    else {}
+                    (
+                        x["data"]["next_1_hours"]["details"]
+                        if "next_1_hours" in x["data"]
+                        else {}
+                    )
                     for x in result["properties"]["timeseries"]
                 ],
             )
@@ -98,14 +102,14 @@ class YrConnection:
 
             return dframe
 
-    async def get_historical_cloud_fraction(
-        self, startdate="2017-01-01", enddate=datetime.datetime.now().date().isoformat()
-    ):
+    async def get_historical_cloud_fraction(self, startdate="2017-01-01", enddate=None):
         """Returns a series with historical cloud fraction
 
         Values for every third hour. 0.0 means clear sky, 1.0 means
         overcast.
         """
+        if enddate is None:
+            enddate = datetime.datetime.now().date().isoformat()
         async with self.websession.get(
             "https://frost.met.no/observations/v0.jsonld",
             params=dict(

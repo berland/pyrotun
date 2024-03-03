@@ -29,6 +29,7 @@ class HassConnection:
         assert self.token, "HASS_TOKEN must be set as an env variable"
 
     async def get_item(self, entity_id, attribute=None, datatype=str):
+        assert self.hass_url is not None
         async with self.websession.get(
             self.hass_url + "/api/states/" + str(entity_id),
             headers={
@@ -36,10 +37,10 @@ class HassConnection:
                 "Content-Type": "application/json",
             },
         ) as resp:
-            resp = await resp.json()
+            resp_dict = await resp.json()
             if attribute is None:
-                return resp["state"]
-            return resp["attributes"][attribute]
+                return resp_dict["state"]
+            return resp_dict["attributes"][attribute]
 
     async def set_item(self, service_path, entity_id, attribute_name, new_state):
         service_path = service_path.strip("/")
