@@ -1,6 +1,8 @@
 sensors:
 - entity_id: sensor.tmble9ny9nf049378_odometer
   openhab_item: EnyaqKm1
+- entity_id: sensor.tmble9ny9nf049378_battery_level
+  openhab_item: EnyaqBatteryState
 - entity_id: sensor.zaptec_charger_zap021299
   openhab_item: ZaptecState
 - attribute: voltage_phase1
