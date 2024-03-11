@@ -1,7 +1,7 @@
 Andre:
   backup_setpoint: 13.0
   cooling_rate: -0.08
-  cooling_rate_winter: -0.7
+  cooling_rate_winter: -0.2
   delta: -5.0
   heating_rate: 1.5
   maxtemp: 13.0
@@ -14,8 +14,8 @@ Andre:
 Bad_Kjeller:
   backup_setpoint: 24
   cooling_rate: -0.1
-  cooling_rate_winter: -1.0
-  heating_rate: 2
+  cooling_rate_winter: -0.2
+  heating_rate: 3
   delta: -2
   maxtemp: 33
   sensor_item: Termostat_Bad_Kjeller_SensorGulv
@@ -28,7 +28,7 @@ Bad_Oppe:
   backup_setpoint: 24.0
   delta: 3
   cooling_rate: -0.1
-  cooling_rate_winter: -1.0
+  cooling_rate_winter: -0.2
   heating_rate: 3.0
   maxtemp: 33.0
   sensor_item: Termostat_Bad_Oppe_SensorGulv
@@ -40,7 +40,7 @@ Bad_Oppe:
 Bakgang:
   backup_setpoint: 12
   cooling_rate: -0.1
-  cooling_rate_winter: -0.6
+  cooling_rate_winter: -0.2
   delta: -15
   heating_rate: 1.5
   maxtemp: 20
@@ -52,8 +52,8 @@ Bakgang:
   wattage: 800
 Gangoppe:
   backup_setpoint: 20
-  cooling_rate: -0.3
-  cooling_rate_winter: -0.5
+  cooling_rate: -0.2
+  cooling_rate_winter: -0.2
   delta: -6
   heating_rate: 0.4
   maxtemp: 26
@@ -66,7 +66,7 @@ Gangoppe:
 Inngang:
   backup_setpoint: 23
   cooling_rate: -0.1
-  cooling_rate_winter: -0.6
+  cooling_rate_winter: -0.2
   delta: -2
   heating_rate: 0.8
   maxtemp: 32
@@ -79,7 +79,7 @@ Inngang:
 Langgang:
   backup_setpoint: 23
   cooling_rate: -0.1
-  cooling_rate_winter: -0.6
+  cooling_rate_winter: -0.2
   delta: -2
   heating_rate: 0.8
   maxtemp: 32
@@ -92,7 +92,7 @@ Langgang:
 Leane:
   backup_setpoint: 20
   cooling_rate: -0.08
-  cooling_rate_winter: -0.5
+  cooling_rate_winter: -0.2
   delta: -6
   heating_rate: 0.7
   maxtemp: 25
@@ -105,7 +105,7 @@ Leane:
 Sofastue:
   backup_setpoint: 20
   cooling_rate: -0.3
-  cooling_rate_winter: -0.35
+  cooling_rate_winter: -0.3
   delta: -9
   heating_rate: 1
   maxtemp: 25
@@ -131,7 +131,7 @@ Syrom:
 Tvstue:
   backup_setpoint: 20
   cooling_rate: -0.02
-  cooling_rate_winter: -0.5
+  cooling_rate_winter: -0.2
   delta: -5
   heating_rate: 0.9
   maxtemp: 26
@@ -157,7 +157,7 @@ Vaskegang:
 Vaskerom:
   backup_setpoint: 15
   cooling_rate: -0.05
-  cooling_rate_winter: -0.5
+  cooling_rate_winter: -0.2
   delta: -8
   heating_rate: 1.0
   maxtemp: 25
