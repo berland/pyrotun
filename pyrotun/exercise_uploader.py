@@ -28,6 +28,7 @@ MAP_SPORT_INFO = {
     "RUNNING": "Løp",
     "TRAIL_RUNNING": "Løp, terreng",
     "TREADMILL_RUNNING": "Løp, mølle",
+    "OTHER": "Styrke innendørs",
 }
 
 EXERCISE_DIR = Path.home() / "polar_dump"
