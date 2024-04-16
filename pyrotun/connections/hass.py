@@ -38,9 +38,12 @@ class HassConnection:
             },
         ) as resp:
             resp_dict = await resp.json()
-            if attribute is None:
-                return resp_dict["state"]
-            return resp_dict["attributes"][attribute]
+            try:
+                if attribute is None:
+                    return resp_dict["state"]
+                return resp_dict["attributes"][attribute]
+            except KeyError:
+                print(resp)
 
     async def set_item(self, service_path, entity_id, attribute_name, new_state):
         service_path = service_path.strip("/")
