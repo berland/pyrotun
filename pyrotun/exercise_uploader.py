@@ -4,6 +4,7 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import Dict
 
 import dateutil  # type: ignore
 import dotenv
@@ -90,7 +91,7 @@ assert timedeltaformatter(60) == "0:01"
 assert timedeltaformatter(60 * 60) == "1:00"
 
 
-def make_http_post_data(dirname):
+def make_http_post_data(dirname: Path) -> Dict[str, str]:
     exercise_datetime = dateutil.parser.isoparse(dirname.name)
     exercise_summary = json.loads((Path(dirname) / "exercise_summary").read_text())
     heart_rate_zones = json.loads((Path(dirname) / "heart_rate_zones").read_text())
@@ -153,7 +154,7 @@ def make_http_post_data(dirname):
             max_beat = exercise_summary["heart-rate"]["maximum"]
         details += f"Puls {avg_beat} / {max_beat}."
 
-    post_data = {
+    return {
         "legginn": "ja",
         "navn": os.getenv("EXERCISE_NAME"),
         "hva": MAP_SPORT_INFO.get(exercise_summary["detailed-sport-info"], "polar v"),
@@ -165,8 +166,6 @@ def make_http_post_data(dirname):
         "toying": "0:00",
         "detaljer": details,
     }
-
-    return post_data
 
 
 async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
@@ -181,7 +180,6 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
     if (dirname / "exercise_summary").is_file() and (
         dirname / "heart_rate_zones"
     ).is_file():
-        logger.info("found training data")
         postdata = None
         if force or not (dirname / DONE_FILE).is_file():
             logger.info("making post data")
@@ -192,11 +190,13 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
 
         if not dryrun and pers is not None:
             logger.info("Submitting exercise data %s", str(postdata))
-            result = await pers.websession.post(
-                url=os.getenv("EXERCISE_URL"), data=postdata
-            )
-            logger.info(str(result))
-            Path(dirname / DONE_FILE).touch()
+            async with pers.websession.post(
+                url=os.getenv("EXERCISE_URL"), params=postdata
+            ) as response:
+                logger.info(str(response))
+                content = await response.content.read()
+                logger.info(content)
+                Path(dirname / DONE_FILE).touch()
         else:
             logger.info("DRY-run, would have submitted %s", str(postdata))
 
