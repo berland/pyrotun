@@ -171,6 +171,8 @@ def make_http_post_data(dirname):
 
 async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
     dirname = Path(dirname)
+    if not dirname.is_dir():
+        dirname = dirname.parent
     try:
         dateutil.parser.isoparse(dirname.name)
     except ValueError:
@@ -179,7 +181,7 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
     if (dirname / "exercise_summary").is_file() and (
         dirname / "heart_rate_zones"
     ).is_file():
-        logger.info("passed initial test")
+        logger.info("found training data")
         postdata = None
         if force or not (dirname / DONE_FILE).is_file():
             logger.info("making post data")
@@ -190,7 +192,10 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
 
         if not dryrun and pers is not None:
             logger.info("Submitting exercise data %s", str(postdata))
-            await pers.websession.post(url=os.getenv("EXERCISE_URL"), data=postdata)
+            result = await pers.websession.post(
+                url=os.getenv("EXERCISE_URL"), data=postdata
+            )
+            logger.info(str(result))
             Path(dirname / DONE_FILE).touch()
         else:
             logger.info("DRY-run, would have submitted %s", str(postdata))
