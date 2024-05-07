@@ -26,10 +26,10 @@ handlers:
     class: HABApp.config.logging.MidnightRotatingFileHandler
     filename: 'HABApp_events.log'
     maxBytes: 1_048_576
-    backupCount: 3
+    backupCount: 2
 
     formatter: HABApp_format
-    level: INFO
+    level: WARNING
 
 
 loggers:
@@ -40,7 +40,7 @@ loggers:
     propagate: False
 
   HABApp.EventBus:
-    level: INFO
+    level: WARNING
     handlers:
       - EventFile
     propagate: False

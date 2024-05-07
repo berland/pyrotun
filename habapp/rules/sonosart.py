@@ -14,7 +14,7 @@ class UpdateSonosArt(HABApp.Rule):
         self.sonosart_item.listen_event(self.on_change, ValueUpdateEventFilter())
 
     def on_change(self, event: ValueUpdateEvent) -> None:
-        if event.value.startswith("http"):
+        if evnt.value is not None and event.value.startswith("http"):
             try:
                 png_bytes = requests.get(event.value).content
                 with open(SONOSART_STATICFILE, "wb") as filehandle:
