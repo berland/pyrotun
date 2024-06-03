@@ -71,6 +71,7 @@ class SkodaConnection:
         except (
             skodaconnect.exceptions.SkodaException,
             skodaconnect.exceptions.SkodaConfigException,
+            skodaconnect.exceptions.SkodaEULAException,
         ) as ex:
             logger.error(f"Skoda login unsuccessful: {ex}")
             return False
