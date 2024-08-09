@@ -21,6 +21,16 @@
   type: bool
   id: ce4bbac5-d7e9-498e-ac47-2aa0582447dc
 
+- name: Røyksensor gjesterom
+  openhab_item: Sensor_Gjesterom_taktemperatur_brannvarsler
+  featurepath: temperature/states/temperature/value
+  id: faa
+- name: Røyksensor gjesterom
+  openhab_item: Sensor_Gjesterom_brann
+  featurepath: alarm/states/fire/value
+  type: bool
+  id: faa
+
 - name: Bevegelse gang nede
   openhab_item: Sensor_Gangnede_taktemperatur_homely
   featurepath: temperature/states/temperature/value
