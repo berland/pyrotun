@@ -46,7 +46,7 @@ async def fetch_snapshot(protect: ProtectApiClient, filename: Path) -> None:
             await filehandle.flush()
             logger.info(f"Wrote {len(pngbytes)} bytes of PNG to {filename}")
     else:
-        logger.error("fGot {len(bytes) bytes from camera")
+        logger.error(f"Got {len(pngbytes)} bytes from camera")
 
 
 def process_camera_event(message: WSSubscriptionMessage):
