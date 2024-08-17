@@ -74,3 +74,11 @@
 - name: Verksteddør
   openhab_item: Sensor_BakdorVerksted_temperatur
   featurepath: temperature/states/temperature/value
+
+# Elvatunet
+- name: Røyksensor loft
+  openhab_item: Sensor_Loftsstue_Elvatunet_temperatur
+  featurepath: temperature/states/temperature/value
+- name: Røyksensor stue
+  openhab_item: Sensor_Stue_Elvatunet_temperatur
+  featurepath: temperature/states/temperature/value

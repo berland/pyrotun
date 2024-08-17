@@ -31,13 +31,14 @@ async def amain(pers=None, dryrun=False, debug=False, do_websocket=False):
             update_openhab_from_websocket_message, PERS
         )
 
-    data = await PERS.homely.get_data()
+    data: List[dict] = await PERS.homely.get_data() # One item pr. location
 
     if debug:
         pprint.pprint(data)
 
     if not dryrun:
-        await update_openhab(PERS, data)
+        for location_data in data:
+            await update_openhab(PERS, location_data)
 
     if do_websocket:
         websocket_supervisor = asyncio.create_task(supervise_websocket(PERS))

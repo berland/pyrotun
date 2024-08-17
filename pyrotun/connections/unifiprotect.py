@@ -2,6 +2,7 @@ import os
 
 import aiohttp
 import dotenv
+import pyunifiprotect
 from pyunifiprotect import ProtectApiClient
 
 import pyrotun
@@ -39,7 +40,10 @@ class UnifiProtectConnection:
             verify_ssl=False,
             session=self.websession,
         )
-        await self.protect.update()  # Sets up websocket
+        try:
+            await self.protect.update()  # Sets up websocket
+        except pyunifiprotect.exceptions.NotAuthorized:
+            pass
 
     async def aclose(self):
         # Close ws subscription:

@@ -3,7 +3,7 @@ import logging
 import os
 import pprint
 from pathlib import Path
-from typing import Awaitable, Optional
+from typing import Awaitable, Optional, List
 
 import aiohttp
 
@@ -32,7 +32,8 @@ class HomelyConnection:
         self.message_handler = message_handler
         self.access_token = None
         self.refresh_token = None
-        self.location_id = None
+        self.location_ids: Optional[List[str]] = None
+
         self.config = None  # Defines the link to OpenHAB
 
         self.websocket_client = None
@@ -50,8 +51,8 @@ class HomelyConnection:
             await self.acquire_token()
             asyncio.create_task(self.token_manager())
 
-        if self.location_id is None:
-            await self.acquire_location_id()
+        if self.location_ids is None:
+            await self.acquire_location_ids()
 
         if self.config is None:
             await self.acquire_config()
@@ -110,30 +111,34 @@ class HomelyConnection:
                 self.refresh_token = json_response["refresh_token"]
                 logger.info("Refreshed homely token")
 
-    async def acquire_location_id(self, index=0):
+    async def acquire_location_ids(self):
         async with self.websession.get(
             BASE_URL + "locations",
             headers={"Authorization": f"Bearer {self.access_token}"},
         ) as resp:
             locations = await resp.json()
-            self.location_id = locations[index]["locationId"]
+            self.location_ids = [location["locationId"] for location in locations]
 
-    async def get_data(self) -> dict:
+    async def get_data(self) -> List[dict]:
         logger.info("Polling for all homely data...")
         response = None
+        data = []
+        while self.location_ids is None:
+            await asyncio.sleep(0.1)
         while response is None or response.status == 401:
-            response = await self.websession.get(
-                BASE_URL + f"home/{self.location_id}",
-                headers={"Authorization": f"Bearer {self.access_token}"},
-            )
-            if response.status == 401:
-                logger.info("Need to reauthenticate with homely")
-                await asyncio.sleep(1)
-                await self.acquire_token()
-                await self.acquire_location_id()
-            else:
-                data = await response.json()
-                return data
+            for location_id in self.location_ids:
+                response = await self.websession.get(
+                    BASE_URL + f"home/{location_id}",
+                    headers={"Authorization": f"Bearer {self.access_token}"},
+                )
+                if response.status == 401:
+                    logger.info("Need to reauthenticate with homely")
+                    await asyncio.sleep(1)
+                    await self.acquire_token()
+                    await self.acquire_location_ids()
+                else:
+                    data.extend([await response.json()])
+        return data
 
     async def run_websocket(self):
         disconnects = 0
