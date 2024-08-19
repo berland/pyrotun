@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import pprint
 from functools import partial
-from typing import Any
+from typing import Any, List
 
 import dotenv
 
@@ -31,7 +31,7 @@ async def amain(pers=None, dryrun=False, debug=False, do_websocket=False):
             update_openhab_from_websocket_message, PERS
         )
 
-    data: List[dict] = await PERS.homely.get_data() # One item pr. location
+    data: List[dict] = await PERS.homely.get_data()  # One item pr. location
 
     if debug:
         pprint.pprint(data)
@@ -94,10 +94,11 @@ async def update_openhab_from_websocket_message(pers, data):
 async def update_openhab(pers, data):
     # "Alarm state" is not a "device" in the homely API response. Handled
     # outside the yaml file..
-    alarmstate_map = {"ARMED_AWAY": "ON", "DISARMED": "OFF"}
-    await pers.openhab.set_item(
-        ALARM_ARMED_ITEM, alarmstate_map[data["alarmState"]], log=True
-    )
+    if data["name"].strip() == "Råtun 40":
+        alarmstate_map = {"ARMED_AWAY": "ON", "DISARMED": "OFF"}
+        await pers.openhab.set_item(
+            ALARM_ARMED_ITEM, alarmstate_map[data["alarmState"]], log=True
+        )
 
     devices_used = set(value["name"] for value in pers.homely.config)
     homely_devices = set(value["name"] for value in data["devices"])
