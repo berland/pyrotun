@@ -3,41 +3,41 @@ sensors:
   openhab_item: EnyaqKm1
 - entity_id: sensor.tmble9ny9nf049378_battery_level
   openhab_item: EnyaqBatteryState
-- entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecState
-- attribute: voltage_phase1
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecVoltagePhase1
-- attribute: voltage_phase2
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecVoltagePhase2
-- attribute: voltage_phase3
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecVoltagePhase3
-- attribute: current_phase1
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecCurrentPhase1
-- attribute: current_phase2
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecCurrentPhase2
-- attribute: current_phase3
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecCurrentPhase3
-- attribute: total_charge_power
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecChargePower
-- attribute: signed_meter_value_kwh
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecCumulativeKwh
-- attribute: total_charge_power_session
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecTotalChargePowerSession
-- attribute: temperature_internal5
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecInternalTemperature
-- attribute: temperature_internal6
-  entity_id: sensor.zaptec_charger_zap021299
-  openhab_item: ZaptecInternalTemperatureLow
+    #- entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecState
+    #- attribute: voltage_phase1
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecVoltagePhase1
+    #- attribute: voltage_phase2
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecVoltagePhase2
+    #- attribute: voltage_phase3
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecVoltagePhase3
+    #- attribute: current_phase1
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecCurrentPhase1
+    #- attribute: current_phase2
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecCurrentPhase2
+    #- attribute: current_phase3
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecCurrentPhase3
+    #- attribute: total_charge_power
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecChargePower
+    #- attribute: signed_meter_value_kwh
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecCumulativeKwh
+    #- attribute: total_charge_power_session
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecTotalChargePowerSession
+    #- attribute: temperature_internal5
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecInternalTemperature
+    #- attribute: temperature_internal6
+    #  entity_id: sensor.zaptec_charger_zap021299
+    #  openhab_item: ZaptecInternalTemperatureLow
 
 - entity_id: sensor.kjellerpumpe_daily_heat_energy_consumption
   openhab_item: Kjeller_varmepumpe_dagsforbruk_oppvarming
