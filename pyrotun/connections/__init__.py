@@ -8,6 +8,5 @@ from . import (  # noqa
     smappee,
     solis,
     tibber,
-    unifiprotect,
     yr,
 )

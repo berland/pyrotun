@@ -2,7 +2,7 @@
 import asyncio
 import os
 
-import asyncio_mqtt
+import aiomqtt
 import dotenv
 
 import pyrotun
