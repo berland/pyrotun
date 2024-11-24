@@ -22,14 +22,18 @@ async def main(pers=PERS):
 
     # Reset smappee connections since reauthentication stopped to
     # work in june 2023 (smappy package stale on pypi since 2018)
-    pers.smappee = None
-    await pers.ainit(["smappee"])
+    if pers.smappee is not None:
+        pers.smappee = None
+        await pers.ainit(["smappee"])
 
     prices_df = await pers.tibber.get_prices()
     logger.info("Got Tibber prices")  # , str(prices_df))
 
-    daily_consumption = pers.smappee.get_daily_df()
-    # NB: This dataframe is always empty right after 00:00
+    if pers.smappee is not None:
+        daily_consumption = pers.smappee.get_daily_df()
+        # NB: This dataframe is always empty right after 00:00
+    else:
+        daily_consumption = pd.DataFrame()
 
     dframe = (
         pd.concat([daily_consumption, prices_df], axis=1, sort=True)

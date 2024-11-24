@@ -1,4 +1,3 @@
-
 """
 Addon-service to OpenHAB for things that are better programmed in CPython rather
 than Jython (inside OpenHAB).
@@ -6,6 +5,7 @@ than Jython (inside OpenHAB).
 Runs continously as a service, calls underlying tools/scripts
 from asyncio at regular intervals (similar to crontab)
 """
+
 import os
 import asyncio
 import datetime
@@ -51,8 +51,8 @@ def setup_crontabs(pers):
 
     Requires the persistence object to be initialized."""
 
-    #@aiocron.crontab(EVERY_10_SECOND)
-    #async def poll_homely():
+    # @aiocron.crontab(EVERY_10_SECOND)
+    # async def poll_homely():
     #    logger.info(" ** Polling Homely")
     #    await pyrotun.pollhomely.amain(pers)
 
@@ -68,7 +68,6 @@ def setup_crontabs(pers):
     async def polltibber():
         logger.info(" ** Polling tibber")
         await pyrotun.polltibber.main(pers)
-
 
     @aiocron.crontab(EVERY_HOUR)
     async def update_thismonth_nettleie():
@@ -89,13 +88,11 @@ def setup_crontabs(pers):
         logger.info(" ** Yrmelding")
         await pyrotun.yrmelding.main(pers)
 
-
-    #@aiocron.crontab(EVERY_15_MINUTE)
-    #async def houseshadow():
+    # @aiocron.crontab(EVERY_15_MINUTE)
+    # async def houseshadow():
     #    await asyncio.sleep(5)
     #    logger.info(" ** Houseshadow")
     #    pyrotun.houseshadow.main("/etc/openhab/html/husskygge.svg")
-
 
     @aiocron.crontab(EVERY_15_MINUTE)
     async def spikes():
@@ -125,6 +122,7 @@ async def main():
     os.environ["OPENHAB_URL"] = "localhost:8080/rest"
     logger.info("Starting pyelvtun service")
     pers = pyrotun.persist.PyrotunPersistence()
+
     await pers.ainit(requested=["openhab", "tibber", "homely"])
 
     startup_tasks = await at_startup(pers)

@@ -23,7 +23,6 @@ import pyrotun.connections.skoda
 import pyrotun.connections.smappee
 import pyrotun.connections.solis
 import pyrotun.connections.tibber
-import pyrotun.connections.unifiprotect
 import pyrotun.dataspike_remover
 import pyrotun.discord
 import pyrotun.disruptive
@@ -44,7 +43,6 @@ import pyrotun.poweranalysis
 import pyrotun.powercontroller
 import pyrotun.powermodels
 import pyrotun.skyss
-import pyrotun.unifiprotect
 import pyrotun.vent_calculations
 import pyrotun.yrmelding
 
@@ -132,14 +130,6 @@ def setup_crontabs(pers):
         await asyncio.sleep(0.5)
         logger.info("Linking Homeassistant")
         await pyrotun.hasslink.link_hass_states_to_openhab(pers)
-
-    @aiocron.crontab(EVERY_15_SECOND)
-    async def poll_unifiprotect():
-        await asyncio.sleep(3)
-        logger.info("Getting garage camera snapshot")
-        await pyrotun.unifiprotect.fetch_snapshot(
-            pers.unifiprotect.protect, pyrotun.unifiprotect.CAMERA_FILENAME
-        )
 
     @aiocron.crontab(EVERY_10_SECOND)
     async def poll_homely():
