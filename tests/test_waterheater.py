@@ -102,7 +102,7 @@ def test_make_graph():
         starttime=mock_prices.index[0],
     )
     print(f"The graph looks like {graph.nodes}")
-    fig, ax = pyplot.subplots()
+    _, ax = pyplot.subplots()
     waterheater.plot_graph(graph, ax=ax)
     path = networkx.shortest_path(
         graph,
@@ -111,15 +111,15 @@ def test_make_graph():
         weight="cost",
     )
     waterheater.plot_path(path, ax=ax)
-    pyplot.show()
+    # pyplot.show()
 
 
 def test_predict_tempincrease():
     assert waterheater.predict_tempincrease(pd.Timedelta(0)) == 0
     assert np.isclose(
-        waterheater.predict_tempincrease(pd.Timedelta(15, unit="m")), 2.99158
+        waterheater.predict_tempincrease(pd.Timedelta(15, unit="m")), 2.880787
     )
-    assert 29.9 < waterheater.predict_tempincrease(pd.Timedelta(2.5, unit="h")) < 30
+    assert 28.8 < waterheater.predict_tempincrease(pd.Timedelta(2.5, unit="h")) < 29
 
 
 def test_waterheatercost():

@@ -387,7 +387,7 @@ def predict_tempincrease(t_delta):
         float: delta temperature.
     """
 
-    # assert isinstance(t_delta, pd._libs.tslibs.timedeltas.TimeDelta)
+    assert isinstance(t_delta, pd._libs.tslibs.timedeltas.Timedelta)
     hours = float(t_delta.value) / 1e9 / 60 / 60  # from nanoseconds
     return 1 / CV / LITRES * WATTAGE * hours
 
