@@ -168,9 +168,9 @@ class ElvatunHeating:
                         ]
                     )[0][0]
                     cost = max(kwh * powerprice, 0)
-                    print(
-                        f"{tstamp} Heating from {temp} to {temp + setpoint_delta} at {kwh} {cost=}"
-                    )
+                    #print(
+                    #    f"{tstamp} Heating from {temp} to {temp + setpoint_delta} at {kwh} {cost=}"
+                    #)
                     graph.add_edge(
                         (tstamp, temp),
                         (next_tstamp, temp + setpoint_delta),

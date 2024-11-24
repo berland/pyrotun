@@ -181,6 +181,8 @@ def crop_svg_meteogram(svg) -> str:
 async def main():
     yr = YrConnection()
     await yr.ainit()
+    res = await yr.forecast()
+    print(res)
     res = await yr.get_historical_cloud_fraction()
     print(res)
 

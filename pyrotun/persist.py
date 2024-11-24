@@ -79,9 +79,9 @@ class PyrotunPersistence:
             self.powermodels = powermodels.Powermodels()
             await self.powermodels.ainit(pers=self)
 
-        if "elvatun" in requested:
+        if "elvatunheating" in requested:
             self.elvatunheating = elvatunheating.ElvatunHeating()
-            self.elvatunheating.ainit(pers=self)
+            await self.elvatunheating.ainit(pers=self)
 
     async def aclose(self):
         logger.info("Tearing down pyrotunpersistence")

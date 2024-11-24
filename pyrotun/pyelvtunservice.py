@@ -55,7 +55,10 @@ def setup_crontabs(pers):
 
     @aiocron.crontab(EVERY_HOUR)
     async def optimize_heating_setpoint():
-        if pers.openhab.get_item("Namronovn_Gang_600w_setpoint", datatype=float) > 12:
+        gang_setpoint = await pers.openhab.get_item(
+            "Namronovn_Gang_600w_setpoint", datatype=float
+        )
+        if gang_setpoint > 12:
             logger.info(" ** We are present, not touching setpoints")
             return
         logger.info(" ** Optimize heating setpoint")
@@ -125,7 +128,9 @@ async def main():
     logger.info("Starting pyelvtun service")
     pers = pyrotun.persist.PyrotunPersistence()
 
-    await pers.ainit(requested=["openhab", "tibber", "homely", "elvatunheating"])
+    await pers.ainit(
+        requested=["openhab", "influxdb", "tibber", "homely", "yr", "elvatunheating"]
+    )
 
     startup_tasks = await at_startup(pers)
     assert startup_tasks

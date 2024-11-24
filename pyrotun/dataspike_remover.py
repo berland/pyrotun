@@ -146,7 +146,7 @@ def filter_measurements(measurements):
         "akselerasjon",
         "lysstyrke",
         "CPU",
-        "Batteri",
+        "batteri",
         "Bakside_lys",
         "fraluft",
         "avkast",
