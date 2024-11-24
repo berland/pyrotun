@@ -119,7 +119,6 @@ async def at_startup(pers) -> List[Any]:
 
 
 async def main():
-    os.environ["OPENHAB_URL"] = "localhost:8080/rest"
     logger.info("Starting pyelvtun service")
     pers = pyrotun.persist.PyrotunPersistence()
 
