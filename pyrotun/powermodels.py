@@ -107,7 +107,7 @@ async def sunheating_model(pers, plot=False):
             color="blue",
             linewidth=3,
         )
-        pyplot.show()
+        # pyplot.show()
 
     logger.info(
         "Innetemp_maxtemp vs clouds: How much can we explain? %.2f"
@@ -120,11 +120,11 @@ async def sunheating_model(pers, plot=False):
 
 async def make_heatingmodel(
     pers,
-    target="Sensor_fraluft_temperatur",
-    ambient="Netatmo_ute_temperatur",  # "UteTemperatur",
+    target: str = "Sensor_fraluft_temperatur",
+    ambient: str = "Netatmo_ute_temperatur",  # "UteTemperatur",
     powermeasure: list | str = "Smappee_avgW_5min",
-    include_sun=True,
-):
+    include_sun: bool = True,
+) -> dict[str, sklearn.linear_model.LinearRegression]:
     """Make heating and/or power models.
 
     Args:
@@ -146,10 +146,15 @@ async def make_heatingmodel(
 
     powerdata = {}
     for measure in powermeasures:
-        # TODO: must resample via seconds
         powerdata[measure] = (
-            await pers.influxdb.get_series_grouped(measure, time="1h")
-        )[measure]
+            # Må være på 10sek eller lavere for god forklaringsevne.
+            # 1 sekund-oppløsning krever 0.5Mb overføring
+            (await pers.influxdb.get_series_grouped(measure, time="1s"))[measure]
+            .ffill()
+            .resample("1h")
+            .mean()
+        )
+
     power_series = (
         pd.concat([powerdata[x] for x in powerdata], axis=1).fillna(value=0).sum(axis=1)
     )
@@ -218,13 +223,25 @@ async def make_heatingmodel(
 
     dataset["indoorvsoutdoor"] = dataset[target] - dataset[ambient]
     dataset["indoorderivative"] = dataset[target].diff()
+
+    # Remove impossible indoor derivatives:
+    dataset = dataset[dataset["indoorderivative"].abs() < 1]
+
     dataset.dropna(inplace=True)  # Drop egde NaN due to diff()
-    dataset.plot(y="HeatingPower")
+
+    # dataset.plot.scatter(
+    #    x="indoorderivative",
+    #    y="HeatingPower",
+    #    c="indoorvsoutdoor",
+    #    grid=True,
+    #    # positiv indoorvsoutdoor betyr varmere inne enn ute
+    # )
+    # pyplot.show()
 
     lm = sklearn.linear_model.LinearRegression()
     modelparameters = ["indoorderivative", "indoorvsoutdoor"]  # , "Irradiation"]
-    X = dataset[modelparameters]
-    y = dataset[["HeatingPower"]]
+    X = dataset[modelparameters].values
+    y = dataset[["HeatingPower"]].values
 
     powermodel = lm.fit(X, y)
     logger.info("Powerusage explanation %.3f", powermodel.score(X, y))
@@ -287,7 +304,6 @@ async def elva_main(pers=None):
         ],
         include_sun=False,
     )
-    print(res)
 
     if closepers:
         await pers.aclose()
@@ -304,7 +320,6 @@ async def main(pers=None):
         pers,
         include_sun=False,
     )
-    print(res)
 
     print("Sun heating model")
     sun = await sunheating_model(pers)
