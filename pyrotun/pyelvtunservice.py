@@ -7,7 +7,6 @@ from asyncio at regular intervals (similar to crontab)
 """
 
 import asyncio
-import datetime
 from typing import Any, List
 
 import aiocron
@@ -19,6 +18,7 @@ import pyrotun.connections.openhab
 import pyrotun.connections.tibber
 import pyrotun.dataspike_remover
 import pyrotun.discord
+import pyrotun.elvatunheating
 import pyrotun.floors
 import pyrotun.houseshadow
 import pyrotun.persist
@@ -54,6 +54,16 @@ def setup_crontabs(pers):
     #    await pyrotun.pollhomely.amain(pers)
 
     @aiocron.crontab(EVERY_HOUR)
+    async def optimize_heating_setpoint():
+        if pers.openhab.get_item("Namronovn_Gang_600w_setpoint", datatype=float) > 12:
+            logger.info(" ** We are present, not touching setpoints")
+            return
+        logger.info(" ** Optimize heating setpoint")
+        setpoint = await pers.elvatunheating.controller()
+        logger.info(f"Calculated optimal setpoint: {setpoint}")
+        await pers.openhab.set_item("Setpoint_optimized", str(setpoint))
+
+    @aiocron.crontab(EVERY_HOUR)
     async def update_public_ip():
         logger.info(" ** Public IP")
         async with pers.websession.get("https://api.ipify.org") as response:
@@ -66,19 +76,15 @@ def setup_crontabs(pers):
         logger.info(" ** Polling tibber")
         await pyrotun.polltibber.main(pers)
 
-    @aiocron.crontab(EVERY_HOUR)
-    async def update_thismonth_nettleie():
-        if datetime.datetime.now().hour == 0:
-            # We have a bug that prevents correct calculation
-            # the first hour of every day..
-            return
-        await asyncio.sleep(30)  # Wait for AMS data to propagate to Influx
-        logger.info(" ** Updating nettleie")
-        await pyrotun.powercontroller.update_effekttrinn(pers)
-
-    async def floors_controller():
-        logger.info(" ** Floor controller")
-        await pyrotun.floors.main(pers)
+    # @aiocron.crontab(EVERY_HOUR)
+    # async def update_thismonth_nettleie():
+    #     if datetime.datetime.now().hour == 0:
+    #         # We have a bug that prevents correct calculation
+    #         # the first hour of every day..
+    #         return
+    #     await asyncio.sleep(30)  # Wait for AMS data to propagate to Influx
+    #     logger.info(" ** Updating nettleie")
+    #     await pyrotun.powercontroller.update_effekttrinn(pers)
 
     @aiocron.crontab(EVERY_HOUR)
     async def yrmelding():
@@ -109,7 +115,7 @@ async def at_startup(pers) -> List[Any]:
     )
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
 
-    tasks.append(asyncio.create_task(pyrotun.floors.main(pers)))
+    tasks.append(asyncio.create_task(pyrotun.elvatunheating.main()))
     tasks.append(asyncio.create_task(pyrotun.yrmelding.main(pers)))
 
     return tasks
@@ -119,7 +125,7 @@ async def main():
     logger.info("Starting pyelvtun service")
     pers = pyrotun.persist.PyrotunPersistence()
 
-    await pers.ainit(requested=["openhab", "tibber", "homely"])
+    await pers.ainit(requested=["openhab", "tibber", "homely", "elvatunheating"])
 
     startup_tasks = await at_startup(pers)
     assert startup_tasks
@@ -132,4 +138,4 @@ async def main():
 
 if __name__ == "__main__":
     dotenv.load_dotenv(verbose=True)
-    asyncio.run(main(), debug=False)
+    asyncio.run(main())

@@ -18,6 +18,7 @@ TIMEDELTA_MINUTES = 60  # minimum is 8 minutes!!
 ROUND = 1
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 SENSOR_ITEM = "Sensor_Kjoleskap_temperatur"
+SETPOINT_ITEM = "Master_setpoint_heating"
 TARGETTEMP_ITEM = "Setpoint_optimized_target"
 MINIMUM_TEMPERATURE = 5
 
@@ -44,133 +45,62 @@ class ElvatunHeating:
             include_sun=False,
         )
 
-    async def controller(self):
-        """Control the waterheater in an optimized way.
+    async def controller(self) -> float:
+        """Calculates the optimal path of setpoint temperatures for the future.
 
-        Sends ON/OFF to OpenHAB, and populates some statistical measures"""
+        Returns the updated optimal setpoint"""
+        assert self.pers is not None
         if self.pers.openhab is None:
-            asyncio.sleep(1)
+            await asyncio.sleep(1)
         assert self.pers.openhab is not None
 
         currenttemp = await self.pers.openhab.get_item(SENSOR_ITEM, datatype=float)
+        currenttemp = round(currenttemp * 2) / 2
         if currenttemp is None:
-            logger.warning("Waterheater set ON, no temperature knowledge")
-            await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
-            await self.pers.openhab.set_item(TARGETTEMP_ITEM, 65, log=True)
-            return
-
-        vacation = await self.pers.openhab.get_item(VACATION_ITEM, datatype=bool)
+            logger.warning(
+                f"Setpoint set to {MINIMUM_TEMPERATURE}, "
+                "no knowledge of current temperature"
+            )
+            return MINIMUM_TEMPERATURE
 
         prices_df = await self.pers.tibber.get_prices()
-        # Grid rental is time dependent:
         prices_df = prices_df.copy()
         prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
+
+        weather_forecast = await self.pers.yr.forecast()
 
         graph = self.future_temp_cost_graph(
             starttemp=currenttemp,
             prices_df=prices_df,
-            vacation=vacation,
-            starttime=None,
-            maxhours=36,
-            mintemp=40,
-            maxtemp=84,
+            temp_forecast=weather_forecast["air_temperature"],
+            mintemp=4,
+            maxtemp=12,
         )
-        # If we are below minimum temperature, we get a graph with 0 nodes.
-        # Turn on waterheater if so.
+
         if not graph:
             logger.info(
-                "Temperature now %s is below minimum water temperature, forcing ON",
-                str(currenttemp),
+                f"Temperature now {currenttemp} is below minimum",
             )
-            await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
-            # High target gives high priority:
-            await self.pers.openhab.set_item(
-                TARGETTEMP_ITEM, currenttemp + 10, log=True
-            )
-            return
+            return MINIMUM_TEMPERATURE
 
-        opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=55)
-
-        # Turn on if temperature in the path should increase:
-        next_temp = opt_results["opt_path"][1][1]
-        await self.pers.openhab.set_item(TARGETTEMP_ITEM, next_temp, log=True)
-        if next_temp > opt_results["opt_path"][0][1]:
-            await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "ON", log=True)
-        else:
-            await self.pers.openhab.set_item(HEATERCONTROLLER_ITEM, "OFF", log=True)
+        opt_results = analyze_graph(
+            graph, starttemp=currenttemp, endtemp=MINIMUM_TEMPERATURE
+        )
 
         logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
         logger.info(f"KWh is {opt_results['kwh']:.2f}")
-
-        # Dump CSV for legacy plotting solution, naive timestamps:
-        isonowhour = datetime.datetime.now().replace(minute=0).strftime("%Y-%m-%d-%H00")
-        onoff = pd.DataFrame(
-            columns=["onoff"], data=path_onoff(opt_results["opt_path"])
-        )
-        onoff.index = onoff.index.tz_localize(None)
-        onoff["timestamp"] = onoff.index
-        onoff.to_csv("/home/berland/heatoptplots/waterheater-" + isonowhour + ".csv")
-
-        # Log when we will turn on:
-        if not onoff[onoff["onoff"] == 1].empty:
-            firston = onoff[onoff["onoff"] == 1].head(1).index.values[0]
-            logger.info("Will turn heater on at %s", firston)
-        else:
-            logger.warning("Not planning to turn on waterheater, hot enough?")
-
-    async def estimate_savings(self, prices_df=None, starttemp=70):
-        """Savings must be estimated without reference to current temperature
-        and needs only to be run for every price change (i.e. every hour)"""
-        if prices_df is None:
-            prices_df = await self.pers.tibber.get_prices()
-            # Grid rental is time dependent:
-            prices_df = prices_df.copy()
-            prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
-
-        logger.info("Building graph for 24h savings estimation")
-        # starttemp should be above the minimum temperature, as the
-        # temperature is often higher than minimum, as we are able to
-        # "cache" temperature. In situations with falling prices, this could
-        # still overestimate the savings (?)
-        graph = self.future_temp_cost_graph(
-            starttemp=starttemp,
-            prices_df=prices_df,
-            vacation=False,
-            starttime=None,
-            maxhours=36,
-            mintemp=40,
-            maxtemp=84,
-        )
-        # There is a "tempdeviation" parameter in the graph which
-        # is the deviation from the starttemp at every node. Minimizing
-        # on this is the same as running with thermostat control.
-
-        # The thermostat mode cost can also be estimated directly from
-        # the usage data probably, without any reference to the graph.
-
-        opt_results = analyze_graph(graph, starttemp=starttemp, endtemp=starttemp)
-
-        logger.info(f"Reference optimized cost is {opt_results['opt_cost']:.3f} NOK")
-        logger.info(f"Thermostat cost is {opt_results['no_opt_cost']:.3f} NOK")
-        logger.info(
-            f"24-hour saving from Dijkstra: {opt_results['savings24h']:.2f} NOK"
-        )
-        await self.pers.openhab.set_item(
-            SAVINGS24H_ITEM, str(opt_results["savings24h"])
-        )
+        return opt_results["opt_path"][1][1]
 
     def future_temp_cost_graph(
         self,
         starttemp=60,
         prices_df=None,
         temp_forecast: pd.Series = None,
-        vacation=False,
         starttime=None,
-        maxhours=36,
-        mintemp=40,  # Can be used to set higher reqs.
-        maxtemp=84,
+        mintemp=4,  # Can be used to set higher reqs.
+        maxtemp=12,
     ):
-        """Build the networkx Directed 2D ~lattice  Graph, with
+        """Build the networkx Directed 2D ~lattice Graph, with
         datetime on the x-axis and water-temperatur on the y-axis.
 
         Edges from nodes determined by (time, temp) has an associated
@@ -226,9 +156,7 @@ class ElvatunHeating:
                 # Namronovner kan styres på halv-grader
                 possible_setpoint_deltas = [-0.5, 0, 0.5]
                 for setpoint_delta in possible_setpoint_deltas:
-                    if temp + setpoint_delta < MINIMUM_TEMPERATURE:
-                        continue
-                    if temp + setpoint_delta > 10:
+                    if not (mintemp <= temp + setpoint_delta <= maxtemp):
                         continue
                     temps[next_tstamp].append(temp + setpoint_delta)
                     kwh = self.powerusagemodel["powermodel"].predict(
@@ -343,16 +271,6 @@ def analyze_graph(graph, starttemp=60, endtemp=60):
     }
 
 
-async def controller(pers):
-    # This is the production code path
-    await pers.waterheater.controller()
-
-
-async def estimate_savings(pers):
-    # This is the production code path
-    await pers.waterheater.estimate_savings()
-
-
 async def main():
     # This is typically used for interactive testing.
     pers = pyrotun.persist.PyrotunPersistence()
@@ -376,13 +294,11 @@ async def main():
 
     starttemp = currenttemp
     graph = elvatunheating.future_temp_cost_graph(
-        # starttemp=60, prices_df=prices_df, mintemp=0.75, maxtemp=84, vacation=False
         starttemp=starttemp,
         prices_df=prices_df,
         temp_forecast=forecast["air_temperature"],
         mintemp=3,
         maxtemp=12,
-        vacation=False,
     )
 
     if not graph:

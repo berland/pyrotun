@@ -3,7 +3,7 @@ from typing import List, Union
 
 import aiohttp
 
-from pyrotun import connections, getLogger, powermodels, waterheater
+from pyrotun import connections, elvatunheating, getLogger, powermodels, waterheater
 
 logger = getLogger(__name__)
 
@@ -26,8 +26,9 @@ class PyrotunPersistence:
         self.unifiprotect = None
         self.waterheater = None
         self.yr = None
+        self.elvatunheating = None
 
-        # If true, no values are ever sent anywhere
+        # If true, no values are never sent anywhere
         self.readonly = readonly
 
     async def ainit(self, requested: Union[str, List[str]] = "all"):
@@ -77,6 +78,10 @@ class PyrotunPersistence:
         if "powermodels" in requested or "all" in requested:
             self.powermodels = powermodels.Powermodels()
             await self.powermodels.ainit(pers=self)
+
+        if "elvatun" in requested:
+            self.elvatunheating = elvatunheating.ElvatunHeating()
+            self.elvatunheating.ainit(pers=self)
 
     async def aclose(self):
         logger.info("Tearing down pyrotunpersistence")
