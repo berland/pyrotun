@@ -3,7 +3,7 @@ import logging
 import os
 import pprint
 from pathlib import Path
-from typing import Awaitable, Optional, List
+from typing import Awaitable, List, Optional
 
 import aiohttp
 

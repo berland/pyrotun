@@ -6,11 +6,8 @@ Runs continously as a service, calls underlying tools/scripts
 from asyncio at regular intervals (similar to crontab)
 """
 
-import os
 import asyncio
 import datetime
-import json
-from pathlib import Path
 from typing import Any, List
 
 import aiocron

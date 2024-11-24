@@ -1,8 +1,9 @@
 """Bridging MQTT messages to Discord via Discord webhooks"""
+
 import asyncio
 import os
 
-import aiomqtt
+import asyncio_mqtt
 import dotenv
 
 import pyrotun
