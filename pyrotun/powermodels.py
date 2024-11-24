@@ -124,7 +124,7 @@ async def make_heatingmodel(
     ambient: str = "Netatmo_ute_temperatur",  # "UteTemperatur",
     powermeasure: list | str = "Smappee_avgW_5min",
     include_sun: bool = True,
-) -> dict[str, sklearn.linear_model.LinearRegression]:
+) -> dict:
     """Make heating and/or power models.
 
     Args:

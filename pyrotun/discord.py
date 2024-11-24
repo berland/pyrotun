@@ -3,7 +3,7 @@
 import asyncio
 import os
 
-import asyncio_mqtt
+import aiomqtt
 import dotenv
 
 import pyrotun
@@ -23,7 +23,7 @@ async def main(pers=None):
         await pers.ainit(["websession"])
     assert pers.websession is not None
 
-    async with asyncio_mqtt.Client(os.getenv("MQTT_HOST")) as client:
+    async with aiomqtt.Client(os.getenv("MQTT_HOST")) as client:
         logger.info("MQTT client ready for discord messages")
         async with client.messages() as messages:
             logger.info("Subscribing to discord messages from mqtt")
