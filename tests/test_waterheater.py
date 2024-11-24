@@ -107,7 +107,7 @@ def test_make_graph():
     path = networkx.shortest_path(
         graph,
         source=(mock_prices.index[0], 70),
-        target=(mock_prices.index[-1], 69.8),
+        target=(mock_prices.index[-1], 69.4),
         weight="cost",
     )
     waterheater.plot_path(path, ax=ax)

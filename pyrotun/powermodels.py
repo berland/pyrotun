@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+from contextlib import suppress
 
 import dotenv
 import pandas as pd
@@ -27,10 +28,25 @@ class Powermodels:
         logger.info("PowerHeatingModels.ainit()")
         self.pers = pers
 
-        models = await make_heatingmodel(pers)
-        self.powermodel = models["powermodel"]
-        self.tempmodel = models["tempmodel"]
-        self.sunheatingmodel = await sunheating_model(pers)
+        with suppress(Exception):
+            models = await make_heatingmodel(pers)
+            self.powermodel = models["powermodel"]
+            self.tempmodel = models["tempmodel"]
+            self.sunheatingmodel = await sunheating_model(pers)
+
+        with suppress(Exception):
+            elva_model = await make_heatingmodel(
+                pers,
+                target="Sensor_Kjoleskap_temperatur",
+                ambient="YrtemperaturMjolfjell",
+                powermeasure=[
+                    "Namronovn_Stue_800w_effekt",
+                    "Namronovn_Bad_400w_effekt",
+                    "Namronovn_Gang_600w_effekt",
+                ],
+                include_sun=False,
+            )
+            self.elvamodel = elva_model["powermodel"]
 
 
 async def sunheating_model(pers, plot=False):
@@ -106,7 +122,8 @@ async def make_heatingmodel(
     pers,
     target="Sensor_fraluft_temperatur",
     ambient="Netatmo_ute_temperatur",  # "UteTemperatur",
-    powermeasure="Smappee_avgW_5min",
+    powermeasure: list | str = "Smappee_avgW_5min",
+    include_sun=True,
 ):
     """Make heating and/or power models.
 
@@ -116,56 +133,88 @@ async def make_heatingmodel(
         ambient: item-name
         powermeasure: item-name, unit=Watt
     """
-    target = "Sensor_fraluft_temperatur"
     # Resampling in InfluxDB over Pandas for speed reasons.
     # BUG: get_series_grouped returns dataframe..
     target_series = (await pers.influxdb.get_series_grouped(target, time="1h"))[target]
     ambient_series = (await pers.influxdb.get_series_grouped(ambient, time="1h"))[
         ambient
     ]
-    power_series = (await pers.influxdb.get_series_grouped(powermeasure, time="1h"))[
-        powermeasure
-    ]
+    if not isinstance(powermeasure, list):
+        powermeasures = [powermeasure]
+    else:
+        powermeasures = powermeasure
+
+    powerdata = {}
+    for measure in powermeasures:
+        # TODO: must resample via seconds
+        powerdata[measure] = (
+            await pers.influxdb.get_series_grouped(measure, time="1h")
+        )[measure]
+    power_series = (
+        pd.concat([powerdata[x] for x in powerdata], axis=1).fillna(value=0).sum(axis=1)
+    )
 
     # Sun altitude in degrees:
-    sunheight = (await pers.influxdb.get_series_grouped("Solhoyde", time="1h"))[
-        "Solhoyde"
-    ].clip(lower=0)
+    if include_sun:
+        sunheight = (await pers.influxdb.get_series_grouped("Solhoyde", time="1h"))[
+            "Solhoyde"
+        ].clip(lower=0)
 
-    # Todo: delete days where max(sunheight) == 0
+        # Todo: delete days where max(sunheight) == 0
 
-    # No contribution from low sun (terrain)
-    sunheight[sunheight < 5] = 0
+        # No contribution from low sun (terrain)
+        sunheight[sunheight < 5] = 0
 
-    cloud_area_fraction = await pers.yr.get_historical_cloud_fraction()
-    if cloud_area_fraction is None:
-        logger.error("Not able to get cloud fraction from yr")
-        return {"powermodel": None, "tempmodel": None}
-    sun_cloud = (
-        pd.concat([cloud_area_fraction, sunheight], axis=1)
-        .sort_index()
-        .fillna(method="ffill")
-        .dropna()
-    )
-    sun_cloud["Irradiation"] = (1 - sun_cloud["cloud_area_fraction"]) * sun_cloud[
-        "Solhoyde"
-    ]
-    # Cleanse data:
-    sun_cloud["date"] = sun_cloud.index.date.astype(str)
-    max_sun_cloud_date = sun_cloud.groupby("date").max()
-    erroneous_dates = max_sun_cloud_date[max_sun_cloud_date["Solhoyde"] < 0.1].index
-    for error_date in erroneous_dates:
-        sun_cloud = sun_cloud[sun_cloud["date"] != error_date]
+        cloud_area_fraction = await pers.yr.get_historical_cloud_fraction()
+        if cloud_area_fraction is None:
+            logger.error("Not able to get cloud fraction from yr")
+            return {"powermodel": None, "tempmodel": None}
+        sun_cloud = (
+            pd.concat([cloud_area_fraction, sunheight], axis=1)
+            .sort_index()
+            .ffill()
+            .dropna()
+        )
+        sun_cloud["Irradiation"] = (1 - sun_cloud["cloud_area_fraction"]) * sun_cloud[
+            "Solhoyde"
+        ]
+        # Cleanse data:
+        sun_cloud["date"] = sun_cloud.index.date.astype(str)
+        max_sun_cloud_date = sun_cloud.groupby("date").max()
+        erroneous_dates = max_sun_cloud_date[max_sun_cloud_date["Solhoyde"] < 0.1].index
+        for error_date in erroneous_dates:
+            sun_cloud = sun_cloud[sun_cloud["date"] != error_date]
+        irradiation = sun_cloud["Irradiation"]
+    else:
+        irradiation = pd.Series()
 
-    substract = await non_heating_powerusage(pers)
-    heating_power = power_series / 1000 - substract
+    if "Smappee" in powermeasure:
+        # Trekk fra vvb:
+        substract = await non_heating_powerusage(pers)
+        heating_power = power_series / 1000 - substract
+    else:
+        heating_power = power_series / 1000
+
     heating_power.name = "HeatingPower"
     heating_power.clip(lower=0, inplace=True)
 
+    if include_sun:
+        cols = [target_series, ambient_series, heating_power, irradiation]
+    else:
+        cols = [target_series, ambient_series, heating_power]
     dataset = pd.concat(
-        [target_series, ambient_series, heating_power, sun_cloud["Irradiation"]],
+        cols,
+        join="inner",
         axis=1,
     ).dropna()
+
+    if "Kjoleskap" in target:
+        # Må trekke fra når vi er tilstede..
+        setpoint = await pers.influxdb.get_series_grouped(
+            "Namronovn_Gang_600w_setpoint", time="1h"
+        )
+        setpoint.ffill(inplace=True)
+        target_series = target_series[(setpoint < 13).index]
 
     dataset["indoorvsoutdoor"] = dataset[target] - dataset[ambient]
     dataset["indoorderivative"] = dataset[target].diff()
@@ -187,15 +236,18 @@ async def make_heatingmodel(
         (powermodel.coef_[0][1] / powermodel.coef_[0][0] + 1),
     )
 
-    # "explanation factor" increases  by only one percent point by including
-    # Irradiation.. Predictive power???
-    p2 = ["HeatingPower", "indoorvsoutdoor", "Irradiation"]
-    y2 = dataset["indoorderivative"]
-    lm2 = sklearn.linear_model.LinearRegression()
-    tempmodel = lm2.fit(dataset[p2], y2)
-    logger.info("Temp increase explanation: %.3f", tempmodel.score(dataset[p2], y2))
-    logger.info("Coefficients %s", str(tempmodel.coef_))
-    logger.info(" - in variables: %s", str(p2))
+    if include_sun:
+        # "explanation factor" increases  by only one percent point by including
+        # Irradiation.. Predictive power???
+        p2 = ["HeatingPower", "indoorvsoutdoor", "Irradiation"]
+        y2 = dataset["indoorderivative"]
+        lm2 = sklearn.linear_model.LinearRegression()
+        tempmodel = lm2.fit(dataset[p2], y2)
+        logger.info("Temp increase explanation: %.3f", tempmodel.score(dataset[p2], y2))
+        logger.info("Coefficients %s", str(tempmodel.coef_))
+        logger.info(" - in variables: %s", str(p2))
+    else:
+        tempmodel = None
 
     return {"powermodel": powermodel, "tempmodel": tempmodel}
 
@@ -217,6 +269,30 @@ async def non_heating_powerusage(pers):
     return cum_usage_hourly[(cum_usage_hourly > 0) & (cum_usage_hourly < 3.0)]
 
 
+async def elva_main(pers=None):
+    closepers = False
+    if pers is None:
+        pers = pyrotun.persist.PyrotunPersistence()
+        await pers.ainit(["influxdb", "openhab", "yr"])
+        closepers = True
+
+    res = await make_heatingmodel(
+        pers,
+        target="Sensor_Kjoleskap_temperatur",
+        ambient="YrtemperaturMjolfjell",
+        powermeasure=[
+            "Namronovn_Stue_800w_effekt",
+            "Namronovn_Bad_400w_effekt",
+            "Namronovn_Gang_600w_effekt",
+        ],
+        include_sun=False,
+    )
+    print(res)
+
+    if closepers:
+        await pers.aclose()
+
+
 async def main(pers=None):
     closepers = False
     if pers is None:
@@ -224,7 +300,10 @@ async def main(pers=None):
         await pers.ainit(["influxdb", "openhab", "yr"])
         closepers = True
 
-    res = await make_heatingmodel(pers)
+    res = await make_heatingmodel(
+        pers,
+        include_sun=False,
+    )
     print(res)
 
     print("Sun heating model")
@@ -244,4 +323,4 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     parser = get_parser()
     args = parser.parse_args()
-    asyncio.run(main(pers=None))
+    asyncio.run(elva_main(pers=None))

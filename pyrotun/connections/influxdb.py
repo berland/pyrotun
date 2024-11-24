@@ -7,17 +7,25 @@ from aioinflux import InfluxDBClient
 
 
 class InfluxDBConnection:
-    def __init__(self, host=""):
+    def __init__(self, host="", port=""):
         if host:
             self.host = host
         else:
             self.host = os.getenv("INFLUXDB_HOST")
 
+        if port:
+            self.port = port
+        else:
+            self.port = os.getenv("INFLUXDB_PORT")
+
         if not self.host:
             raise ValueError("INFLUXDB_HOST not provided")
 
+        if not self.port:
+            raise ValueError("INFLUXDB_PORT not provided")
+
         self.client = InfluxDBClient(
-            output="dataframe", db="openhab_db", host=self.host
+            output="dataframe", db="openhab_db", host=self.host, port=self.port
         )
 
     async def get_series(
@@ -52,12 +60,11 @@ class InfluxDBConnection:
     async def get_series_grouped(
         self, item, aggregator="mean", time="1h", condition=""
     ) -> pd.DataFrame:
-        resp = await self.client.query(
-            (
-                f"SELECT {aggregator}(value) FROM {item} {condition} "
-                f"group by time({time})"
-            )
+        query = (
+            f"SELECT {aggregator}(value) FROM {item} {condition} "
+            f"group by time({time})"
         )
+        resp = await self.client.query(query)
         resp.columns = [item]
         return resp
 
