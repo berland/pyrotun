@@ -118,7 +118,6 @@ async def at_startup(pers) -> List[Any]:
     )
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
 
-    tasks.append(asyncio.create_task(pyrotun.elvatunheating.main()))
     tasks.append(asyncio.create_task(pyrotun.yrmelding.main(pers)))
 
     return tasks

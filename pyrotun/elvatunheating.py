@@ -18,8 +18,7 @@ TIMEDELTA_MINUTES = 60  # minimum is 8 minutes!!
 ROUND = 1
 PD_TIMEDELTA = str(TIMEDELTA_MINUTES) + "min"
 SENSOR_ITEM = "Sensor_Kjoleskap_temperatur"
-SETPOINT_ITEM = "Master_setpoint_heating"
-TARGETTEMP_ITEM = "Setpoint_optimized_target"
+SETPOINT_ITEM = "Setpoint_optimized"
 MINIMUM_TEMPERATURE = 5
 
 
@@ -56,6 +55,11 @@ class ElvatunHeating:
 
         currenttemp = await self.pers.openhab.get_item(SENSOR_ITEM, datatype=float)
         currenttemp = round(currenttemp * 2) / 2
+
+        currentsetpoint = await self.pers.openhab.get_item(
+            SETPOINT_ITEM, datatype=float
+        )
+
         if currenttemp is None:
             logger.warning(
                 f"Setpoint set to {MINIMUM_TEMPERATURE}, "
@@ -70,7 +74,7 @@ class ElvatunHeating:
         weather_forecast = await self.pers.yr.forecast()
 
         graph = self.future_temp_cost_graph(
-            starttemp=currenttemp,
+            starttemp=currentsetpoint,
             prices_df=prices_df,
             temp_forecast=weather_forecast["air_temperature"],
             mintemp=4,
@@ -154,7 +158,7 @@ class ElvatunHeating:
             powerprice = dframe.loc[tstamp]["NOK/KWh"]
             for temp in temps[tstamp]:
                 # Namronovner kan styres på halv-grader
-                possible_setpoint_deltas = [-0.5, 0, 0.5]
+                possible_setpoint_deltas = [-2, -1.5, -1, -0.5, 0, 0.5]
                 for setpoint_delta in possible_setpoint_deltas:
                     if not (mintemp <= temp + setpoint_delta <= maxtemp):
                         continue
@@ -168,9 +172,9 @@ class ElvatunHeating:
                         ]
                     )[0][0]
                     cost = max(kwh * powerprice, 0)
-                    #print(
+                    # print(
                     #    f"{tstamp} Heating from {temp} to {temp + setpoint_delta} at {kwh} {cost=}"
-                    #)
+                    # )
                     graph.add_edge(
                         (tstamp, temp),
                         (next_tstamp, temp + setpoint_delta),

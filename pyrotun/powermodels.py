@@ -34,20 +34,6 @@ class Powermodels:
             self.tempmodel = models["tempmodel"]
             self.sunheatingmodel = await sunheating_model(pers)
 
-        with suppress(Exception):
-            elva_model = await make_heatingmodel(
-                pers,
-                target="Sensor_Kjoleskap_temperatur",
-                ambient="YrtemperaturMjolfjell",
-                powermeasure=[
-                    "Namronovn_Stue_800w_effekt",
-                    "Namronovn_Bad_400w_effekt",
-                    "Namronovn_Gang_600w_effekt",
-                ],
-                include_sun=False,
-            )
-            self.elvamodel = elva_model["powermodel"]
-
 
 async def sunheating_model(pers, plot=False):
     """Make a model of how much sun and cloud-cover affects maximal
