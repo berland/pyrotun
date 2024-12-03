@@ -27,12 +27,14 @@ class Powermodels:
     async def ainit(self, pers):
         logger.info("PowerHeatingModels.ainit()")
         self.pers = pers
+        await self.update_heatingmodel()
 
+    async def update_heatingmodel(self):
         with suppress(Exception):
-            models = await make_heatingmodel(pers)
+            models = await make_heatingmodel(self.pers)
             self.powermodel = models["powermodel"]
             self.tempmodel = models["tempmodel"]
-            self.sunheatingmodel = await sunheating_model(pers)
+            self.sunheatingmodel = await sunheating_model(self.pers)
 
 
 async def sunheating_model(pers, plot=False):
@@ -231,7 +233,8 @@ async def make_heatingmodel(
 
     powermodel = lm.fit(X, y)
     logger.info("Powerusage explanation %.3f", powermodel.score(X, y))
-    logger.info("Coefficients %s", str(powermodel.coef_))
+    logger.info(f"Coefficients {powermodel.coef_}")
+    logger.info(f"Intercept {powermodel.intercept_}")
     logger.info(" - in variables: %s", str(modelparameters))
 
     logger.info(

@@ -55,6 +55,7 @@ def setup_crontabs(pers):
 
     @aiocron.crontab(EVERY_HOUR)
     async def optimize_heating_setpoint():
+        await asyncio.sleep(10)  # Ensure new power price is live.
         gang_setpoint = await pers.openhab.get_item(
             "Namronovn_Gang_600w_setpoint", datatype=float
         )
@@ -65,6 +66,23 @@ def setup_crontabs(pers):
         setpoint = await pers.elvatunheating.controller()
         logger.info(f"Calculated optimal setpoint: {setpoint}")
         await pers.openhab.set_item("Setpoint_optimized", str(setpoint))
+
+    @aiocron.crontab(EVERY_DAY)
+    async def update_heatingmodel():
+        logger.info(" ** Update heating model")
+        await pers.elvatunheating.update_heatingmodel()
+        await pers.openhab.set_item(
+            "WattPrHeatedDegree",
+            pers.elvatunheating.powerusagemodel["powermodel"].coef_[0][0],
+        )
+        await pers.openhab.set_item(
+            "WattPrOutsidedifference",
+            pers.elvatunheating.powerusagemodel["powermodel"].coef_[0][1],
+        )
+        await pers.openhab.set_item(
+            "WattEquilibrium",
+            pers.elvatunheating.powerusagemodel["powermodel"].intercept_[0],
+        )
 
     @aiocron.crontab(EVERY_HOUR)
     async def update_public_ip():
@@ -79,26 +97,10 @@ def setup_crontabs(pers):
         logger.info(" ** Polling tibber")
         await pyrotun.polltibber.main(pers)
 
-    # @aiocron.crontab(EVERY_HOUR)
-    # async def update_thismonth_nettleie():
-    #     if datetime.datetime.now().hour == 0:
-    #         # We have a bug that prevents correct calculation
-    #         # the first hour of every day..
-    #         return
-    #     await asyncio.sleep(30)  # Wait for AMS data to propagate to Influx
-    #     logger.info(" ** Updating nettleie")
-    #     await pyrotun.powercontroller.update_effekttrinn(pers)
-
     @aiocron.crontab(EVERY_HOUR)
     async def yrmelding():
         logger.info(" ** Yrmelding")
         await pyrotun.yrmelding.main(pers)
-
-    # @aiocron.crontab(EVERY_15_MINUTE)
-    # async def houseshadow():
-    #    await asyncio.sleep(5)
-    #    logger.info(" ** Houseshadow")
-    #    pyrotun.houseshadow.main("/etc/openhab/html/husskygge.svg")
 
     @aiocron.crontab(EVERY_15_MINUTE)
     async def spikes():

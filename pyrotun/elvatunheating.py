@@ -31,9 +31,11 @@ class ElvatunHeating:
     async def ainit(self, pers):
         logger.info("Elvatunheating.ainit()")
         self.pers = pers
+        await self.update_heatingmodel()
 
-        self.powerusagemodel = await powermodels.make_heatingmodel(
-            pers,
+    async def update_heatingmodel(self):
+        self.powerusagemodel: dict = await powermodels.make_heatingmodel(
+            self.pers,
             target=SENSOR_ITEM,
             ambient="YrtemperaturMjolfjell",
             powermeasure=[

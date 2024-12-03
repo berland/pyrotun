@@ -62,7 +62,7 @@ async def main(pers=None):
         "Yr_irradiation_next24", irradiation_product.iloc[0:24].sum(), log=True
     )
     # Calculate how much the sun will increase the house temperature:
-    if pers.powermodels is not None:
+    if pers.powermodels is not None and pers.powermodels.sunheatingmodel is not None:
         soloppvarming = pers.powermodels.sunheatingmodel.predict(
             [[irradiation_product[0:12].sum()]]
         ) - pers.powermodels.sunheatingmodel.predict([[0]])
