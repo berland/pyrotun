@@ -217,16 +217,16 @@ async def make_heatingmodel(
 
     dataset.dropna(inplace=True)  # Drop egde NaN due to diff()
 
-    # dataset.plot.scatter(
-    #    x="indoorderivative",
-    #    y="HeatingPower",
-    #    c="indoorvsoutdoor",
-    #    grid=True,
-    #    # positiv indoorvsoutdoor betyr varmere inne enn ute
-    # )
-    # pyplot.show()
+    dataset.plot.scatter(
+        x="indoorderivative",
+        y="HeatingPower",
+        c="indoorvsoutdoor",
+        grid=True,
+        # positiv indoorvsoutdoor betyr varmere inne enn ute
+    )
+    pyplot.show()
 
-    lm = sklearn.linear_model.LinearRegression()
+    lm = sklearn.linear_model.LinearRegression(fit_intercept=False)
     modelparameters = ["indoorderivative", "indoorvsoutdoor"]  # , "Irradiation"]
     X = dataset[modelparameters].values
     y = dataset[["HeatingPower"]].values

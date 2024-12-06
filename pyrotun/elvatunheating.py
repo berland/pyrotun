@@ -160,7 +160,7 @@ class ElvatunHeating:
             powerprice = dframe.loc[tstamp]["NOK/KWh"]
             for temp in temps[tstamp]:
                 # Namronovner kan styres på halv-grader
-                possible_setpoint_deltas = [-2, -1.5, -1, -0.5, 0, 0.5]
+                possible_setpoint_deltas = [-2, -1, 0, 0.25]
                 for setpoint_delta in possible_setpoint_deltas:
                     if not (mintemp <= temp + setpoint_delta <= maxtemp):
                         continue
@@ -316,7 +316,7 @@ async def main():
 
     logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
     logger.info(f"KWh is {opt_results['kwh']:.2f}")
-
+    logger.info(f"Setpoint path: {opt_results['opt_path']}")
     _, ax = pyplot.subplots()
     # plot_graph(graph, ax=ax, show=False)
     plot_path(opt_results["opt_path"], ax=ax, show=False)
