@@ -90,7 +90,7 @@ class ElvatunHeating:
             return MINIMUM_TEMPERATURE
 
         opt_results = analyze_graph(
-            graph, starttemp=currenttemp, endtemp=MINIMUM_TEMPERATURE
+            graph, starttemp=currenttemp, endtemp=6
         )
 
         logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
@@ -296,7 +296,7 @@ async def main():
 
     # currenttemp = await pers.openhab.get_item(SENSOR_ITEM, datatype=float)
     # MOCK
-    currenttemp = 5
+    currenttemp = 4
 
     starttemp = currenttemp
     graph = elvatunheating.future_temp_cost_graph(
@@ -311,7 +311,7 @@ async def main():
         logger.warning("Indoor temperature below minimum, should force on")
         await pers.aclose()
         return
-    endtemp = 5
+    endtemp = 6
     opt_results = analyze_graph(graph, starttemp=starttemp, endtemp=endtemp)
 
     logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
