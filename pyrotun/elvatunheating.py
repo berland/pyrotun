@@ -90,15 +90,17 @@ class ElvatunHeating:
             )
             return MINIMUM_TEMPERATURE
 
-        opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=6)
+        opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=5)
 
         logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
         logger.info(f"KWh is {opt_results['kwh']:.2f}")
+        sorted_path = sorted(opt_results["opt_path"][0:12], key=lambda x: -x[1])
+        logger.info(f"Peak future (12h) setpoint: {sorted_path[0]}")
         return opt_results["opt_path"][1][1]
 
     def future_temp_cost_graph(
         self,
-        starttemp=60,
+        starttemp=4,
         prices_df=None,
         temp_forecast: pd.Series = None,
         starttime=None,
@@ -139,23 +141,34 @@ class ElvatunHeating:
             temps[next_tstamp] = []
             temps[tstamp] = list(set(temps[tstamp]))  # Make rolled over temps unique
             temps[tstamp].sort()
-            powerprice = dframe.loc[tstamp]["NOK/KWh"]
+
+            # Denne gir ikke mening, burde vært tstamp ikke next_tstamp
+            powerprice = float(dframe.loc[next_tstamp]["NOK/KWh"])
+
             for temp in temps[tstamp]:
                 # Namronovner kan styres på halv-grader
-                possible_setpoint_deltas = [-2, -1, 0, 0.25]
+                possible_setpoint_deltas = [-3.0, -2.0, 0.0, 0.25]
+                # Vi må kun gå ned mye om gangen, fordi modellen ikke
+                # tar hensyn til at det faktisk tar tid for temperaturen å synke
+                # når setpoint settes lavt
                 for setpoint_delta in possible_setpoint_deltas:
                     if not (mintemp <= temp + setpoint_delta <= maxtemp):
                         continue
                     temps[next_tstamp].append(temp + setpoint_delta)
-                    kwh = self.powerusagemodel["powermodel"].predict(
-                        [
-                            [
-                                setpoint_delta,
-                                temp + setpoint_delta - temp_forecast[tstamp],
-                            ]
-                        ]
-                    )[0][0]
-                    cost = max(kwh * powerprice, 0)
+                    kwh = max(
+                        float(
+                            self.powerusagemodel["powermodel"].predict(
+                                [
+                                    [
+                                        setpoint_delta,
+                                        temp + setpoint_delta - temp_forecast[tstamp],
+                                    ]
+                                ]
+                            )[0][0]
+                        ),
+                        0,
+                    )
+                    cost = kwh * powerprice
                     # print(
                     #    f"{tstamp} Heating from {temp} to {temp + setpoint_delta} at {kwh} {cost=}"
                     # )
@@ -230,7 +243,7 @@ def path_kwh(graph, path):
     return [graph.edges[path[i], path[i + 1]]["kwh"] for i in range(len(path) - 1)]
 
 
-def analyze_graph(graph, starttemp=60, endtemp=60):
+def analyze_graph(graph, starttemp=6, endtemp=6):
     """Find shortest path, and do some extra calculations for estimating
     savings. The savings must be interpreted carefully, and is
     probably only correct if start and endtemp is equal"""
@@ -320,12 +333,14 @@ async def main():
         logger.warning("Indoor temperature below minimum, should force on")
         await pers.aclose()
         return
-    endtemp = 6
+    endtemp = 5
     opt_results = analyze_graph(graph, starttemp=starttemp, endtemp=endtemp)
 
     logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
     logger.info(f"KWh is {opt_results['kwh']:.2f}")
-    logger.info(f"Setpoint path: {opt_results['opt_path']}")
+    sorted_path = sorted(opt_results["opt_path"][0:11], key=lambda x: -x[1])
+    # logger.info(f"Setpoint path: {opt_results['opt_path']}")
+    logger.info(f"Peak future (12h) setpoint: {sorted_path[0]}")
     _, ax = pyplot.subplots()
     # plot_graph(graph, ax=ax, show=False)
     plot_path(opt_results["opt_path"], ax=ax, show=False)
