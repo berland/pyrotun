@@ -1,7 +1,8 @@
 import asyncio
 import datetime
+import numpy as np
 import os
-
+from sklearn.base import BaseEstimator
 import dotenv
 import networkx
 import pandas as pd
@@ -89,9 +90,7 @@ class ElvatunHeating:
             )
             return MINIMUM_TEMPERATURE
 
-        opt_results = analyze_graph(
-            graph, starttemp=currenttemp, endtemp=6
-        )
+        opt_results = analyze_graph(graph, starttemp=currenttemp, endtemp=6)
 
         logger.info(f"Cost is {opt_results['opt_cost']:.3f} NOK")
         logger.info(f"KWh is {opt_results['kwh']:.2f}")
@@ -126,26 +125,9 @@ class ElvatunHeating:
         # If we are at 19:48 and timedelta is 15 minutes, we should
         # round down to 19:45:
         datetimes = datetimes[datetimes > starttime - pd.Timedelta(PD_TIMEDELTA)]
-        # Merge prices into the requested datetime:
-        dframe = (
-            pd.concat(
-                [
-                    prices_df,
-                    pd.DataFrame(index=datetimes),
-                ],
-                axis="index",
-            )
-            .sort_index()
-            .ffill()
-            .bfill()  # (this is hardly necessary)
-            .loc[datetimes]  # slicing to this means we do not compute
-            # correcly around hour shifts
-        )
-        dframe = dframe[~dframe.index.duplicated(keep="first")]
+        dframe = prices_df[datetimes[0] : datetimes[-1]]
 
         # Build Graph, starting with current temperature
-        # temps = np.arange(40, 85, 0.1)
-
         graph = networkx.DiGraph()
 
         temps: dict[pd.Timestamp, list[float]] = {}
@@ -277,6 +259,27 @@ def analyze_graph(graph, starttemp=60, endtemp=60):
     }
 
 
+class MockedLinearEstimator(BaseEstimator):
+    def __init__(self, kw_pr_heated_degree: float, kw_pr_outside_difference: float):
+        self.kw_pr_heated_degree: float = kw_pr_heated_degree
+        self.kw_pr_outside_difference: float = kw_pr_outside_difference
+
+    def fit(self):
+        return self
+
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        assert len(x) == 1
+        assert len(x[0]) == 2
+        return np.array(
+            [
+                [
+                    self.kw_pr_heated_degree * x[0][0]
+                    + self.kw_pr_outside_difference * x[0][1]
+                ]
+            ]
+        )
+
+
 async def main():
     # This is typically used for interactive testing.
     pers = pyrotun.persist.PyrotunPersistence()
@@ -287,7 +290,13 @@ async def main():
     forecast = await pers.yr.forecast()
 
     elvatunheating = ElvatunHeating()
-    await elvatunheating.ainit(pers)
+
+    # Mock the linear estimator for power usage:
+    # await elvatunheating.ainit(pers)
+    elvatunheating.powerusagemodel = {
+        "powermodel": MockedLinearEstimator(0.957, 0.05034),
+        "tempmodel": None,
+    }
 
     # Grid rental is time dependent:
     prices_df["NOK/KWh"] += localpowerprice.get_gridrental(
@@ -299,6 +308,7 @@ async def main():
     currenttemp = 4
 
     starttemp = currenttemp
+    print(prices_df.tail(20))
     graph = elvatunheating.future_temp_cost_graph(
         starttemp=starttemp,
         prices_df=prices_df,
@@ -306,7 +316,6 @@ async def main():
         mintemp=3,
         maxtemp=12,
     )
-
     if not graph:
         logger.warning("Indoor temperature below minimum, should force on")
         await pers.aclose()
