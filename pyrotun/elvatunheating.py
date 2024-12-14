@@ -62,7 +62,7 @@ class ElvatunHeating:
         currentsetpoint = await self.pers.openhab.get_item(
             SETPOINT_ITEM, datatype=float
         )
-
+        logger.info(f"Current setpoint is {currentsetpoint}")
         if currenttemp is None:
             logger.warning(
                 f"Setpoint set to {MINIMUM_TEMPERATURE}, "
@@ -72,7 +72,9 @@ class ElvatunHeating:
 
         prices_df = await self.pers.tibber.get_prices()
         prices_df = prices_df.copy()
-        prices_df["NOK/KWh"] += localpowerprice.get_gridrental(prices_df.index)
+        prices_df["NOK/KWh"] += localpowerprice.get_gridrental(
+            prices_df.index, provider="tendranett"
+        )
 
         weather_forecast = await self.pers.yr.forecast()
 
@@ -80,7 +82,7 @@ class ElvatunHeating:
             starttemp=currentsetpoint,
             prices_df=prices_df,
             temp_forecast=weather_forecast["air_temperature"],
-            mintemp=4,
+            mintemp=3,
             maxtemp=12,
         )
 
@@ -147,10 +149,7 @@ class ElvatunHeating:
 
             for temp in temps[tstamp]:
                 # Namronovner kan styres på halv-grader
-                possible_setpoint_deltas = [-3.0, -2.0, 0.0, 0.25]
-                # Vi må kun gå ned mye om gangen, fordi modellen ikke
-                # tar hensyn til at det faktisk tar tid for temperaturen å synke
-                # når setpoint settes lavt
+                possible_setpoint_deltas = np.arange(-4, 0.25 + 0.25, 0.25)
                 for setpoint_delta in possible_setpoint_deltas:
                     if not (mintemp <= temp + setpoint_delta <= maxtemp):
                         continue
@@ -300,33 +299,30 @@ async def main():
     await pers.ainit(["tibber", "influxdb", "openhab", "yr"])
     prices_df = await pers.tibber.get_prices()
 
-    forecast = await pers.yr.forecast()
-
     elvatunheating = ElvatunHeating()
-
+    elvatunheating.pers = pers
     # Mock the linear estimator for power usage:
     # await elvatunheating.ainit(pers)
     elvatunheating.powerusagemodel = {
-        "powermodel": MockedLinearEstimator(0.957, 0.05034),
+        "powermodel": MockedLinearEstimator(0.957, 0.05034),  # Historymatched
         "tempmodel": None,
     }
 
     # Grid rental is time dependent:
+    prices_df = prices_df.copy()
     prices_df["NOK/KWh"] += localpowerprice.get_gridrental(
         prices_df.index, provider="tendranett"
     )
+    weather_forecast = await pers.yr.forecast()
 
-    # currenttemp = await pers.openhab.get_item(SENSOR_ITEM, datatype=float)
-    # MOCK
     currenttemp = 4
 
     starttemp = currenttemp
-    print(prices_df.tail(20))
     graph = elvatunheating.future_temp_cost_graph(
         starttemp=starttemp,
         prices_df=prices_df,
-        temp_forecast=forecast["air_temperature"],
-        mintemp=3,
+        temp_forecast=weather_forecast["air_temperature"],
+        mintemp=4,
         maxtemp=12,
     )
     if not graph:
@@ -349,7 +345,7 @@ async def main():
 
     ax2 = ax.twinx()
     prices_df.plot(drawstyle="steps-post", y="NOK/KWh", ax=ax2)  # , alpha=0.9)
-    (forecast["air_temperature"] / 10).plot(ax=ax2)
+    (weather_forecast["air_temperature"] / 10).plot(ax=ax2)
 
     ax.set_xlim(
         left=datetime.datetime.now() - datetime.timedelta(hours=2),
