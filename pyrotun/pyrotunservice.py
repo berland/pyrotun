@@ -9,6 +9,7 @@ from asyncio at regular intervals (similar to crontab)
 import asyncio
 import datetime
 import json
+import os
 from pathlib import Path
 from typing import Any, List
 
@@ -42,7 +43,7 @@ import pyrotun.polltibber
 import pyrotun.poweranalysis
 import pyrotun.powercontroller
 import pyrotun.powermodels
-import pyrotun.skyss
+
 import pyrotun.vent_calculations
 import pyrotun.yrmelding
 
@@ -131,6 +132,21 @@ def setup_crontabs(pers):
         logger.info("Linking Homeassistant")
         await pyrotun.hasslink.link_hass_states_to_openhab(pers)
 
+    @aiocron.crontab(EVERY_15_SECOND)
+    async def poll_unifiprotect():
+        await asyncio.sleep(3)
+        logger.info("Getting garage camera snapshot")
+        process = await asyncio.create_subprocess_exec(
+            "ffmpeg",
+            "-y",
+            "-i",
+            os.getenv("UNIFI_RTSP"),
+            "-vframes",
+            "1",
+            "/etc/openhab/html/garagecamera.png",
+        )
+        await process.wait()
+
     @aiocron.crontab(EVERY_10_SECOND)
     async def poll_homely():
         logger.info(" ** Polling Homely")
@@ -148,6 +164,7 @@ def setup_crontabs(pers):
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def poll_skyss():
+        return
         await asyncio.sleep(5)  # No need to overlap with ventilation
         logger.info(" ** Polling skyss")
         await pyrotun.skyss.main(pers)
