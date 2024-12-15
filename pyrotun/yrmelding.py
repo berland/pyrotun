@@ -54,7 +54,9 @@ async def main(pers=None):
         forecast_df["sunheight"].clip(0, 90)
         * (1 - forecast_df["cloud_area_fraction"] / 100)
     ) / 100
-    await pers.openhab.set_item("Yr_irradiation_now", irradiation_product.iloc[0], log=True)
+    await pers.openhab.set_item(
+        "Yr_irradiation_now", irradiation_product.iloc[0], log=True
+    )
     await pers.openhab.set_item(
         "Yr_irradiation_next12", irradiation_product.iloc[0:12].sum(), log=True
     )
