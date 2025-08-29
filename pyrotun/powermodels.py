@@ -134,14 +134,16 @@ async def make_heatingmodel(
 
     powerdata = {}
     for measure in powermeasures:
+        print(measure)
         powerdata[measure] = (
             # Må være på 10sek eller lavere for god forklaringsevne.
             # 1 sekund-oppløsning krever 0.5Mb overføring
-            (await pers.influxdb.get_series_grouped(measure, time="1s"))[measure]
+            (await pers.influxdb.get_series_grouped(measure, time="10s"))[measure]
             .ffill()
             .resample("1h")
             .mean()
         )
+    print("done")
 
     power_series = (
         pd.concat([powerdata[x] for x in powerdata], axis=1).fillna(value=0).sum(axis=1)
