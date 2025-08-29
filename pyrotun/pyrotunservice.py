@@ -28,6 +28,7 @@ import pyrotun.dataspike_remover
 
 # import pyrotun.discord
 import pyrotun.disruptive
+import pyrotun.exercise_analyzer
 import pyrotun.exercise_uploader
 import pyrotun.floors
 import pyrotun.hasslink
@@ -299,6 +300,7 @@ async def at_startup(pers) -> List[Any]:
 
     # Sets up an async generator:
     tasks.append(asyncio.create_task(pyrotun.exercise_uploader.main(pers)))
+    tasks.append(asyncio.create_task(pyrotun.exercise_analyzer.main(pers)))
 
     tasks.append(asyncio.create_task(pyrotun.houseshadow.amain("shadow.svg")))
 
