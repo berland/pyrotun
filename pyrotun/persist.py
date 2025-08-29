@@ -63,9 +63,9 @@ class PyrotunPersistence:
         if "smappee" in requested or "all" in requested:
             self.smappee = connections.smappee.SmappeeConnection()
 
-        if "skoda" in requested or "all" in requested:
-            self.skoda = connections.skoda.SkodaConnection()
-            await self.skoda.ainit(websession=self.websession)
+        #if "skoda" in requested or "all" in requested:
+        #    self.skoda = connections.skoda.SkodaConnection()
+        #    await self.skoda.ainit(websession=self.websession)
 
         if "solis" in requested or "all" in requested:
             self.solis = connections.solis.SolisConnection()

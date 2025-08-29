@@ -25,7 +25,8 @@ import pyrotun.connections.smappee
 import pyrotun.connections.solis
 import pyrotun.connections.tibber
 import pyrotun.dataspike_remover
-import pyrotun.discord
+
+# import pyrotun.discord
 import pyrotun.disruptive
 import pyrotun.exercise_uploader
 import pyrotun.floors
@@ -92,6 +93,8 @@ def setup_crontabs(pers):
     """Registers coroutines for execution via crontab syntax.
 
     Requires the persistence object to be initialized."""
+    # @aiocron.crontab(EVERY_MINUTE)
+    # async def poll_skoda():
 
     # @aiocron.crontab(EVERY_4_SECOND)
     async def get_alexa_last_command():
@@ -143,6 +146,7 @@ def setup_crontabs(pers):
             "-vframes",
             "1",
             "/etc/openhab/html/garagecamera.png",
+            stdout=asyncio.subprocess.DEVNULL,
         )
         await process.wait()
 
@@ -153,8 +157,8 @@ def setup_crontabs(pers):
 
     @aiocron.crontab(EVERY_MINUTE)
     async def poll_skoda():
-        logger.info(" ** Polling Skoda")
-        await pyrotun.pollskoda.amain(pers)
+        logger.info(" ** Polling Skoda - deactivated")
+        # await pyrotun.pollskoda.amain(pers)
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def vent_calc():
@@ -287,11 +291,11 @@ async def at_startup(pers) -> List[Any]:
     tasks.append(asyncio.create_task(pyrotun.polltibber.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.powercontroller.update_effekttrinn(pers)))
-    tasks.append(asyncio.create_task(pyrotun.discord.main(pers)))
+    # tasks.append(asyncio.create_task(pyrotun.discord.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.disruptive.main(pers)))
-    tasks.append(
-        asyncio.create_task(pyrotun.unifiprotect.main(pers, waitforever=False))
-    )
+    # tasks.append(
+    #    asyncio.create_task(pyrotun.unifiprotect.main(pers, waitforever=False))
+    # )
 
     # Sets up an async generator:
     tasks.append(asyncio.create_task(pyrotun.exercise_uploader.main(pers)))
