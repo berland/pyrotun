@@ -55,15 +55,15 @@ services:
   entity_id: vacuum.roborock_s7
   openhab_item: RoborockS7ActionControl
   service_path: vacuum/start
-- attribute: temperature
-  entity_id: climate.stuepumpe_room_temperature
-  openhab_item: Stue_varmepumpe_termostat_reell
-  service_path: climate/set_temperature
-- attribute: hvac_mode  # verdier kan være 'heat', 'cool', 'off'. Case sensitive
-  entity_id: climate.stuepumpe_room_temperature
-  openhab_item: Stue_varmepumpe_modus
-  service_path: climate/set_hvac_mode
-- attribute: fan_mode  # verdier kan være 'auto', 'silence, '1'...'5'
-  entity_id: climate.stuepumpe_room_temperature
-  openhab_item: Stue_varmepumpe_vifte
-  service_path: climate/set_fan_mode
+    #- attribute: temperature
+    #  entity_id: climate.stuepumpe_room_temperature
+    #  openhab_item: Stue_varmepumpe_termostat_reell
+    #  service_path: climate/set_temperature
+    #- attribute: hvac_mode  # verdier kan være 'heat', 'cool', 'off'. Case sensitive
+    #  entity_id: climate.stuepumpe_room_temperature
+    #  openhab_item: Stue_varmepumpe_modus
+    #  service_path: climate/set_hvac_mode
+    #- attribute: fan_mode  # verdier kan være 'auto', 'silence, '1'...'5'
+    #  entity_id: climate.stuepumpe_room_temperature
+    #  openhab_item: Stue_varmepumpe_vifte
+    #  service_path: climate/set_fan_mode

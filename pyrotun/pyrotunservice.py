@@ -147,9 +147,14 @@ def setup_crontabs(pers):
             "-vframes",
             "1",
             "/etc/openhab/html/garagecamera.png",
-            stdout=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-        await process.wait()
+        stdout_data, stderr_data = await process.communicate()
+        return_code = await process.wait()
+        if return_code:
+            logger.error(stdout_data.decode())
+            logger.error(stderr_data.decode())
 
     @aiocron.crontab(EVERY_10_SECOND)
     async def poll_homely():
