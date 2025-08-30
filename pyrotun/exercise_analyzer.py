@@ -150,7 +150,7 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
 
 async def analyze_all():
     dfs = []
-    dirs = sorted(glob.glob(str(EXERCISE_DIR / "2025*")))
+    dirs = sorted(glob.glob(str(EXERCISE_DIR / "20*")))
     for _dir in dirs:
         d = datetime.datetime.fromisoformat(Path(_dir).name)
         if d.weekday() == TUESDAY and d.hour == 18:
