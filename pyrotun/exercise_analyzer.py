@@ -87,7 +87,7 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
 
 
 async def analyze_torsdag(directory: Path) -> pd.DataFrame:
-    reader = activereader.Tcx.from_file(str(directory / "tcx"))
+    reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
     records: list[dict] = []
     order40s = 0
     order200 = 0
@@ -115,7 +115,7 @@ async def analyze_torsdag(directory: Path) -> pd.DataFrame:
 
 
 async def analyze_lordag(directory: Path) -> pd.DataFrame:
-    reader = activereader.Tcx.from_file(str(directory / "tcx"))
+    reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
     records: list[dict] = []
     ordersiljulang = 0
     order400 = 0
