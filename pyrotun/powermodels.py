@@ -34,6 +34,7 @@ class Powermodels:
             models = await make_heatingmodel(self.pers)
             self.powermodel = models["powermodel"]
             self.tempmodel = models["tempmodel"]
+            await asyncio.sleep(0.01)
             self.sunheatingmodel = await sunheating_model(self.pers)
 
 
@@ -124,9 +125,11 @@ async def make_heatingmodel(
     # Resampling in InfluxDB over Pandas for speed reasons.
     # BUG: get_series_grouped returns dataframe..
     target_series = (await pers.influxdb.get_series_grouped(target, time="1h"))[target]
+    await asyncio.sleep(0.01)
     ambient_series = (await pers.influxdb.get_series_grouped(ambient, time="1h"))[
         ambient
     ]
+    await asyncio.sleep(0.01)
     if not isinstance(powermeasure, list):
         powermeasures = [powermeasure]
     else:
@@ -134,6 +137,7 @@ async def make_heatingmodel(
 
     powerdata = {}
     for measure in powermeasures:
+        await asyncio.sleep(0.01)
         print(measure)
         powerdata[measure] = (
             # Må være på 10sek eller lavere for god forklaringsevne.
