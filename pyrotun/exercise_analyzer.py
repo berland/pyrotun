@@ -284,7 +284,7 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
             record = {
                 "order": ordersiljulang,
                 "category": "siljulang",
-                **lap_to_dict(lap),
+                **lap_to_dict(lap, excplicit_distance=2170),
             }
             records.append(record)
         if 350 < lap.distance_m < 450 and 50 < lap.total_time_s < 90:
