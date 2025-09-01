@@ -33,6 +33,12 @@ def speed_to_pace(speed_mps):
     return f"{minutes}:{seconds:02d}"
 
 
+def seconds_pr_km_to_pace(seconds):
+    minutes = int(seconds / 60)
+    seconds = int(seconds - minutes * 60)
+    return f"{minutes}:{seconds:02d}"
+
+
 def lap_to_dict(lap: activereader.tcx.Lap, explicit_distance=None) -> dict:
     if explicit_distance is not None:
         # Meters per second
@@ -91,6 +97,138 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
+async def make_description(directory: Path) -> dict[str, str]:
+    d = datetime.datetime.fromisoformat(directory.name)
+    if d.weekday() == TUESDAY and d.hour == 18:
+        data = await analyze_tirsdag(directory)
+        if data.empty:
+            return {}
+        rows_1000 = data["category"] == "tirsdag1000"
+        rows_500 = data["category"] == "tirsdag500"
+        rows_200 = data["category"] == "tirsdag200"
+        hr_cost = round(
+            (data[rows_1000]["hr_avg"] - data[rows_1000]["expected_hr_avg"]).mean(),
+            1,
+        )
+        if sum(rows_1000):
+            startfart1000 = seconds_pr_km_to_pace(
+                data[rows_1000]["time"].head(1).values[0]
+            )
+            sluttfart1000 = seconds_pr_km_to_pace(
+                data[rows_1000]["time"].tail(1).values[0]
+            )
+            desc_1000 = (
+                f"{startfart1000}->{sluttfart1000} på 1000 (pulskost {hr_cost}), "
+            )
+        else:
+            desc_1000 = ""
+        if sum(rows_500):
+            startfart500 = seconds_pr_km_to_pace(
+                data[rows_500]["time"].head(1).values[0] * 2
+            )
+            sluttfart500 = seconds_pr_km_to_pace(
+                data[rows_500]["time"].tail(1).values[0] * 2
+            )
+            desc_500 = f"{startfart500}->{sluttfart500} på 500, "
+        else:
+            desc_500 = ""
+        if sum(rows_200):
+            startfart200 = int(data[rows_200]["time"].head(1).values[0])
+            sluttfart200 = int(data[rows_200]["time"].tail(1).values[0])
+            desc_200 = f"{startfart200}->{sluttfart200} på 200"
+        else:
+            desc_200 = ""
+        return {
+            "title": f"BFG {sum(rows_1000)}x1000m, {sum(rows_500)}x500m, {sum(rows_200)}x200m, 6x60m",
+            "desc": f"{desc_1000}{desc_500}{desc_200}.",
+        }
+    if d.weekday() == THURSDAY and d.hour == 18:
+        data = await analyze_torsdag(directory)
+        if data.empty:
+            return {}
+        rows_40s = data["category"] == "torsdag40s"
+        rows_3000 = data["category"] == "torsdag3000"
+        rows_200 = data["category"] == "torsdag200"
+        if sum(rows_40s):
+            meanlength40s = int(data[rows_40s]["distance"].mean())
+            desc_40s = f"{meanlength40s}m pr 40s drag, "
+        else:
+            # (hvis noen andre har ropt f.eks., som 2025-02-06)
+            desc_40s = ""
+        if sum(rows_3000):
+            hr_cost = round(
+                (data[rows_3000]["hr_avg"] - data[rows_3000]["expected_hr_avg"]).mean(),
+                1,
+            )
+            desc_3000 = (
+                seconds_pr_km_to_pace(data[rows_3000]["time"].values[0] / 3)
+                + f" på 3000m (pulskost{hr_cost}), "
+            )
+        else:
+            desc_3000 = ""
+        if sum(rows_200):
+            startfart200 = int(data[rows_200]["time"].head(1).values[0])
+            sluttfart200 = int(data[rows_200]["time"].tail(1).values[0])
+            desc_200 = f"{startfart200}->{sluttfart200} på 200"
+        else:
+            desc_200 = ""
+        return {
+            "title": (
+                f"BFG {sum(rows_40s)}x40s, {'3000m, ' if sum(rows_3000) else ''}"
+                f"{sum(rows_200)}x200m, 6x60m"
+            ),
+            "desc": f"{desc_40s}{desc_3000}{desc_200}",
+        }
+    if d.weekday() == SATURDAY and d.hour == 9:
+        data = await analyze_lordag(directory)
+        if data.empty:
+            return {}
+        rows_lang = data["category"] == "siljulang"
+        rows_400 = data["category"] == "silju400"
+        rows_200 = data["category"] == "silju200"
+        if sum(rows_lang):
+            startfart_lang = seconds_pr_km_to_pace(
+                data[rows_lang]["time"].head(1).values[0]
+            )
+            sluttfart_lang = seconds_pr_km_to_pace(
+                data[rows_lang]["time"].tail(1).values[0]
+            )
+            langefarter = "-".join(
+                [seconds_pr_km_to_pace(t) for t in data[rows_lang]["time"].values]
+            )
+            hr_cost_lang = round(
+                (data[rows_lang]["hr_avg"] - data[rows_lang]["expected_hr_avg"]).mean(),
+                1,
+            )
+            desc_lang = (
+                f"{sum(rows_lang)} lange på {langefarter} (pulskost {hr_cost_lang}), "
+            )
+        else:
+            desc_lang = ""
+        if sum(rows_400):
+            startfart400 = int(data[rows_400]["time"].head(1).values[0])
+            sluttfart400 = int(data[rows_400]["time"].tail(1).values[0])
+            hr_cost_400 = round(
+                (data[rows_400]["hr_avg"] - data[rows_400]["expected_hr_avg"]).mean(),
+                1,
+            )
+            desc_400 = (
+                f"{startfart400}->{sluttfart400} på 400 (pulskost {hr_cost_400}). "
+            )
+        else:
+            desc_400 = ""
+        if sum(rows_200):
+            startfart200 = int(data[rows_200]["time"].head(1).values[0])
+            sluttfart200 = int(data[rows_200]["time"].tail(1).values[0])
+            desc_200 = f"{startfart200}->{sluttfart200} på 200, "
+        else:
+            desc_200 = ""
+        return {
+            "title": "BFG Siljustøl" if sum(rows_400) else "BFG-lørdag",
+            "desc": f"{desc_lang}{desc_400}{desc_200}6x60m.",
+        }
+
+
 async def analyze_torsdag(directory: Path) -> pd.DataFrame:
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
     records: list[dict] = []
@@ -116,7 +254,7 @@ async def analyze_torsdag(directory: Path) -> pd.DataFrame:
             }
             records.append(record)
             found3000 = True
-        elif 186 < lap.distance_m < 214 and 28 < lap.total_time_s < 42:
+        elif 180 < lap.distance_m < 214 and 28 < lap.total_time_s < 42:
             # WOWOW, plukker opp 40s-dragene,
             order200 = order200 + 1
             record = {
@@ -166,6 +304,14 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
             }
             records.append(record)
     return pd.DataFrame.from_records(records)
+
+
+async def describe():
+    dirs = sorted(glob.glob(str(EXERCISE_DIR / "202*")))
+    for _dir in dirs:
+        desc = await make_description(Path(_dir))
+        if desc:
+            print(f"{desc['title']}:    {Path(_dir).name}\n\t{desc['desc']}")
 
 
 async def analyze_all():
@@ -232,4 +378,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
     # asyncio.run(main())
-    asyncio.run(analyze_all())
+    # asyncio.run(analyze_all())
+    asyncio.run(describe())
