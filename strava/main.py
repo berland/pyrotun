@@ -1,26 +1,48 @@
-import pprint
+import datetime
 import hashlib
 import hmac
 import json
+import logging
 import os
+import pprint
 import time
 
 import httpx
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Header, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
+import asyncio
 
 VERIFY_TOKEN = "vapourfly"
-
+logger = logging.getLogger(__name__)
 load_dotenv()
 app = FastAPI()
 
 TOKEN_FILE = "/home/berland/.stra_tokens"
 CLIENT_SECRET = os.environ.get("STRAVA_CLIENT_SECRET")
 CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
+
+logging.basicConfig(level=logging.INFO)
+
+
+async def heartbeat_logger():
+    while True:
+        logger.info(" [ strava-app heartbeat (180s) ] ")
+        await asyncio.sleep(180)  # Log every 60 seconds
+
+
+@app.on_event("startup")
+async def startup_event():
+    await asyncio.sleep(5)
+    # refresh_token_if_needed(force=True)
+    # print_athlete_info()
+    # print_activity_info(15786634920)
+    # print_activity_info("15786634920")
+    # print_activity_info("16634920")
+    asyncio.create_task(heartbeat_logger())
 
 
 def load_tokens():
@@ -32,18 +54,22 @@ def load_tokens():
 
 
 def save_tokens(tokens):
+    logger.info("Persisting tokens to disk")
     with open(TOKEN_FILE, "w") as f:
-        json.dump(tokens, f)
+        json.dump(tokens, f, indent=2)
 
 
-def refresh_token_if_needed():
+def refresh_token_if_needed(force=False):
     tokens = load_tokens()
     if not tokens:
-        raise Exception("No tokens found. User must authenticate first.")
+        raise Exception(f"No tokens found. Construct {TOKEN_FILE}")
 
     now = int(time.time())
-    if tokens["expires_at"] <= now:
-        print("Access token expired, refreshing...")
+    if force:
+        logger.info("Force refresh of tokens")
+    if force or ("expires_at" not in tokens or tokens["expires_at"] <= now):
+        if not force:
+            logger.info("Access token expired, refreshing...")
         response = requests.post(
             "https://www.strava.com/oauth/token",
             data={
@@ -59,6 +85,9 @@ def refresh_token_if_needed():
             tokens["access_token"] = new_tokens["access_token"]
             tokens["refresh_token"] = new_tokens["refresh_token"]
             tokens["expires_at"] = new_tokens["expires_at"]
+            tokens["expires_at_iso"] = datetime.datetime.fromtimestamp(
+                new_tokens["expires_at"]
+            ).isoformat()
             save_tokens(tokens)
             print("Tokens refreshed and saved.")
         else:
@@ -71,6 +100,7 @@ def refresh_token_if_needed():
 @app.get("/strava-webhook")
 def verify_subscription(request: Request):
     params = dict(request.query_params)
+    print(params)
     if params.get("hub.verify_token") == VERIFY_TOKEN:
         return {"hub.challenge": params.get("hub.challenge")}
     return JSONResponse(status_code=403, content={"error": "Invalid verify token"})
@@ -91,21 +121,34 @@ async def receive_event(payload: dict):
         if not hmac.compare_digest(signature, expected_signature):
             return "Invalid signature", 403
 
-    print(f"Received event from Strava:")
+    print("Received event from Strava:")
     pprint.pprint(payload)
     # Handle different event types here
     activity_id = payload.get("object_id")
     print_activity_info(activity_id)
-    await download_tcx(activity_id, "activity.tcx")
+    # await download_tcx(activity_id, "activity.tcx")
     if payload.get("aspect_type") == "create":
-        update_activity(activity_id, "Raaserv app was here", "yay, long desc")
+        update_activity(activity_id, "Morgenrun", "..")
         # await download_tcx(activity_id, "activity.tcx")
 
     return "", 200
 
+    print()
 
-@app.get("/exchange_token")
-async def exchange_token(code: str):
+
+@app.get("/oauth/callback")
+async def exchange_token(request: Request):
+    """This function is called by Strava when the User clicks 'Authorize' to authorize
+    this app. To get to the authorize webpage, use a browser where user is logged in at Strava
+    and visit
+
+    https://www.strava.com/oauth/authorize?client_id=XXXXXXX&response_type=code&redirect_uri=https://XXXXXXXXX.ngrok-free.app/oauth/callback&scope=read,activity:read_all&approval_prompt=force
+    """
+    params = dict(request.query_params)
+    code = params.get("code")
+    state = params.get("state")  # Optional, for CSRF protection if you use it
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing code parameter")
     token_url = "https://www.strava.com/api/v3/oauth/token"
 
     data = {
@@ -128,24 +171,39 @@ async def exchange_token(code: str):
             "access_token": tokens["access_token"],
             "refresh_token": tokens["refresh_token"],
             "expires_at": tokens["expires_at"],
+            "expires_at_iso": datetime.datetime.fromtimestamp(
+                tokens["expires_at"]
+            ).isoformat(),
         }
     )
 
 
-def print_activity_info(activity_id):
+def print_athlete_info():
+    access_token = refresh_token_if_needed()
+    url = "https://www.strava.com/api/v3/athlete"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(url, headers=headers)
+
+    print(response)
+    print(response.json())
+
+
+def print_activity_info(activity_id: str):
     access_token = refresh_token_if_needed()
     url = f"https://www.strava.com/api/v3/activities/{activity_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
+    print(url)
+    print(headers)
+    response = requests.get(url, headers=headers)
 
-    meta = requests.get(url, headers=headers)
-
-    activity = meta.json()
+    print(response)
+    activity = response.json()
     print("*** ACTIVITY INFO ***")
     pprint.pprint(activity)
     print("*** ACTIVITY END ***")
 
 
-def update_activity(activity_id, new_title, new_description):
+def update_activity(activity_id: str, new_title: str, new_description: str):
     access_token = refresh_token_if_needed()
     url = f"https://www.strava.com/api/v3/activities/{activity_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
