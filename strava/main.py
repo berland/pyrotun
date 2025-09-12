@@ -1,6 +1,4 @@
 import datetime
-import hashlib
-import hmac
 import json
 import logging
 import os
@@ -12,6 +10,8 @@ import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+
+from pyrotun import exercise_analyzer
 
 app = FastAPI()
 import asyncio
@@ -108,25 +108,12 @@ def verify_subscription(request: Request):
 
 @app.post("/strava-webhook")
 async def receive_event(payload: dict):
-    if False:
-        print("THERE was a signature")
-        print(payload)
-        raw_body = payload
-        expected_signature = hmac.new(
-            key=CLIENT_SECRET.encode("utf-8"),
-            msg=raw_body,
-            digestmod=hashlib.sha256,
-        ).hexdigest()
-
-        if not hmac.compare_digest(signature, expected_signature):
-            return "Invalid signature", 403
-
     print("Received event from Strava:")
     pprint.pprint(payload)
-    # Handle different event types here
+
     activity_id = payload.get("object_id")
-    print_activity_info(activity_id)
-    # await download_tcx(activity_id, "activity.tcx")
+    await process_activity_update(activity_id)
+
     if payload.get("aspect_type") == "create":
         update_activity(activity_id, "Morgenrun", "..")
         # await download_tcx(activity_id, "activity.tcx")
@@ -142,11 +129,10 @@ async def exchange_token(request: Request):
     this app. To get to the authorize webpage, use a browser where user is logged in at Strava
     and visit
 
-    https://www.strava.com/oauth/authorize?client_id=XXXXXXX&response_type=code&redirect_uri=https://XXXXXXXXX.ngrok-free.app/oauth/callback&scope=read,activity:read_all&approval_prompt=force
+    https://www.strava.com/oauth/authorize?client_id=XXXXXXX&response_type=code&redirect_uri=https://XXXXXXXXX.ngrok-free.app/oauth/callback&scope=read,activity:read_all,activity:write&approval_prompt=force
     """
     params = dict(request.query_params)
     code = params.get("code")
-    state = params.get("state")  # Optional, for CSRF protection if you use it
     if not code:
         raise HTTPException(status_code=400, detail="Missing code parameter")
     token_url = "https://www.strava.com/api/v3/oauth/token"
@@ -188,7 +174,7 @@ def print_athlete_info():
     print(response.json())
 
 
-def print_activity_info(activity_id: str):
+async def process_activity_update(activity_id: str):
     access_token = refresh_token_if_needed()
     url = f"https://www.strava.com/api/v3/activities/{activity_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -199,15 +185,20 @@ def print_activity_info(activity_id: str):
     print(response)
     activity = response.json()
     print("*** ACTIVITY INFO ***")
-    pprint.pprint(activity)
+    pprint.pprint(upper_dict_layer(activity))
     print("*** ACTIVITY END ***")
 
+    updates = await exercise_analyzer.make_description_from_stravaactivity(activity)
+    print(f"Computed activity updates: {updates}")
 
-def update_activity(activity_id: str, new_title: str, new_description: str):
+    if "Run" in activity["name"]:
+        update_activity(activity_id, updates)
+
+
+def update_activity(activity_id: str, data):
     access_token = refresh_token_if_needed()
     url = f"https://www.strava.com/api/v3/activities/{activity_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
-    data = {"name": new_title, "description": new_description}
     response = requests.put(url, headers=headers, data=data)
 
     if response.status_code == 200:
@@ -241,3 +232,10 @@ async def download_tcx(activity_id: str, save_path: str) -> None:
         )
 
     print(response.text)
+
+def upper_dict_layer(dict) -> dict:
+    newdict = {}
+    for key, value in dict:
+        if not isinstance(value, dict):
+            newdict[key] = value
+    return newdict

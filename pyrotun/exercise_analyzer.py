@@ -37,6 +37,8 @@ LAP_CENTROIDS = {
     "tirsdag200": {"lon": 5.319548818252679, "lat": 60.29029686700665},
     "tirsdag500": {"lon": 5.341696926437765, "lat": 60.27289127429241},
     "tirsdag1000": {"lon": 5.3658868288692, "lat": 60.27033820109348},
+    "work": {"lon": 5.288397, "lat": 60.298407 },
+    "home": {"lon": 5.323187, "lat": 60.290948}
 }
 
 
@@ -84,6 +86,9 @@ def lap_to_dict(lap: activereader.tcx.Lap, explicit_distance=None) -> dict:
 
 
 def lap_centroid_dist(category: str, centroid_dict: dict) -> float:
+    if centroid_dict["lon"] is None or centroid_dict["lat"] is None:
+        print("coordinates were None")
+        return 1000000000000000000
     return distance.distance(
         tuple(LAP_CENTROIDS[category].values()),
         (centroid_dict["lon"], centroid_dict["lat"]),
@@ -136,7 +141,31 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
-async def make_description(directory: Path) -> dict[str, str]:
+async def make_description_from_stravaactivity(data: dict):
+    start_coord = {
+        "lat": data.get("start_latlng", [None, None])[0],
+        "lon": data.get("start_latlng", [None, None])[1],
+    }
+    end_coord = {
+        "lat": data.get("end_latlng", [None, None])[0],
+        "lon": data.get("end_latlng", [None, None])[1],
+    }
+    updates = {}
+    if lap_centroid_dist("home", start_coord) < 200 and lap_centroid_dist("work", end_coord) < 200:
+        updates["name"] = "Til jobb"
+    if lap_centroid_dist("work", start_coord) < 200 and lap_centroid_dist("home", end_coord) < 200:
+        updates["name"] = "Hjem fra jobb"
+    if "jobb" in updates.get("name", ""):
+        updates["commute"] = True
+        updates["hide_from_home"] = True
+        if data["distance"] > 4500:
+            updates["description"] = "Omvei"
+        if data["distance"] > 7000:
+            updates["description"] = "Lang omvei"
+            updates["hide_from_home"] = False
+    return updates
+
+async def make_description_from_tcx(directory: Path) -> dict[str, str]:
     d = datetime.datetime.fromisoformat(directory.name)
     if d.weekday() == TUESDAY and d.hour == 18:
         data = await analyze_tirsdag(directory)
@@ -348,7 +377,7 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
 async def describe():
     dirs = sorted(glob.glob(str(EXERCISE_DIR / "202*")))
     for _dir in dirs:
-        desc = await make_description(Path(_dir))
+        desc = await make_description_from_tcx(Path(_dir))
         if desc:
             print(f"{desc['title']}:    {Path(_dir).name}\n\t{desc['desc']}")
 
