@@ -7,8 +7,10 @@ from pathlib import Path
 
 import activereader
 import dotenv
+import numpy as np
 import pandas as pd
 import watchfiles
+from geopy import distance
 
 import pyrotun
 import pyrotun.persist
@@ -22,6 +24,20 @@ SATURDAY = 5
 EXERCISE_DIR = Path.home() / "polar_dump"
 
 logger = pyrotun.getLogger(__name__)
+
+# midpoints = pd.read_csv("intervaller.csv").groupby("category").agg("mean")[["lon", "lat"]]
+# midpoints.to_dict(orient="index")
+LAP_CENTROIDS = {
+    "torsdag40s": {"lon": 5.282329871212935, "lat": 60.29923441179828},
+    "torsdag3000": {"lon": 5.2924457330164, "lat": 60.29050007675862},
+    "siljulang": {"lon": 5.304600518840247, "lat": 60.29737223157386},
+    "silju200": {"lon": 5.317422952368899, "lat": 60.291241335829895},
+    "silju400": {"lon": 5.317486788439951, "lat": 60.29053396667061},
+    "torsdag200": {"lon": 5.318714879288788, "lat": 60.29041950444813},
+    "tirsdag200": {"lon": 5.319548818252679, "lat": 60.29029686700665},
+    "tirsdag500": {"lon": 5.341696926437765, "lat": 60.27289127429241},
+    "tirsdag1000": {"lon": 5.3658868288692, "lat": 60.27033820109348},
+}
 
 
 def speed_to_pace(speed_mps):
@@ -40,6 +56,8 @@ def seconds_pr_km_to_pace(seconds):
 
 
 def lap_to_dict(lap: activereader.tcx.Lap, explicit_distance=None) -> dict:
+    lats = [p.lat for p in lap.trackpoints if p.lat is not None]
+    lons = [p.lon for p in lap.trackpoints if p.lon is not None]
     if explicit_distance is not None:
         # Meters per second
         pace = explicit_distance / lap.total_time_s
@@ -47,20 +65,29 @@ def lap_to_dict(lap: activereader.tcx.Lap, explicit_distance=None) -> dict:
         # Meters per second
         pace = lap.avg_speed_ms
     expected_hr_avg = None
-    if pace > 3.0:
+    if pace is not None and pace > 3.0:
         expected_hr_avg = 130 + (pace - 3.854) * (170 - 130) / (5.04 - 3.854)
     return {
         "date": str(lap.start_time.date()),
         "epoch": int(lap.start_time.timestamp()),
         "distance": round(lap.distance_m, 1),
-        "speed_ms": round(lap.avg_speed_ms, 3),
-        "hr_avg": lap.hr_avg if lap.hr_avg and 130 < lap.hr_avg < 180 else None,
+        "speed_ms": round(lap.avg_speed_ms or 0, 3),
+        "hr_avg": lap.hr_avg if lap.hr_avg and 140 < lap.hr_avg < 180 else None,
         "expected_hr_avg": round(expected_hr_avg, 1) if expected_hr_avg else None,
         "hr_max": lap.hr_max if lap.hr_max and 140 < lap.hr_max < 190 else None,
         "time": lap.total_time_s,
-        "gps_pace": speed_to_pace(lap.avg_speed_ms),
-        "pace": speed_to_pace(pace),
+        "gps_pace": speed_to_pace(lap.avg_speed_ms or 0),
+        "pace": speed_to_pace(pace or 0),
+        "lon": np.nanmean(lons) if lons else None,
+        "lat": np.nanmean(lats) if lats else None,
     }
+
+
+def lap_centroid_dist(category: str, centroid_dict: dict) -> float:
+    return distance.distance(
+        tuple(LAP_CENTROIDS[category].values()),
+        (centroid_dict["lon"], centroid_dict["lat"]),
+    ).meters
 
 
 async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
@@ -70,21 +97,32 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
     order500 = 0
     order200 = 0
     for lap in reader.laps:
-        if 900 < lap.distance_m < 1100 and 180 < lap.total_time_s < 270:
+        centroid = lap_to_dict(lap)
+        if (
+            900 < lap.distance_m < 1100
+            and 180 < lap.total_time_s < 270
+            and lap_centroid_dist("tirsdag1000", centroid) < 4500
+        ):
             order1000 = order1000 + 1
             record = {
                 "order": order1000,
                 "category": "tirsdag1000",
                 **lap_to_dict(lap, explicit_distance=1000),
             }
+            record["cat_centroid_dist"] = lap_centroid_dist("tirsdag1000", centroid)
             records.append(record)
-        if 400 < lap.distance_m < 600 and 60 < lap.total_time_s < 120:
+        elif (
+            400 < lap.distance_m < 600
+            and 60 < lap.total_time_s < 120
+            and lap_centroid_dist("tirsdag500", centroid) < 4000
+        ):
             order500 = order500 + 1
             record = {
                 "order": order500,
                 "category": "tirsdag500",
                 **lap_to_dict(lap, explicit_distance=500),
             }
+            record["cat_centroid_dist"] = lap_centroid_dist("tirsdag500", centroid)
             records.append(record)
         if 150 < lap.distance_m < 250 and 25 < lap.total_time_s < 45:
             order200 = order200 + 1
@@ -93,6 +131,7 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
                 "category": "tirsdag200",
                 **lap_to_dict(lap, explicit_distance=200),
             }
+            record["cat_centroid_dist"] = lap_centroid_dist("tirsdag200", centroid)
             records.append(record)
     return pd.DataFrame.from_records(records)
 
@@ -187,12 +226,12 @@ async def make_description(directory: Path) -> dict[str, str]:
         rows_400 = data["category"] == "silju400"
         rows_200 = data["category"] == "silju200"
         if sum(rows_lang):
-            startfart_lang = seconds_pr_km_to_pace(
-                data[rows_lang]["time"].head(1).values[0]
-            )
-            sluttfart_lang = seconds_pr_km_to_pace(
-                data[rows_lang]["time"].tail(1).values[0]
-            )
+            # _startfart_lang = seconds_pr_km_to_pace(
+            #    data[rows_lang]["time"].head(1).values[0]
+            # )
+            # _sluttfart_lang = seconds_pr_km_to_pace(
+            #    data[rows_lang]["time"].tail(1).values[0]
+            # )
             langefarter = "-".join(
                 [seconds_pr_km_to_pace(t) for t in data[rows_lang]["time"].values]
             )
@@ -284,7 +323,7 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
             record = {
                 "order": ordersiljulang,
                 "category": "siljulang",
-                **lap_to_dict(lap, excplicit_distance=2170),
+                **lap_to_dict(lap, explicit_distance=2170),
             }
             records.append(record)
         if 350 < lap.distance_m < 450 and 50 < lap.total_time_s < 90:
@@ -316,7 +355,7 @@ async def describe():
 
 async def analyze_all():
     dfs = []
-    dirs = sorted(glob.glob(str(EXERCISE_DIR / "20*")))
+    dirs = sorted(glob.glob(str(EXERCISE_DIR / "202*")))
     for _dir in dirs:
         await asyncio.sleep(0.1)
         d = datetime.datetime.fromisoformat(Path(_dir).name)
@@ -378,5 +417,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
     # asyncio.run(main())
-    # asyncio.run(analyze_all())
+    asyncio.run(analyze_all())
     asyncio.run(describe())
