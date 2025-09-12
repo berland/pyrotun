@@ -272,7 +272,7 @@ def setup_crontabs(pers):
         logger.info(" ** Houseshadow")
         pyrotun.houseshadow.main("/etc/openhab/html/husskygge.svg")
 
-    @aiocron.crontab(EVERY_15_MINUTE)
+    @aiocron.crontab(EVERY_5_MINUTE)
     async def polar_dump_now():
         logger.info(" ** Polar dumper")
         pyrotun.polar_dump.main()

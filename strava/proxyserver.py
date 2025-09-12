@@ -61,8 +61,35 @@ def register_strava_webhook(public_url: str):
     else:
         print("Failed to register webhook:", response.text)
 
+def wait_for_fastapi(url=f"http://localhost:{PORT}/health", timeout=30, interval=1):
+    """
+    Wait until the FastAPI app responds at the given URL or timeout.
 
+    Args:
+        url (str): The URL to check (ideally a lightweight healthcheck endpoint)
+        timeout (int): Max seconds to wait
+        interval (int): Seconds between retries
+
+    Returns:
+        bool: True if server responded, False if timed out
+    """
+    start_time = time.time()
+    while True:
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                print(f"FastAPI is up! Responded in {time.time() - start_time:.1f}s")
+                return True
+        except requests.ConnectionError:
+            pass  # Server not up yet
+
+        if time.time() - start_time > timeout:
+            print(f"Timeout waiting for FastAPI after {timeout}s")
+            return False
+
+        time.sleep(interval)
 if __name__ == "__main__":
+    wait_for_fastapi()
     print("Starting ngrok...")
     try:
         public_url = start_ngrok()

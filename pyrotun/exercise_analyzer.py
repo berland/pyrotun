@@ -74,7 +74,7 @@ def lap_to_dict(lap: activereader.tcx.Lap, explicit_distance=None) -> dict:
         "epoch": int(lap.start_time.timestamp()),
         "distance": round(lap.distance_m, 1),
         "speed_ms": round(lap.avg_speed_ms or 0, 3),
-        "hr_avg": lap.hr_avg if lap.hr_avg and 140 < lap.hr_avg < 180 else None,
+        "hr_avg": lap.hr_avg if lap.hr_avg and 120 < lap.hr_avg < 180 else None,
         "expected_hr_avg": round(expected_hr_avg, 1) if expected_hr_avg else None,
         "hr_max": lap.hr_max if lap.hr_max and 140 < lap.hr_max < 190 else None,
         "time": lap.total_time_s,
@@ -86,14 +86,14 @@ def lap_to_dict(lap: activereader.tcx.Lap, explicit_distance=None) -> dict:
 
 
 def lap_centroid_dist(category: str, centroid_dict: dict) -> float:
-    if centroid_dict["lon"] is None or centroid_dict["lat"] is None:
+    try:
+        return distance.distance(
+            tuple(LAP_CENTROIDS[category].values()),
+            (centroid_dict["lon"], centroid_dict["lat"]),
+        ).meters
+    except (KeyError, ValueError):
         print("coordinates were None")
         return 1000000000000000000
-    return distance.distance(
-        tuple(LAP_CENTROIDS[category].values()),
-        (centroid_dict["lon"], centroid_dict["lat"]),
-    ).meters
-
 
 async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
@@ -142,14 +142,18 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
 
 
 async def make_description_from_stravaactivity(data: dict):
-    start_coord = {
-        "lat": data.get("start_latlng", [None, None])[0],
-        "lon": data.get("start_latlng", [None, None])[1],
-    }
-    end_coord = {
-        "lat": data.get("end_latlng", [None, None])[0],
-        "lon": data.get("end_latlng", [None, None])[1],
-    }
+    start_coord = {}
+    if data.get("start_latlng") and len(data.get("start_latlng")) == 2:
+        start_coord = {
+            "lat": data.get("start_latlng")[0],
+            "lon": data.get("start_latlng")[1],
+        }
+    end_coord={}
+    if data.get("end_coord") and len(data.get("end_latlng")) == 2:
+        end_coord = {
+            "lat": data.get("end_latlng")[0],
+            "lon": data.get("end_latlng")[1],
+        }
     updates = {}
     if lap_centroid_dist("home", start_coord) < 200 and lap_centroid_dist("work", end_coord) < 200:
         updates["name"] = "Til jobb"
@@ -228,9 +232,10 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
                 (data[rows_3000]["hr_avg"] - data[rows_3000]["expected_hr_avg"]).mean(),
                 1,
             )
+            puls_str = f" (pulskostnad {hr_cost})" if hr_cost else ""
             desc_3000 = (
                 seconds_pr_km_to_pace(data[rows_3000]["time"].values[0] / 3)
-                + f" på 3000m (pulskost{hr_cost}), "
+                + f" på 3000m{puls_str}, "
             )
         else:
             desc_3000 = ""
@@ -292,8 +297,8 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
         else:
             desc_200 = ""
         return {
-            "title": "BFG Siljustøl" if sum(rows_400) else "BFG-lørdag",
-            "desc": f"{desc_lang}{desc_400}{desc_200}6x60m.",
+            "name": "BFG Siljustøl" if sum(rows_400) else "BFG-lørdag",
+            "description": f"{desc_lang}{desc_400}{desc_200}6x60m.",
         }
 
 
@@ -379,7 +384,7 @@ async def describe():
     for _dir in dirs:
         desc = await make_description_from_tcx(Path(_dir))
         if desc:
-            print(f"{desc['title']}:    {Path(_dir).name}\n\t{desc['desc']}")
+            print(f"{desc['name']}:    {Path(_dir).name}\n\t{desc['description']}")
 
 
 async def analyze_all():

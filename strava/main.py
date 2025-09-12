@@ -4,12 +4,13 @@ import logging
 import os
 import pprint
 import time
+from pathlib import Path
 
 import httpx
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from pyrotun import exercise_analyzer
 
@@ -112,15 +113,18 @@ async def receive_event(payload: dict):
     pprint.pprint(payload)
 
     activity_id = payload.get("object_id")
+    if payload.get("aspect_type") == "delete":
+        return "", 200
+
     await process_activity_update(activity_id)
 
-    if payload.get("aspect_type") == "create":
-        update_activity(activity_id, "Morgenrun", "..")
-        # await download_tcx(activity_id, "activity.tcx")
 
     return "", 200
 
-    print()
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 
 @app.get("/oauth/callback")
@@ -162,6 +166,7 @@ async def exchange_token(request: Request):
             ).isoformat(),
         }
     )
+    return RedirectResponse(url="/dashboard")
 
 
 def print_athlete_info():
@@ -189,10 +194,26 @@ async def process_activity_update(activity_id: str):
     print("*** ACTIVITY END ***")
 
     updates = await exercise_analyzer.make_description_from_stravaactivity(activity)
-    print(f"Computed activity updates: {updates}")
-
-    if "Run" in activity["name"]:
+    if updates and "Run" in activity["name"]:
+        print(f"Submitting activity updates: {updates}")
         update_activity(activity_id, updates)
+
+
+    if "start_date_local" in activity:
+        counter = 0
+        tcxfilename = None
+        while counter < 30 * 60 and tcxfilename is None:
+            tcxfilename = find_nearby_file(activity["start_date_local"])
+            counter += 1
+            await asyncio.sleep(1)
+        if tcxfilename:
+            updates = await exercise_analyzer.make_description_from_tcx(tcxfilename)
+            if updates and "Run" in activity["name"]:
+                print(f"Submitting activity updates: {updates}")
+                update_activity(activity_id, updates)
+            else:
+                print(f"Computed updates, but not submitting: {updates}")
+
 
 
 def update_activity(activity_id: str, data):
@@ -209,6 +230,17 @@ def update_activity(activity_id: str, data):
         print(response.text)
         return None
 
+def find_nearby_file(iso_timestamp_from_strava, seconds_range=3) -> Path | None:
+    base_dir=Path("/home/berland/polar_dump")
+    fmt = "%Y-%m-%dT%H:%M:%S"
+    base_time = datetime.datetime.strptime(iso_timestamp_from_strava.rstrip("Z"), fmt)
+
+    for delta_sec in range(-seconds_range, seconds_range + 1):
+        candidate_time = base_time + datetime.timedelta(seconds=delta_sec)
+        candidate_path = base_dir / candidate_time.strftime(fmt) / "tcx"
+        if candidate_path.exists():
+            return candidate_path.parent  # Return the first match
+    return None
 
 async def download_tcx(activity_id: str, save_path: str) -> None:
     access_token = refresh_token_if_needed()
@@ -233,9 +265,5 @@ async def download_tcx(activity_id: str, save_path: str) -> None:
 
     print(response.text)
 
-def upper_dict_layer(dict) -> dict:
-    newdict = {}
-    for key, value in dict:
-        if not isinstance(value, dict):
-            newdict[key] = value
-    return newdict
+def upper_dict_layer(d: dict) -> dict:
+    return {k: v for k, v in dict(d).items() if not isinstance(v, dict) and not isinstance(v, list)}

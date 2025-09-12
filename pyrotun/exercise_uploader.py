@@ -16,6 +16,7 @@ from geopy import distance
 
 import pyrotun
 import pyrotun.persist
+from pyrotun import exercise_analyzer
 
 dotenv.load_dotenv()
 
@@ -91,7 +92,7 @@ assert timedeltaformatter(60) == "0:01"
 assert timedeltaformatter(60 * 60) == "1:00"
 
 
-def make_http_post_data(dirname: Path) -> Dict[str, str]:
+async def make_http_post_data(dirname: Path) -> Dict[str, str]:
     exercise_datetime = dateutil.parser.isoparse(dirname.name)
     exercise_summary = json.loads((Path(dirname) / "exercise_summary").read_text())
     heart_rate_zones = json.loads((Path(dirname) / "heart_rate_zones").read_text())
@@ -127,7 +128,12 @@ def make_http_post_data(dirname: Path) -> Dict[str, str]:
         move_time = sum(ddf[ddf.moving].t_delta)
         moving_speed = prettyprintseconds(move_time / (dist / 1000.0))
 
-    details = ""
+    auto_desc = await exercise_analyzer.make_description_from_tcx(dirname)
+    if auto_desc:
+        details = f"{auto_desc['name']} {auto_desc['description']}"
+    else:
+        details = ""
+
     if "distance" in exercise_summary:
         distance = exercise_summary["distance"] / 1000
         details += f"{distance:.1f} km. "
@@ -183,7 +189,7 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
         postdata = None
         if force or not (dirname / DONE_FILE).is_file():
             logger.info("making post data")
-            postdata = make_http_post_data(dirname)
+            postdata = await make_http_post_data(dirname)
             logger.info("postdata is %s", str(postdata))
         if postdata is None:
             return
