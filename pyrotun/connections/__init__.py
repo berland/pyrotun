@@ -4,7 +4,6 @@ from . import (  # noqa
     influxdb,
     myuplink,
     openhab,
-    skoda,
     smappee,
     solis,
     tibber,

@@ -20,7 +20,6 @@ import pyrotun
 import pyrotun.connections.hass
 import pyrotun.connections.homely
 import pyrotun.connections.openhab
-import pyrotun.connections.skoda
 import pyrotun.connections.smappee
 import pyrotun.connections.solis
 import pyrotun.connections.tibber
@@ -94,10 +93,7 @@ def setup_crontabs(pers):
     """Registers coroutines for execution via crontab syntax.
 
     Requires the persistence object to be initialized."""
-    # @aiocron.crontab(EVERY_MINUTE)
-    # async def poll_skoda():
 
-    # @aiocron.crontab(EVERY_4_SECOND)
     async def get_alexa_last_command():
         # Band-aid until alexa binding is updated.
         async with pers.websession.get(
@@ -163,8 +159,8 @@ def setup_crontabs(pers):
 
     @aiocron.crontab(EVERY_MINUTE)
     async def poll_skoda():
-        logger.info(" ** Polling Skoda - deactivated")
-        # await pyrotun.pollskoda.amain(pers)
+        logger.info(" ** Polling Skoda")
+        await pyrotun.pollskoda.amain(pers)
 
     @aiocron.crontab(EVERY_15_SECOND)
     async def vent_calc():
