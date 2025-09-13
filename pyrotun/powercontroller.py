@@ -352,7 +352,7 @@ def _estimate_currenthourusage(
         return round(lastminute_value)
     time_min = lasthour_series.index.min()
     time_max = time_min + datetime.timedelta(hours=1)
-    lasthour_s = lasthour_series.resample("s").mean().fillna(method="ffill")
+    lasthour_s = lasthour_series.resample("s").mean().ffill()
     remainder_hour = pd.Series(
         index=pd.date_range(
             start=lasthour_s.index[-1] + datetime.timedelta(seconds=1),

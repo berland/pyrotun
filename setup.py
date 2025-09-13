@@ -4,7 +4,8 @@ import setuptools
 from setuptools import find_packages
 
 REQUIREMENTS = [
-    "aiocron",
+    "activereader",
+    "aiocron<2",  # aiocron 2.1 støtter ikke sekund-felt
     "aiofiles",
     "aiohttp",
     "aioinflux",
