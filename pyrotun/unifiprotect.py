@@ -52,7 +52,7 @@ async def fetch_snapshot(protect: ProtectApiClient, filename: Path) -> None:
 def process_camera_event(message: WSSubscriptionMessage):
     """This function is called whenever an event (a message) occurs
     on the websocket from unifiprotect."""
-    for key in SWITCH_ITEMS:
+    for key, _ in SWITCH_ITEMS.items():
         if key in message.changed_data:
             value = bool(message.changed_data[key])
             if SWITCH_ITEMS[key].get("inverted", False):

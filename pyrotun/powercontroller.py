@@ -272,7 +272,7 @@ async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
     assert action in {"ON", "OFF"}
     mintemp_for_thermostats = 11
     logger.info(f" *** Turning {action} {device}")
-    if "setpoint_item" in device and device["setpoint_item"] is not np.nan:
+    if "setpoint_item" in device and not np.isnan(device["setpoint_item"]):
         if action == "ON":
             if isinstance(device["setpoint_item"], str):
                 device["setpoint_item"] = [device["setpoint_item"]]
@@ -303,7 +303,7 @@ async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
                         log=True,
                     )
 
-    elif "switch_item" in device and device["switch_item"] is not np.nan:
+    elif "switch_item" in device and not np.isnan(device["switch_item"]):
         # Simple switch item to flip:
         if device.get("inverted_switch", False):
             action = {"ON": "OFF", "OFF": "ON"}[action]

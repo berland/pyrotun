@@ -1,3 +1,4 @@
+import contextlib
 import os
 
 import aiohttp
@@ -40,10 +41,8 @@ class UnifiProtectConnection:
             verify_ssl=False,
             session=self.websession,
         )
-        try:
+        with contextlib.suppress(pyunifiprotect.exceptions.NotAuthorized):
             await self.protect.update()  # Sets up websocket
-        except pyunifiprotect.exceptions.NotAuthorized:
-            pass
 
     async def aclose(self):
         # Close ws subscription:

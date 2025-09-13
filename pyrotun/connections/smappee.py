@@ -36,9 +36,7 @@ class SmappeeConnection:
     def authenticate(self):
         self.mysmappee = smappy.Smappee(self.user, self.token)
         response = self.mysmappee.authenticate(self.user, self.pword)
-        if response:
-            return True
-        return False
+        return bool(response)
 
     def get_recent_df(self, minutes, aggregation=1):
         tz = pytz.timezone(os.getenv("TIMEZONE"))

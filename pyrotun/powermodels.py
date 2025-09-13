@@ -300,6 +300,7 @@ async def elva_main(pers=None):
         include_sun=False,
     )
 
+    print(res)
     if closepers:
         await pers.aclose()
 
@@ -315,6 +316,7 @@ async def main(pers=None):
         pers,
         include_sun=False,
     )
+    print(res)
 
     print("Sun heating model")
     sun = await sunheating_model(pers)
