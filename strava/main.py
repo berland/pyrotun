@@ -188,9 +188,10 @@ async def process_activity_update(activity_id: str):
     response = requests.get(url, headers=headers)
 
     print(response)
-    activity = response.json()
+    activity: dict = response.json()
     print("*** ACTIVITY INFO ***")
     pprint.pprint(upper_dict_layer(activity))
+    #pprint.pprint(activity)
     print("*** ACTIVITY END ***")
 
     updates = await exercise_analyzer.make_description_from_stravaactivity(activity)

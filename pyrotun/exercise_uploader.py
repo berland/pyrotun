@@ -128,11 +128,14 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
         move_time = sum(ddf[ddf.moving].t_delta)
         moving_speed = prettyprintseconds(move_time / (dist / 1000.0))
 
+    title = MAP_SPORT_INFO.get(exercise_summary["detailed-sport-info"], "polar v")
+
     auto_desc = await exercise_analyzer.make_description_from_tcx(dirname)
-    if auto_desc:
-        details = f"{auto_desc['name']} {auto_desc['description']}"
-    else:
-        details = ""
+
+    details = f"{auto_desc['name']} {auto_desc['description']}" if auto_desc else ""
+
+    if "BFG" in details:
+        title += ", intervall"
 
     if "distance" in exercise_summary:
         distance = exercise_summary["distance"] / 1000
@@ -163,7 +166,7 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
     return {
         "legginn": "ja",
         "navn": os.getenv("EXERCISE_NAME"),
-        "hva": MAP_SPORT_INFO.get(exercise_summary["detailed-sport-info"], "polar v"),
+        "hva": title,
         "dato": exercise_datetime.strftime("%Y-%m-%d"),
         "hoyintensitet": threezones_df.loc["hoy"]["hh:mm"],
         "modintensitet": threezones_df.loc["moderat"]["hh:mm"],

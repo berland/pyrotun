@@ -141,19 +141,13 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
-async def make_description_from_stravaactivity(data: dict):
-    start_coord = {}
-    if data.get("start_latlng") and len(data.get("start_latlng")) == 2:
-        start_coord = {
-            "lat": data.get("start_latlng")[0],
-            "lon": data.get("start_latlng")[1],
-        }
-    end_coord={}
-    if data.get("end_coord") and len(data.get("end_latlng")) == 2:
-        end_coord = {
-            "lat": data.get("end_latlng")[0],
-            "lon": data.get("end_latlng")[1],
-        }
+def make_commute_description(start_lat: float | None, start_lon: float | None, end_lat: float | None, end_lon:float | None, distance: float) -> dict:
+    """Returns empty dict if this is not a commute"""
+    if start_lat is None or start_lon is None or end_lat is None or end_lon is None:
+        print("Can't recognize commutes, no coordinates")
+        return {}
+    start_coord = {"lat": start_lat, "lon": start_lon}
+    end_coord = {"lat": end_lat, "lon": end_lon}
     updates = {}
     if lap_centroid_dist("home", start_coord) < 200 and lap_centroid_dist("work", end_coord) < 200:
         updates["name"] = "Til jobb"
@@ -162,11 +156,35 @@ async def make_description_from_stravaactivity(data: dict):
     if "jobb" in updates.get("name", ""):
         updates["commute"] = True
         updates["hide_from_home"] = True
-        if data["distance"] > 4500:
+        if distance > 4500:
             updates["description"] = "Omvei"
-        if data["distance"] > 7000:
+        if distance > 7000:
             updates["description"] = "Lang omvei"
             updates["hide_from_home"] = False
+    return updates
+
+async def make_description_from_stravaactivity(data: dict) -> dict[str, str]:
+    """The data argument is the json dictionary obtained from the Strava API call"""
+    start_coord = {}
+    if data.get("start_latlng") and len(data.get("start_latlng")) == 2:
+        start_coord = {
+            "lat": data.get("start_latlng")[0],
+            "lon": data.get("start_latlng")[1],
+        }
+    end_coord={}
+    if data.get("end_latlng") and len(data.get("end_latlng")) == 2:
+        end_coord = {
+            "lat": data.get("end_latlng")[0],
+            "lon": data.get("end_latlng")[1],
+        }
+    updates = {}
+    print(f"{start_coord}")
+    print(f"{end_coord}")
+    #with suppress(KeyError):
+    updates.update(make_commute_description(start_coord["lat"], start_coord["lon"], end_coord["lat"], end_coord["lon"], data["distance"]))
+    #except Exception as e:
+    #    print(e)
+
     return updates
 
 async def make_description_from_tcx(directory: Path) -> dict[str, str]:
@@ -286,14 +304,14 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
                 1,
             )
             desc_400 = (
-                f"{startfart400}->{sluttfart400} på 400 (pulskost {hr_cost_400}). "
+                f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}0 (pulskost {hr_cost_400}). "
             )
         else:
             desc_400 = ""
         if sum(rows_200):
             startfart200 = int(data[rows_200]["time"].head(1).values[0])
             sluttfart200 = int(data[rows_200]["time"].tail(1).values[0])
-            desc_200 = f"{startfart200}->{sluttfart200} på 200, "
+            desc_200 = f"{sum(rows_200)}x200m {startfart200}->{sluttfart200}, "
         else:
             desc_200 = ""
         return {
