@@ -467,7 +467,7 @@ async def make_weekly_profile(pers, vacation=False, plot=False):
     dframe = await pers.influxdb.get_series(SENSOR_ITEM)
     dframe.columns = ["watertemp"]
     meanwatertemp = dframe["watertemp"].mean()
-    dframe["watertemp"].clip(lower=20, upper=85, inplace=True)
+    dframe["watertemp"] = dframe["watertemp"].clip(lower=20, upper=85)
     # Two-stage resampling, finer resolution than 15 minutes from raw data
     # yields too erratic results. So we first resample to 15 min, and then
     # go smoothly to finer scales afterwards if wanted.
@@ -482,7 +482,7 @@ async def make_weekly_profile(pers, vacation=False, plot=False):
     dframe = dframe[dframe["waterdiff"] < 0]
 
     vacation = await pers.influxdb.get_series(VACATION_ITEM)
-    vacation = vacation.resample(PD_TIMEDELTA).max().fillna(method="ffill")
+    vacation = vacation.resample(PD_TIMEDELTA).max().ffill()
     vacation.columns = ["vacation"]
 
     # Juxtapose the waterdiff and vacation series:
