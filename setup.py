@@ -15,6 +15,7 @@ REQUIREMENTS = [
     "defusedxml",
     "geopy",
     "gpxpy",
+    "fastapi",
  #   "habapp", # no-go for py312 elvcat
     "holidays",
     "isodate",
@@ -34,6 +35,7 @@ REQUIREMENTS = [
     "scikit-learn",
     "skodaconnect",
     "smappy",
+    "uvicorn",
     "watchfiles",
 ]
 

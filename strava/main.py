@@ -26,32 +26,25 @@ TOKEN_FILE = "/home/berland/.stra_tokens"
 CLIENT_SECRET = os.environ.get("STRAVA_CLIENT_SECRET")
 CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
+
 logging.basicConfig(level=logging.INFO)
 
-
+HEARTBEAT = 240  # seconds
 async def heartbeat_logger():
     while True:
-        logger.info(" [ strava-app heartbeat (180s) ] ")
-        await asyncio.sleep(180)  # Log every 60 seconds
-
-
-@app.on_event("startup")
-async def startup_event():
-    await asyncio.sleep(5)
-    # refresh_token_if_needed(force=True)
-    # print_athlete_info()
-    # print_activity_info(15786634920)
-    # print_activity_info("15786634920")
-    # print_activity_info("16634920")
-    asyncio.create_task(heartbeat_logger())
+        counter = 0
+        while counter < HEARTBEAT:
+            counter+=1
+            await asyncio.sleep(1)  # Uvicorn will not exit during this second
+        logger.info(f" [ strava-app heartbeat ({HEARTBEAT}s) ] ")
 
 
 def load_tokens():
     try:
         with open(TOKEN_FILE, "r") as f:
             return json.load(f)
-    except FileNotFoundError:
-        return None
+    except FileNotFoundError as e:
+        raise Exception(f"No tokens found. Construct {TOKEN_FILE}") from e
 
 
 def save_tokens(tokens):
@@ -62,9 +55,6 @@ def save_tokens(tokens):
 
 def refresh_token_if_needed(force=False):
     tokens = load_tokens()
-    if not tokens:
-        raise Exception(f"No tokens found. Construct {TOKEN_FILE}")
-
     now = int(time.time())
     if force:
         logger.info("Force refresh of tokens")
@@ -194,6 +184,19 @@ async def process_activity_update(activity_id: str):
     #pprint.pprint(activity)
     print("*** ACTIVITY END ***")
 
+    updates = {}
+    if activity.get("device_name", "") == "Zwift Run":
+        start_time = datetime.datetime.fromisoformat(str(activity["start_date_local"]))
+        if float(activity.get("average_speed", "5")) < 2.54:  # 6:30 min/km
+            print("Neppe jeg som har løpt på Zwift, setter til privat")
+            updates["private"] = True
+            updates["visibility"] = "only_me"
+        elif start_time.weekday() == 0 and 8 < start_time.hour < 11:  # Mandag
+            updates["name"] = "Gym på jobben"
+            updates["description"] = "Zwift"
+        print(f"Submitting activity updates: {updates}")
+        update_activity(activity_id, updates)
+
     updates = await exercise_analyzer.make_description_from_stravaactivity(activity)
     if updates and "Run" in activity["name"]:
         print(f"Submitting activity updates: {updates}")
@@ -213,7 +216,9 @@ async def process_activity_update(activity_id: str):
                 print(f"Submitting activity updates: {updates}")
                 update_activity(activity_id, updates)
             else:
-                print(f"Computed updates, but not submitting: {updates}")
+                print(f"Computed updates, but not submitting ('Run' not present in name): {updates}")
+        else:
+            logger.error(f"TCX file never appeared on disk for {activity['start_date_local']=}")
 
 
 

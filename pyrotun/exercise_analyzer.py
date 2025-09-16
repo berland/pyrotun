@@ -180,11 +180,7 @@ async def make_description_from_stravaactivity(data: dict) -> dict[str, str]:
     updates = {}
     print(f"{start_coord}")
     print(f"{end_coord}")
-    #with suppress(KeyError):
     updates.update(make_commute_description(start_coord["lat"], start_coord["lon"], end_coord["lat"], end_coord["lon"], data["distance"]))
-    #except Exception as e:
-    #    print(e)
-
     return updates
 
 async def make_description_from_tcx(directory: Path) -> dict[str, str]:
@@ -231,6 +227,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
         return {
             "title": f"BFG {sum(rows_1000)}x1000m, {sum(rows_500)}x500m, {sum(rows_200)}x200m, 6x60m",
             "desc": f"{desc_1000}{desc_500}{desc_200}.",
+            "visibility": "everyone"
         }
     if d.weekday() == THURSDAY and d.hour == 18:
         data = await analyze_torsdag(directory)
@@ -269,6 +266,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
                 f"{sum(rows_200)}x200m, 6x60m"
             ),
             "desc": f"{desc_40s}{desc_3000}{desc_200}",
+            "visibility": "everyone"
         }
     if d.weekday() == SATURDAY and d.hour == 9:
         data = await analyze_lordag(directory)
@@ -317,6 +315,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
         return {
             "name": "BFG Siljustøl" if sum(rows_400) else "BFG-lørdag",
             "description": f"{desc_lang}{desc_400}{desc_200}6x60m.",
+            "visibility": "everyone"
         }
 
 
