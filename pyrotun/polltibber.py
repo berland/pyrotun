@@ -66,5 +66,4 @@ async def main(pers=PERS):
 
 
 if __name__ == "__main__":
-    PERS = pyrotun.persist.PyrotunPersistence()
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
