@@ -125,7 +125,7 @@ def setup_crontabs(pers):
         logger.info("Linking Myuplink")
         await pyrotun.pollmyuplink.update_openhab(pers)
 
-    @aiocron.crontab(EVERY_15_SECOND)
+    #@aiocron.crontab(EVERY_15_SECOND)
     async def do_hasslink():
         await asyncio.sleep(0.5)
         logger.info("Linking Homeassistant")
