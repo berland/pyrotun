@@ -81,9 +81,9 @@ class TibberConnection:
             if not self.authenticated:
                 logger.debug("Reauth in tibber")
                 await self.authenticate()
-            await self.home.update_price_info()
-        except (asyncio.TimeoutError, AttributeError):
-            logger.warning("Timeout connecting to Tibber")
+            await self.home.update_info_and_price_info()
+        except asyncio.TimeoutError as e:
+            logger.warning(f"Timeout connecting to Tibber {e}")
             if self.lastpriceframe is not None:
                 logger.warning("Using internal cache for price_df")
                 return self.lastpriceframe
