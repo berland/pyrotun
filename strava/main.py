@@ -106,7 +106,7 @@ async def receive_event(payload: dict):
     if payload.get("aspect_type") == "delete":
         return "", 200
 
-    await process_activity_update(activity_id)
+    await process_activity_update(activity_id, payload.get("aspect_type", ""))
 
     return "", 200
 
@@ -169,7 +169,7 @@ def print_athlete_info():
     print(response.json())
 
 
-async def process_activity_update(activity_id: str):
+async def process_activity_update(activity_id: str, aspect_type: str):
     access_token = refresh_token_if_needed()
     url = f"https://www.strava.com/api/v3/activities/{activity_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -221,7 +221,8 @@ async def process_activity_update(activity_id: str):
             logger.error(f"TCX file never appeared on disk for {activity['start_date_local']=}")
 
 
-    await check_and_notify_about_undefined_shoe(activity)
+    if aspect_type == "create":
+        await check_and_notify_about_undefined_shoe(activity)
 
 
 async def check_and_notify_about_undefined_shoe(activity: dict):
