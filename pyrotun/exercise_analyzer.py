@@ -215,8 +215,10 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
             sluttfart500 = seconds_pr_km_to_pace(
                 data[rows_500]["time"].tail(1).values[0] * 2
             )
+            name_500 = f"{sum(rows_500)}x500m, "
             desc_500 = f"{startfart500}->{sluttfart500} på 500, "
         else:
+            name_500 = ""
             desc_500 = ""
         if sum(rows_200):
             startfart200 = int(data[rows_200]["time"].head(1).values[0])
@@ -225,9 +227,10 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
         else:
             desc_200 = ""
         return {
-            "title": f"BFG {sum(rows_1000)}x1000m, {sum(rows_500)}x500m, {sum(rows_200)}x200m, 6x60m",
-            "desc": f"{desc_1000}{desc_500}{desc_200}.",
-            "visibility": "everyone"
+            "name": f"BFG {sum(rows_1000)}x1000m, {name_500}{sum(rows_200)}x200m, 6x60m",
+            "description": f"{desc_1000}{desc_500}{desc_200}.",
+            "visibility": "everyone",
+            "private": "false"
         }
     if d.weekday() == THURSDAY and d.hour == 18:
         data = await analyze_torsdag(directory)
@@ -261,12 +264,13 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
         else:
             desc_200 = ""
         return {
-            "title": (
+            "name": (
                 f"BFG {sum(rows_40s)}x40s, {'3000m, ' if sum(rows_3000) else ''}"
                 f"{sum(rows_200)}x200m, 6x60m"
             ),
-            "desc": f"{desc_40s}{desc_3000}{desc_200}",
-            "visibility": "everyone"
+            "description": f"{desc_40s}{desc_3000}{desc_200}",
+            "visibility": "everyone",
+            "private": "false"
         }
     if d.weekday() == SATURDAY and d.hour == 9:
         data = await analyze_lordag(directory)
@@ -315,7 +319,8 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
         return {
             "name": "BFG Siljustøl" if sum(rows_400) else "BFG-lørdag",
             "description": f"{desc_lang}{desc_400}{desc_200}6x60m.",
-            "visibility": "everyone"
+            "visibility": "everyone",
+            "private": "false"
         }
 
 
