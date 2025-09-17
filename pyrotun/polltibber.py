@@ -60,9 +60,12 @@ async def main(pers=PERS):
 
     nupris, priceorder, relpriceorder = await pers.tibber.get_currentprice()
     logger.info("Pris nå: %s øre", nupris)
-    await pers.openhab.set_item("Tibber_current_price", nupris)
-    await pers.openhab.set_item("PowerPriceOrder", priceorder, log=True)
-    await pers.openhab.set_item("RelativePowerPriceOrder", relpriceorder, log=True)
+    if nupris is not None:
+        await pers.openhab.set_item("Tibber_current_price", nupris)
+    if priceorder is not None:
+        await pers.openhab.set_item("PowerPriceOrder", priceorder, log=True)
+    if relpriceorder is not None:
+        await pers.openhab.set_item("RelativePowerPriceOrder", relpriceorder, log=True)
 
 
 if __name__ == "__main__":

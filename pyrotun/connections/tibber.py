@@ -119,6 +119,9 @@ class TibberConnection:
         )
 
         prices = await self.get_prices()
+        if nowhour not in prices.index:
+            logger.error("Prices from Tibber are not available!")
+            return (None, None, None)
         nowprice = prices.loc[nowhour, "NOK/KWh"] * 100
         if "dayrank" in prices:
             priceorder = prices.loc[nowhour, "dayrank"]
