@@ -108,8 +108,8 @@ async def receive_event(payload: dict):
 
     await process_activity_update(activity_id)
 
-
     return "", 200
+
 
 
 @app.get("/health")
@@ -221,6 +221,27 @@ async def process_activity_update(activity_id: str):
             logger.error(f"TCX file never appeared on disk for {activity['start_date_local']=}")
 
 
+    await check_and_notify_about_undefined_shoe(activity)
+
+
+async def check_and_notify_about_undefined_shoe(activity: dict):
+    if activity.get("manual"):
+        return
+
+    gear = activity.get("gear", {})
+    if "Undefined" in gear.get("name", ""):
+        edit_url = f"https://www.strava.com/activities/{activity['id']}/edit"
+        message = f"⚠️ Velg sko for Strava-økt: {edit_url}"
+
+        data = {
+        "token": os.getenv("PUSHOVER_APIKEY", ""),
+        "user": os.getenv("PUSHOVER_USER", ""),
+        "title": "Strava skovalg",
+        "message": message,
+    }
+
+        pushover_resp = requests.post("https://api.pushover.net/1/messages.json", data=data)
+        print("Pushover sent:", pushover_resp.status_code)
 
 def update_activity(activity_id: str, data):
     access_token = refresh_token_if_needed()
