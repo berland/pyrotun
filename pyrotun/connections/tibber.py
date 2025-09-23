@@ -69,7 +69,7 @@ class TibberConnection:
             self.authenticated = False
 
     async def get_prices(self):
-        """Prices in the dataframe is valid *forwards* in time"""
+        """Prices in the dataframe are valid *forwards* in time"""
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         if (
             self.lastpriceframe_timestamp is not None
@@ -98,8 +98,12 @@ class TibberConnection:
 
                 return disk_frame
         prices_df = pd.DataFrame.from_dict(self.home.price_total, orient="index")
-        prices_df.columns = ["NOK/KWh"]
         prices_df.index = pd.to_datetime(prices_df.index, utc=True).tz_convert(tz)
+
+        # Delete quarterly prices:
+        prices_df = prices_df[(prices_df.index.minute == 0) & (prices_df.index.second == 0)]
+
+        prices_df.columns = ["NOK/KWh"]
         prices_df["weekday"] = prices_df.index.weekday
         prices_df["dayrank"] = (
             prices_df.groupby("weekday")["NOK/KWh"].rank().astype(int)
@@ -109,7 +113,7 @@ class TibberConnection:
         self.lastpriceframe_timestamp = datetime.datetime.now()
         return prices_df
 
-    async def get_currentprice(self):
+    async def get_currentprice(self) -> tuple[float | None, int | None, float | None]:
         """Get the current power price in øre/kwh"""
         tz = pytz.timezone(os.getenv("TIMEZONE"))
         nowhour = pd.to_datetime(
@@ -119,6 +123,7 @@ class TibberConnection:
         )
 
         prices = await self.get_prices()
+        assert prices is not None
         if nowhour not in prices.index:
             logger.error("Prices from Tibber are not available!")
             return (None, None, None)
