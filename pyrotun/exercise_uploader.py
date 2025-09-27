@@ -131,8 +131,9 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
     title = MAP_SPORT_INFO.get(exercise_summary["detailed-sport-info"], "polar v")
 
     auto_desc = await exercise_analyzer.make_description_from_tcx(dirname)
+    logger.info(f"{auto_desc=}")
 
-    details = f"{auto_desc['name']} {auto_desc['description']}" if auto_desc else ""
+    details = f"{auto_desc.get('name', '')} {auto_desc.get('description', '')}".strip() if auto_desc else ""
 
     if "BFG" in details:
         title += ", intervall"
@@ -176,6 +177,16 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
         "detaljer": details,
     }
 
+async def post_exercise_data(pers, postdata: dict):
+    logger.info("Submitting exercise data %s", str(postdata))
+    async with pers.websession.post(
+        url=os.getenv("EXERCISE_URL"), params=postdata
+    ) as response:
+        content = await response.content.read()
+        if response.status_code != "200":
+            logger.info(str(response))
+            logger.info(content)
+
 
 async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
     dirname = Path(dirname)
@@ -198,14 +209,8 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
             return
 
         if not dryrun and pers is not None:
-            logger.info("Submitting exercise data %s", str(postdata))
-            async with pers.websession.post(
-                url=os.getenv("EXERCISE_URL"), params=postdata
-            ) as response:
-                logger.info(str(response))
-                content = await response.content.read()
-                logger.info(content)
-                Path(dirname / DONE_FILE).touch()
+            await post_exercise_data(pers, postdata)
+            Path(dirname / DONE_FILE).touch()
         else:
             logger.info("DRY-run, would have submitted %s", str(postdata))
 

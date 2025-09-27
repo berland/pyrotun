@@ -184,11 +184,23 @@ async def make_description_from_stravaactivity(data: dict) -> dict[str, str]:
     return updates
 
 async def make_description_from_tcx(directory: Path) -> dict[str, str]:
+    reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
+    for trackpoint in reader.trackpoints:
+        if (start_lat := trackpoint.lat) and (start_lon := trackpoint.lon):
+            break
+    for trackpoint in reversed(list(reader.trackpoints)):
+        if (end_lat := trackpoint.lat) and (end_lon := trackpoint.lon):
+            break
+    if commute := make_commute_description(start_lat, start_lon, end_lat, end_lon, reader.distance_m):
+        logger.info(f"Detected commute run {commute}")
+        return commute
     d = datetime.datetime.fromisoformat(directory.name)
     if d.weekday() == TUESDAY and d.hour == 18:
         data = await analyze_tirsdag(directory)
         if data.empty:
+            logger.warning("Muligens tirsdagsintervall, men klarte ikke analysere")
             return {}
+        logger.info("Detected tirsdagsintervall")
         rows_1000 = data["category"] == "tirsdag1000"
         rows_500 = data["category"] == "tirsdag500"
         rows_200 = data["category"] == "tirsdag200"
@@ -235,7 +247,9 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
     if d.weekday() == THURSDAY and d.hour == 18:
         data = await analyze_torsdag(directory)
         if data.empty:
+            logger.warning("Muligens torsdagsintervall, men klarte ikke analysere")
             return {}
+        logger.info("Fant torsdagsintervall")
         rows_40s = data["category"] == "torsdag40s"
         rows_3000 = data["category"] == "torsdag3000"
         rows_200 = data["category"] == "torsdag200"
@@ -275,6 +289,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
     if d.weekday() == SATURDAY and d.hour == 9:
         data = await analyze_lordag(directory)
         if data.empty:
+            logger.warning("Muligens lørdagsintervall, men klarte ikke analysere")
             return {}
         rows_lang = data["category"] == "siljulang"
         rows_400 = data["category"] == "silju400"
@@ -406,7 +421,7 @@ async def describe():
     for _dir in dirs:
         desc = await make_description_from_tcx(Path(_dir))
         if desc:
-            print(f"{desc['name']}:    {Path(_dir).name}\n\t{desc['description']}")
+            print(f"{desc.get('name')}:    {Path(_dir).name}\n\t{desc.get('description')}")
 
 
 async def analyze_all():
