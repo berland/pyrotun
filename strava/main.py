@@ -26,6 +26,8 @@ TOKEN_FILE = "/home/berland/.stra_tokens"
 CLIENT_SECRET = os.environ.get("STRAVA_CLIENT_SECRET")
 CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
+SHOE_NOTIFICATIONS_SENT = set()
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -221,12 +223,15 @@ async def process_activity_update(activity_id: str, aspect_type: str):
             logger.error(f"TCX file never appeared on disk for {activity['start_date_local']=}")
 
 
-    if aspect_type == "create":
+    if aspect_type == "create" and "Run" in activity["name"]:
         await check_and_notify_about_undefined_shoe(activity)
 
 
 async def check_and_notify_about_undefined_shoe(activity: dict):
     if activity.get("manual"):
+        return
+
+    if activity["id"] in SHOE_NOTIFICATIONS_SENT:
         return
 
     gear = activity.get("gear", {})
@@ -243,6 +248,7 @@ async def check_and_notify_about_undefined_shoe(activity: dict):
 
         pushover_resp = requests.post("https://api.pushover.net/1/messages.json", data=data)
         print("Pushover sent:", pushover_resp.status_code)
+        SHOE_NOTIFICATIONS_SENT.add(activity["id"])
 
 def update_activity(activity_id: str, data):
     access_token = refresh_token_if_needed()
