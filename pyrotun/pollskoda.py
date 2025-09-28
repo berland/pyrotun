@@ -22,7 +22,7 @@ async def amain(pers=None, debug=False):
         assert pers.openhab is not None
 
     async with ClientSession() as session:
-        myskoda = MySkoda(session)
+        myskoda = MySkoda(session, mqtt_enabled=False)
         await myskoda.connect(os.getenv("SKODA_USERNAME"), os.getenv("SKODA_PASSWORD"))
         charge = await myskoda.get_charging(os.getenv("SKODA_VIN"))
         positions = await myskoda.get_positions(os.getenv("SKODA_VIN"))
