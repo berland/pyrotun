@@ -235,12 +235,12 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
         if sum(rows_200):
             startfart200 = int(data[rows_200]["time"].head(1).values[0])
             sluttfart200 = int(data[rows_200]["time"].tail(1).values[0])
-            desc_200 = f"{startfart200}->{sluttfart200} på 200"
+            desc_200 = f"{startfart200}->{sluttfart200}s på 200"
         else:
             desc_200 = ""
         return {
             "name": f"BFG {sum(rows_1000)}x1000m, {name_500}{sum(rows_200)}x200m, 6x60m",
-            "description": f"{desc_1000}{desc_500}{desc_200}.",
+            "description": f"{desc_1000}{desc_500}{desc_200}. ",
             "visibility": "everyone",
             "private": "false"
         }
@@ -274,7 +274,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
         if sum(rows_200):
             startfart200 = int(data[rows_200]["time"].head(1).values[0])
             sluttfart200 = int(data[rows_200]["time"].tail(1).values[0])
-            desc_200 = f"{startfart200}->{sluttfart200} på 200"
+            desc_200 = f"{startfart200}->{sluttfart200}s på 200, "
         else:
             desc_200 = ""
         return {
@@ -321,19 +321,19 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:
                 1,
             )
             desc_400 = (
-                f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}0 (pulskost {hr_cost_400}). "
+                f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}s (pulskost {hr_cost_400}), "
             )
         else:
             desc_400 = ""
         if sum(rows_200):
             startfart200 = int(data[rows_200]["time"].head(1).values[0])
             sluttfart200 = int(data[rows_200]["time"].tail(1).values[0])
-            desc_200 = f"{sum(rows_200)}x200m {startfart200}->{sluttfart200}, "
+            desc_200 = f"{sum(rows_200)}x200m {startfart200}->{sluttfart200}s, "
         else:
             desc_200 = ""
         return {
             "name": "BFG Siljustøl" if sum(rows_400) else "BFG-lørdag",
-            "description": f"{desc_lang}{desc_400}{desc_200}6x60m.",
+            "description": f"{desc_lang}{desc_400}{desc_200}6x60m. ",
             "visibility": "everyone",
             "private": "false"
         }
