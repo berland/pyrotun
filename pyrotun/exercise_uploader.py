@@ -133,7 +133,7 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
     auto_desc = await exercise_analyzer.make_description_from_tcx(dirname)
     logger.info(f"{auto_desc=}")
 
-    details = f"{auto_desc.get('name', '')} {auto_desc.get('description', '')}".strip() if auto_desc else ""
+    details = f"{auto_desc.get('name', '')}. {auto_desc.get('description', '')}.".strip() if auto_desc else ""
 
     if "BFG" in details:
         title += ", intervall"
@@ -152,6 +152,8 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
         and "distance" in exercise_summary
         and gpxfile.is_file()
     ):
+        if details:
+            details += " "
         details += f"{moving_speed} min/km. "
         details += f"Tid: {prettyprintseconds(move_time)}. "
 
@@ -183,7 +185,7 @@ async def post_exercise_data(pers, postdata: dict):
         url=os.getenv("EXERCISE_URL"), params=postdata
     ) as response:
         content = await response.content.read()
-        if response.status_code != "200":
+        if response.status != "200":
             logger.info(str(response))
             logger.info(content)
 

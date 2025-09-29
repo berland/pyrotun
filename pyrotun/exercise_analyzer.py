@@ -180,11 +180,12 @@ async def make_description_from_stravaactivity(data: dict) -> dict[str, str]:
     updates = {}
     print(f"{start_coord}")
     print(f"{end_coord}")
-    updates.update(make_commute_description(start_coord["lat"], start_coord["lon"], end_coord["lat"], end_coord["lon"], data["distance"]))
+    updates.update(make_commute_description(start_coord.get("lat"), start_coord.get("lon"), end_coord.get("lat"), end_coord.get("lon"), data["distance"]))
     return updates
 
 async def make_description_from_tcx(directory: Path) -> dict[str, str]:
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
+    start_lat, start_lon, end_lat, end_lon = None, None, None, None
     for trackpoint in reader.trackpoints:
         if (start_lat := trackpoint.lat) and (start_lon := trackpoint.lon):
             break
