@@ -26,7 +26,7 @@ import pyrotun.connections.tibber
 import pyrotun.dataspike_remover
 
 # import pyrotun.discord
-import pyrotun.disruptive
+# import pyrotun.disruptive
 import pyrotun.exercise_analyzer
 import pyrotun.exercise_uploader
 import pyrotun.floors
@@ -294,7 +294,7 @@ async def at_startup(pers) -> List[Any]:
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.powercontroller.update_effekttrinn(pers)))
     # tasks.append(asyncio.create_task(pyrotun.discord.main(pers)))
-    tasks.append(asyncio.create_task(pyrotun.disruptive.main(pers)))
+    #tasks.append(asyncio.create_task(pyrotun.disruptive.main(pers)))
     # tasks.append(
     #    asyncio.create_task(pyrotun.unifiprotect.main(pers, waitforever=False))
     # )
