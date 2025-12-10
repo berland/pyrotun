@@ -140,7 +140,7 @@ class ElvatunHeating:
         temps[dframe.index[0]] = [starttemp]
         # Loop over all datetimes, and inject nodes and
         # possible edges
-        for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
+        for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:], strict=False):
             temps[next_tstamp] = []
             temps[tstamp] = list(set(temps[tstamp]))  # Make rolled over temps unique
             temps[tstamp].sort()

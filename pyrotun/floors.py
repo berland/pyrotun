@@ -455,7 +455,7 @@ async def heatreservoir_temp_cost_graph(
     first_tstamp = dframe.index[0]
     logger.debug(f"First timestamp in graph is {first_tstamp}")
     # Loop over all datetimes, and inject nodes and possible edges
-    for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
+    for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:], strict=False):
         # Yield..
         await asyncio.sleep(0.001)
         temps[next_tstamp] = []

@@ -229,7 +229,7 @@ class WaterHeater:
         # Loop over all datetimes, and inject nodes and
         # possible edges
         # dframe = dframe.head(10)
-        for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:]):
+        for tstamp, next_tstamp in zip(dframe.index, dframe.index[1:], strict=False):
             temps[next_tstamp] = []
             temps[tstamp] = list(set(temps[tstamp]))
             temps[tstamp].sort()
