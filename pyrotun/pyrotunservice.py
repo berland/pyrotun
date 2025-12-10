@@ -167,7 +167,7 @@ def setup_crontabs(pers):
         logger.info(" ** Ventilation calculations")
         await pyrotun.vent_calculations.main(pers)
 
-    @aiocron.crontab(EVERY_15_SECOND)
+    # @aiocron.crontab(EVERY_15_SECOND)
     async def poll_skyss():
         return
         await asyncio.sleep(5)  # No need to overlap with ventilation
@@ -180,7 +180,7 @@ def setup_crontabs(pers):
         logger.info(" ** Pollsolis")
         await pyrotun.pollsolis.post_solisdata_to_openhab(pers)
 
-    @aiocron.crontab(EVERY_5_MINUTE)
+    # @aiocron.crontab(EVERY_5_MINUTE)
     async def pollsmappe():
         await asyncio.sleep(10)
         logger.info(" ** Pollsmappee")
