@@ -133,8 +133,10 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
     auto_desc = await exercise_analyzer.make_description_from_tcx(dirname)
     logger.info(f"{auto_desc=}")
 
-    details = f"{auto_desc.get('name', '')}. {auto_desc.get('description', '')}.".strip() if auto_desc else ""
-
+    details = f"{auto_desc.get('name', '')}. {auto_desc.get('description', '')}. " if auto_desc else ""
+    details = details.replace(". .", ".")
+    details = details.replace("  ", " ")
+    details = details.replace(", .", ".")
     if "BFG" in details:
         title += ", intervall"
 
@@ -196,8 +198,8 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
         dirname = dirname.parent
     try:
         dateutil.parser.isoparse(dirname.name)
-    except ValueError:
-        logger.warning(f"Skipping strange-looking directory {dirname}")
+    except ValueError as exc:
+        logger.warning(f"Skipping strange-looking directory {dirname} due to {exc}")
         return
     if (dirname / "exercise_summary").is_file() and (
         dirname / "heart_rate_zones"
@@ -238,10 +240,19 @@ async def main(pers=None, dryrun=False):
 
     logger.info(f"Starting watching {EXERCISE_DIR} for exercises")
     async for changes in watchfiles.awatch(EXERCISE_DIR):
-        # changes is set of tuples
+        # changes is set of tuples containing files or directories
         logger.info(f"Detected filesystem change: {changes}")
-        dirnames = set([Path(change[1]) for change in changes])
-        logger.info(f"Will process directories {dirnames}")
+        dirnames = set()
+        for change in changes:
+            if Path(change[1]).name == "done":
+                continue
+            if Path(change[1]).name == "analyzed.pkl":
+                continue
+            if Path(change[1]).is_dir():
+                dirnames.add(Path(change[1]).absolute())
+            if Path(change[1]).is_file():
+                dirnames.add(Path(change[1]).parent.absolute())
+        logger.info(f"Will process {len(dirnames)} directories {dirnames}")
         # dirnames are timestamps
         for dirname in dirnames:
             logger.info(f"Processing dir {dirname}")

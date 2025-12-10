@@ -183,7 +183,7 @@ async def make_description_from_stravaactivity(data: dict) -> dict[str, str]:
     updates.update(make_commute_description(start_coord.get("lat"), start_coord.get("lon"), end_coord.get("lat"), end_coord.get("lon"), data["distance"]))
     return updates
 
-async def make_description_from_tcx(directory: Path) -> dict[str, str]:
+async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa: PLR0911
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
     start_lat, start_lon, end_lat, end_lon = None, None, None, None
     for trackpoint in reader.trackpoints:
@@ -429,18 +429,27 @@ async def analyze_all():
     dfs = []
     dirs = sorted(glob.glob(str(EXERCISE_DIR / "202*")))
     for _dir in dirs:
+        cache_file = Path(_dir) / "analyzed.pkl"
         await asyncio.sleep(0.1)
         d = datetime.datetime.fromisoformat(Path(_dir).name)
-        if d.weekday() == TUESDAY and d.hour == 18:
-            logger.info(f"Analyzing tirsdag {_dir}")
-            dfs.append(await analyze_tirsdag(Path(_dir)))
-        if d.weekday() == THURSDAY and d.hour == 18:
-            logger.info(f"Analyzing torsdag {_dir}")
-            dfs.append(await analyze_torsdag(Path(_dir)))
-        if d.weekday() == SATURDAY and d.hour == 9:
-            logger.info(f"Analyzing siljustøl {_dir}")
-            dfs.append(await analyze_lordag(Path(_dir)))
+        exercise_data : pd.DataFrame | None = None
+        if cache_file.is_file():
+            exercise_data = pd.read_pickle(cache_file)
+        else:
+            if d.weekday() == TUESDAY and d.hour == 18:
+                logger.info(f"Analyzing tirsdag {_dir}")
+                exercise_data = await analyze_tirsdag(Path(_dir))
+            if d.weekday() == THURSDAY and d.hour == 18:
+                logger.info(f"Analyzing torsdag {_dir}")
+                exercise_data = await analyze_torsdag(Path(_dir))
+            if d.weekday() == SATURDAY and d.hour == 9:
+                logger.info(f"Analyzing siljustøl {_dir}")
+                exercise_data = await analyze_lordag(Path(_dir))
 
+            if exercise_data is not None:
+                exercise_data.to_pickle(cache_file)
+        if exercise_data is not None:
+            dfs.append(exercise_data)
     data = pd.concat(dfs)
     data.to_csv(EXERCISE_DIR / "intervaller.csv")
     data.to_sql(
@@ -462,7 +471,16 @@ async def main(pers=None, dryrun=False):
     async for changes in watchfiles.awatch(EXERCISE_DIR):
         # changes is set of tuples
         logger.info(f"Detected filesystem change: {changes}")
-        dirnames = set([Path(change[1]) for change in changes])
+        dirnames = set()
+        for change in changes:
+            if Path(change[1]).name == "done":
+                continue
+            if Path(change[1]).name == "analyzed.pkl":
+                continue
+            if Path(change[1]).is_dir():
+                dirnames.add(Path(change[1]).absolute())
+            if Path(change[1]).is_file():
+                dirnames.add(Path(change[1]).parent.absolute())
         logger.info(f"Will process directories {dirnames}")
         # dirnames are timestamps
         interval_session_found = False
