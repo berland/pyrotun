@@ -74,6 +74,16 @@ async def amain(pers=None, debug=False):
                 f"{lat},{lon}",
                     log=True,
                 )
+            await pers.openhab.set_item(
+            "EnyaqCoordinatesLat",
+                f"{lat}",
+                    log=False,
+                )
+            await pers.openhab.set_item(
+            "EnyaqCoordinatesLon",
+                f"{lon}",
+                    log=False,
+                )
             async with ClientSession() as session:
                 response = await session.get(f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json")
 
