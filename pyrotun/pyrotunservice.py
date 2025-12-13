@@ -10,10 +10,12 @@ import asyncio
 import datetime
 import json
 import os
+import traceback
 from pathlib import Path
 from typing import Any, List
 
 import aiocron
+import aiohttp
 import dotenv
 
 import pyrotun
@@ -61,6 +63,42 @@ EVERY_HOUR = "0 * * * *"
 EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
 
+async def send_pushover(message: str, title: str = "Async App Error"):
+    PUSHOVER_URL = "https://api.pushover.net/1/messages.json"
+    payload = {
+        "token": os.getenv("PUSHOVER_APIKEY"),
+        "user": os.getenv("PUSHOVER_USER"),
+        "title": title,
+        "message": message,
+        "priority": 1,
+    }
+
+    async with aiohttp.ClientSession() as session, session.post(PUSHOVER_URL, data=payload) as resp:
+            if resp.status != 200:
+                err = await resp.text()
+                logger.error(f"Failed to send pushover: {err}")
+
+def global_exception_handler(loop, context):
+    exc = context.get("exception")
+
+    if exc:
+        tb = "".join(
+            traceback.format_exception(type(exc), exc, exc.__traceback__)
+        )
+        message = tb
+    else:
+        # No exception object, just a message
+        message = context.get("message", "Unknown asyncio exception")
+
+    # Pushover limit ~1024 chars
+    message = message[-1000:]
+
+    asyncio.create_task(
+        send_pushover(
+            title="Unhandled asyncio exception",
+            message=message,
+        )
+    )
 
 def get_alexa_serial_to_devicename() -> dict:
     thingsfile = Path("/etc/openhab/things/amazonechocontrol.things")
@@ -316,6 +354,8 @@ async def at_startup(pers) -> List[Any]:
 
 async def main():
     logger.info("Starting pyrotun service")
+    loop = asyncio.get_event_loop()
+    loop.set_exception_handler(global_exception_handler)
     pers = pyrotun.persist.PyrotunPersistence()
     await pers.ainit(requested="all")
 
