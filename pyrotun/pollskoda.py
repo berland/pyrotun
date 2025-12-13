@@ -29,79 +29,81 @@ async def amain(pers=None, debug=False):
 
     if charge.status:
         await pers.openhab.set_item(
-            "EnyaqChargeState",
-            str(charge.status.state), log=True
+            "EnyaqChargeState", str(charge.status.state), log=True
         )
         await pers.openhab.set_item(
             "EnyaqBatteryState",
             str(charge.status.battery.state_of_charge_in_percent),
-                    log=True,
-                )
+            log=True,
+        )
         await pers.openhab.set_item(
             "EnyaqRange",
             str(float(charge.status.battery.remaining_cruising_range_in_meters) / 1000),
-                    log=True,
-                )
+            log=True,
+        )
         await pers.openhab.set_item(
             "EnyaqChargingPower",
             str(charge.status.charge_power_in_kw),
-                    log=True,
-                )
+            log=True,
+        )
         await pers.openhab.set_item(
             "EnyaqChargeTarget",
             str(charge.settings.target_state_of_charge_in_percent),
-                    log=True,
-                )
+            log=True,
+        )
 
     if positions:
         if "IN_MOTION" in str(positions.errors):
             await pers.openhab.set_item(
-            "EnyaqInMotion",
+                "EnyaqInMotion",
                 "ON",
-                    log=True,
-                )
+                log=True,
+            )
         else:
             await pers.openhab.set_item(
-            "EnyaqInMotion",
+                "EnyaqInMotion",
                 "OFF",
-                    log=True,
-                )
+                log=True,
+            )
         if positions.positions:
             lat = positions.positions[0].gps_coordinates.latitude
             lon = positions.positions[0].gps_coordinates.longitude
             await pers.openhab.set_item(
-            "EnyaqCoordinates",
+                "EnyaqCoordinates",
                 f"{lat},{lon}",
-                    log=True,
-                )
+                log=True,
+            )
             await pers.openhab.set_item(
-            "EnyaqCoordinatesLat",
+                "EnyaqCoordinatesLat",
                 f"{lat}",
-                    log=False,
-                )
+                log=False,
+            )
             await pers.openhab.set_item(
-            "EnyaqCoordinatesLon",
+                "EnyaqCoordinatesLon",
                 f"{lon}",
-                    log=False,
-                )
+                log=False,
+            )
             async with ClientSession() as session:
-                response = await session.get(f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json")
+                response = await session.get(
+                    f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+                )
 
                 if response.status == 200:
                     data = await response.json()
                     address = data["address"]
-                    country=""
+                    country = ""
                     if address["country"] not in ["Norge", "Norway"]:
                         country = f", {address['country']}"
                     await pers.openhab.set_item(
-                    "EnyaqPositionHumanreadable",
-                        f"{address['road']}, {address['neighbourhood']}, {address['county']}{country}",
-                            log=True,
-                        )
+                        "EnyaqPositionHumanreadable",
+                        f"{address.get('road', '')}, "
+                        f"{address.get('neighbourhood', address.get('town', ''))}, "
+                        f"{address['county']}{country}",
+                        log=True,
+                    )
 
     if close_pers:
         await pers.aclose()
-
 
 
 if __name__ == "__main__":
