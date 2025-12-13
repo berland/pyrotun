@@ -36,7 +36,7 @@
   featurepath: temperature/states/temperature/value
   id: 495dab28-889d-459f-8a40-f9d335822963
 - name: Bevegelse gang nede
-  openhab_item: Sensor_Gangnede_bevegelse_homely
+  openhab_item: Sensor_Gangnede_bevegelse_homely_raw
   featurepath: alarm/states/alarm/value
   type: bool
   id: 495dab28-889d-459f-8a40-f9d335822963
@@ -46,7 +46,7 @@
   featurepath: temperature/states/temperature/value
   id: 55d9546f-0581-4ff5-8717-c9b0ecf20e27
 - name: Bevegelse stue
-  openhab_item: Sensor_Stue_bevegelse
+  openhab_item: Sensor_Stue_bevegelse_raw
   featurepath: alarm/states/alarm/value
   type: bool
   id: 55d9546f-0581-4ff5-8717-c9b0ecf20e27
