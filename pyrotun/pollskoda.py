@@ -2,6 +2,7 @@ import asyncio
 import os
 
 import dotenv
+import pygeohash
 from aiohttp import ClientSession
 from myskoda import MySkoda
 
@@ -81,6 +82,12 @@ async def amain(pers=None, debug=False):
             await pers.openhab.set_item(
                 "EnyaqCoordinatesLon",
                 f"{lon}",
+                log=False,
+            )
+            geohash = pygeohash.encode(lat, lon, precision=12)
+            await pers.openhab.set_item(
+                "EnyaqCoordinatesGeohash",
+                f"{geohash}",
                 log=False,
             )
             async with ClientSession() as session:

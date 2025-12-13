@@ -25,6 +25,7 @@ REQUIREMENTS = [
     "numpy",
     "paho-mqtt",
     "pandas",
+    "pygeohash",
     "pylunar",
     "python-dotenv",
     "python-dotenv",
