@@ -186,7 +186,7 @@ def setup_crontabs(pers):
         logger.info(" ** Pollsmappee")
         await pyrotun.pollsmappee.main(pers)
 
-    @aiocron.crontab(EVERY_MIDNIGHT)
+    # @aiocron.crontab(EVERY_MIDNIGHT)
     async def reset_daily_cum():
         await pers.openhab.set_item("Smappee_day_cumulative", 0)
 
