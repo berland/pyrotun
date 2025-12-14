@@ -11,7 +11,6 @@ import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
 
-
 async def amain(pers=None, debug=False):
     close_pers = False
     if pers is None:
@@ -25,8 +24,15 @@ async def amain(pers=None, debug=False):
     async with ClientSession() as session:
         myskoda = MySkoda(session, mqtt_enabled=False)
         await myskoda.connect(os.getenv("SKODA_USERNAME"), os.getenv("SKODA_PASSWORD"))
-        charge = await myskoda.get_charging(os.getenv("SKODA_VIN"))
-        positions = await myskoda.get_positions(os.getenv("SKODA_VIN"))
+        vin = os.getenv("SKODA_VIN", "")
+        charge = await myskoda.get_charging(vin)
+        positions = await myskoda.get_positions(vin)
+        health = await myskoda.get_health(vin)
+
+    if health:
+        await pers.openhab.set_item(
+            "EnyaqKm1", str(health.mileage_in_km), log=True
+        )
 
     if charge.status:
         await pers.openhab.set_item(
