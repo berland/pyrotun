@@ -137,7 +137,12 @@ class HomelyConnection:
                     await self.acquire_token()
                     await self.acquire_location_ids()
                 else:
-                    data.extend([await response.json()])
+                    try:
+                        jsondata = await response.json()
+                    except aiohttp.ContentTypeError as err:
+                        text = await response.text()
+                        raise ValueError(f"Got html data from homely: {text}") from err
+                    data.extend([jsondata])
         return data
 
     async def run_websocket(self):
