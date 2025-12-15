@@ -139,10 +139,12 @@ class HomelyConnection:
                 else:
                     try:
                         jsondata = await response.json()
+                        data.extend([jsondata])
                     except aiohttp.ContentTypeError as err:
                         text = await response.text()
-                        raise ValueError(f"Got html data from homely: {text}") from err
-                    data.extend([jsondata])
+                        if "502 Bad Gateway" not in text:  # Occurs once a day?
+                            raise ValueError(f"Got html data from homely: {text}") from err
+
         return data
 
     async def run_websocket(self):
