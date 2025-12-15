@@ -246,10 +246,10 @@ def setup_crontabs(pers):
         logger.info(" ** Polling tibber")
         await pyrotun.polltibber.main(pers)
 
-    @aiocron.crontab(EVERY_MIDNIGHT)
-    async def calc_power_savings_yesterday():
-        logger.info(" ** Calculating power cost savings yesterday")
-        await pyrotun.poweranalysis.estimate_savings_yesterday(pers, dryrun=False)
+    # @aiocron.crontab(EVERY_MIDNIGHT)
+    # async def calc_power_savings_yesterday():
+    #     logger.info(" ** Calculating power cost savings yesterday")
+    #     await pyrotun.poweranalysis.estimate_savings_yesterday(pers, dryrun=False)
 
     @aiocron.crontab(EVERY_MINUTE)
     async def update_thishour_powerestimate():
