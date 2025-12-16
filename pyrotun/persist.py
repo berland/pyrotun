@@ -60,10 +60,10 @@ class PyrotunPersistence:
             self.tibber = connections.tibber.TibberConnection()
             await self.tibber.ainit(websession=self.websession)
 
-        #if "smappee" in requested or "all" in requested:
-        #self.smappee = connections.smappee.SmappeeConnection()
+        # if "smappee" in requested or "all" in requested:
+        # self.smappee = connections.smappee.SmappeeConnection()
 
-        #if "skoda" in requested or "all" in requested:
+        # if "skoda" in requested or "all" in requested:
         #    self.skoda = connections.skoda.SkodaConnection()
         #    await self.skoda.ainit(websession=self.websession)
 

@@ -63,6 +63,7 @@ EVERY_HOUR = "0 * * * *"
 EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
 
+
 async def send_pushover(message: str, title: str = "Async App Error"):
     PUSHOVER_URL = "https://api.pushover.net/1/messages.json"
     payload = {
@@ -73,18 +74,20 @@ async def send_pushover(message: str, title: str = "Async App Error"):
         "priority": 1,
     }
 
-    async with aiohttp.ClientSession() as session, session.post(PUSHOVER_URL, data=payload) as resp:
-            if resp.status != 200:
-                err = await resp.text()
-                logger.error(f"Failed to send pushover: {err}")
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(PUSHOVER_URL, data=payload) as resp,
+    ):
+        if resp.status != 200:
+            err = await resp.text()
+            logger.error(f"Failed to send pushover: {err}")
+
 
 def global_exception_handler(loop, context):
     exc = context.get("exception")
 
     if exc:
-        tb = "".join(
-            traceback.format_exception(type(exc), exc, exc.__traceback__)
-        )
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         message = tb
     else:
         # No exception object, just a message
@@ -102,6 +105,7 @@ def global_exception_handler(loop, context):
             message=message,
         )
     )
+
 
 def get_alexa_serial_to_devicename() -> dict:
     thingsfile = Path("/etc/openhab/things/amazonechocontrol.things")
@@ -166,7 +170,7 @@ def setup_crontabs(pers):
         logger.info("Linking Myuplink")
         await pyrotun.pollmyuplink.update_openhab(pers)
 
-    #@aiocron.crontab(EVERY_15_SECOND)
+    # @aiocron.crontab(EVERY_15_SECOND)
     async def do_hasslink():
         await asyncio.sleep(0.5)
         logger.info("Linking Homeassistant")
@@ -285,8 +289,8 @@ def setup_crontabs(pers):
     #     logger.info(" ** Waterheater controller")
     #     await pyrotun.waterheater.controller(pers)
 
-    #@aiocron.crontab(EVERY_HOUR)
-    #async def estimate_savings():
+    # @aiocron.crontab(EVERY_HOUR)
+    # async def estimate_savings():
     #    # 3 minutes after every hour
     #    await asyncio.sleep(60 * 3)
     #    logger.info(" ** Waterheater 24h saving estimation")
@@ -335,7 +339,7 @@ async def at_startup(pers) -> List[Any]:
     tasks.append(asyncio.create_task(pyrotun.pollsmappee.main(pers)))
     tasks.append(asyncio.create_task(pyrotun.powercontroller.update_effekttrinn(pers)))
     # tasks.append(asyncio.create_task(pyrotun.discord.main(pers)))
-    #tasks.append(asyncio.create_task(pyrotun.disruptive.main(pers)))
+    # tasks.append(asyncio.create_task(pyrotun.disruptive.main(pers)))
     # tasks.append(
     #    asyncio.create_task(pyrotun.unifiprotect.main(pers, waitforever=False))
     # )

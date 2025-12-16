@@ -101,7 +101,9 @@ class TibberConnection:
         prices_df.index = pd.to_datetime(prices_df.index, utc=True).tz_convert(tz)
 
         # Delete quarterly prices:
-        prices_df = prices_df[(prices_df.index.minute == 0) & (prices_df.index.second == 0)]
+        prices_df = prices_df[
+            (prices_df.index.minute == 0) & (prices_df.index.second == 0)
+        ]
 
         prices_df.columns = ["NOK/KWh"]
         prices_df["weekday"] = prices_df.index.weekday

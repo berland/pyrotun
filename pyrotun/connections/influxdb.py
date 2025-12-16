@@ -61,8 +61,7 @@ class InfluxDBConnection:
         self, item, aggregator="mean", time="1h", condition=""
     ) -> pd.DataFrame:
         query = (
-            f"SELECT {aggregator}(value) FROM {item} {condition} "
-            f"group by time({time})"
+            f"SELECT {aggregator}(value) FROM {item} {condition} group by time({time})"
         )
         resp = await self.client.query(query)
         resp.columns = [item]

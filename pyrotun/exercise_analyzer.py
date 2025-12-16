@@ -37,8 +37,8 @@ LAP_CENTROIDS = {
     "tirsdag200": {"lon": 5.319548818252679, "lat": 60.29029686700665},
     "tirsdag500": {"lon": 5.341696926437765, "lat": 60.27289127429241},
     "tirsdag1000": {"lon": 5.3658868288692, "lat": 60.27033820109348},
-    "work": {"lon": 5.288397, "lat": 60.298407 },
-    "home": {"lon": 5.323187, "lat": 60.290948}
+    "work": {"lon": 5.288397, "lat": 60.298407},
+    "home": {"lon": 5.323187, "lat": 60.290948},
 }
 
 
@@ -95,6 +95,7 @@ def lap_centroid_dist(category: str, centroid_dict: dict) -> float:
         print("coordinates were None")
         return 1000000000000000000
 
+
 async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
     records: list[dict] = []
@@ -141,7 +142,13 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
-def make_commute_description(start_lat: float | None, start_lon: float | None, end_lat: float | None, end_lon:float | None, distance: float) -> dict:
+def make_commute_description(
+    start_lat: float | None,
+    start_lon: float | None,
+    end_lat: float | None,
+    end_lon: float | None,
+    distance: float,
+) -> dict:
     """Returns empty dict if this is not a commute"""
     if start_lat is None or start_lon is None or end_lat is None or end_lon is None:
         print("Can't recognize commutes, no coordinates")
@@ -149,9 +156,15 @@ def make_commute_description(start_lat: float | None, start_lon: float | None, e
     start_coord = {"lat": start_lat, "lon": start_lon}
     end_coord = {"lat": end_lat, "lon": end_lon}
     updates = {}
-    if lap_centroid_dist("home", start_coord) < 200 and lap_centroid_dist("work", end_coord) < 200:
+    if (
+        lap_centroid_dist("home", start_coord) < 200
+        and lap_centroid_dist("work", end_coord) < 200
+    ):
         updates["name"] = "Til jobb"
-    if lap_centroid_dist("work", start_coord) < 200 and lap_centroid_dist("home", end_coord) < 200:
+    if (
+        lap_centroid_dist("work", start_coord) < 200
+        and lap_centroid_dist("home", end_coord) < 200
+    ):
         updates["name"] = "Hjem fra jobb"
     if "jobb" in updates.get("name", ""):
         updates["commute"] = True
@@ -163,6 +176,7 @@ def make_commute_description(start_lat: float | None, start_lon: float | None, e
             updates["hide_from_home"] = False
     return updates
 
+
 async def make_description_from_stravaactivity(data: dict) -> dict[str, str]:
     """The data argument is the json dictionary obtained from the Strava API call"""
     start_coord = {}
@@ -171,7 +185,7 @@ async def make_description_from_stravaactivity(data: dict) -> dict[str, str]:
             "lat": data.get("start_latlng")[0],
             "lon": data.get("start_latlng")[1],
         }
-    end_coord={}
+    end_coord = {}
     if data.get("end_latlng") and len(data.get("end_latlng")) == 2:
         end_coord = {
             "lat": data.get("end_latlng")[0],
@@ -180,8 +194,17 @@ async def make_description_from_stravaactivity(data: dict) -> dict[str, str]:
     updates = {}
     print(f"{start_coord}")
     print(f"{end_coord}")
-    updates.update(make_commute_description(start_coord.get("lat"), start_coord.get("lon"), end_coord.get("lat"), end_coord.get("lon"), data["distance"]))
+    updates.update(
+        make_commute_description(
+            start_coord.get("lat"),
+            start_coord.get("lon"),
+            end_coord.get("lat"),
+            end_coord.get("lon"),
+            data["distance"],
+        )
+    )
     return updates
+
 
 async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa: PLR0911
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
@@ -192,7 +215,9 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
     for trackpoint in reversed(list(reader.trackpoints)):
         if (end_lat := trackpoint.lat) and (end_lon := trackpoint.lon):
             break
-    if commute := make_commute_description(start_lat, start_lon, end_lat, end_lon, reader.distance_m):
+    if commute := make_commute_description(
+        start_lat, start_lon, end_lat, end_lon, reader.distance_m
+    ):
         logger.info(f"Detected commute run {commute}")
         return commute
     d = datetime.datetime.fromisoformat(directory.name)
@@ -243,7 +268,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
             "name": f"BFG {sum(rows_1000)}x1000m, {name_500}{sum(rows_200)}x200m, 6x60m",
             "description": f"{desc_1000}{desc_500}{desc_200}. ",
             "visibility": "everyone",
-            "private": "false"
+            "private": "false",
         }
     if d.weekday() == THURSDAY and d.hour == 18:
         data = await analyze_torsdag(directory)
@@ -285,7 +310,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
             ),
             "description": f"{desc_40s}{desc_3000}{desc_200}",
             "visibility": "everyone",
-            "private": "false"
+            "private": "false",
         }
     if d.weekday() == SATURDAY and d.hour == 9:
         data = await analyze_lordag(directory)
@@ -321,9 +346,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
                 (data[rows_400]["hr_avg"] - data[rows_400]["expected_hr_avg"]).mean(),
                 1,
             )
-            desc_400 = (
-                f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}s (pulskost {hr_cost_400}), "
-            )
+            desc_400 = f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}s (pulskost {hr_cost_400}), "
         else:
             desc_400 = ""
         if sum(rows_200):
@@ -336,7 +359,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
             "name": "BFG Siljustøl" if sum(rows_400) else "BFG-lørdag",
             "description": f"{desc_lang}{desc_400}{desc_200}6x60m. ",
             "visibility": "everyone",
-            "private": "false"
+            "private": "false",
         }
 
 
@@ -422,7 +445,9 @@ async def describe():
     for _dir in dirs:
         desc = await make_description_from_tcx(Path(_dir))
         if desc:
-            print(f"{desc.get('name')}:    {Path(_dir).name}\n\t{desc.get('description')}")
+            print(
+                f"{desc.get('name')}:    {Path(_dir).name}\n\t{desc.get('description')}"
+            )
 
 
 async def analyze_all():
@@ -432,7 +457,7 @@ async def analyze_all():
         cache_file = Path(_dir) / "analyzed.pkl"
         await asyncio.sleep(0.1)
         d = datetime.datetime.fromisoformat(Path(_dir).name)
-        exercise_data : pd.DataFrame | None = None
+        exercise_data: pd.DataFrame | None = None
         if cache_file.is_file():
             exercise_data = pd.read_pickle(cache_file)
         else:

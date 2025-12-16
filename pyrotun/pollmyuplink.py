@@ -58,8 +58,8 @@ async def update_openhab(pers):
     while result is None and attempt < 5:
         attempt += 1
         result = await pers.myuplink.get(
-                f"v2/devices/{pers.myuplink.vvb_device_id}/points"
-            )
+            f"v2/devices/{pers.myuplink.vvb_device_id}/points"
+        )
         if result is not None:
             datapoints = {
                 point["parameterName"]: point["value"] for point in json.loads(result)

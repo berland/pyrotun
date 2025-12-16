@@ -143,7 +143,9 @@ class HomelyConnection:
                     except aiohttp.ContentTypeError as err:
                         text = await response.text()
                         if "502 Bad Gateway" not in text:  # Occurs once a day?
-                            raise ValueError(f"Got html data from homely: {text}") from err
+                            raise ValueError(
+                                f"Got html data from homely: {text}"
+                            ) from err
 
         return data
 

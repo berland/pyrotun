@@ -133,7 +133,11 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
     auto_desc = await exercise_analyzer.make_description_from_tcx(dirname)
     logger.info(f"{auto_desc=}")
 
-    details = f"{auto_desc.get('name', '')}. {auto_desc.get('description', '')}. " if auto_desc else ""
+    details = (
+        f"{auto_desc.get('name', '')}. {auto_desc.get('description', '')}. "
+        if auto_desc
+        else ""
+    )
     details = details.replace(". .", ".")
     details = details.replace("  ", " ")
     details = details.replace(", .", ".")
@@ -180,6 +184,7 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
         "toying": "0:00",
         "detaljer": details,
     }
+
 
 async def post_exercise_data(pers, postdata: dict):
     logger.info("Submitting exercise data %s", str(postdata))
