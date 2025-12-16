@@ -58,16 +58,17 @@ async def update_openhab(pers):
     while result is None and attempt < 5:
         attempt += 1
         result = await pers.myuplink.get(
-            f"v2/devices/{pers.myuplink.vvb_device_id}/points"
-        )
-        datapoints = {
-            point["parameterName"]: point["value"] for point in json.loads(result)
-        }
-        for p_name, value in datapoints.items():
-            if p_name in pers.myuplink.config:
-                await pers.openhab.set_item(
-                    pers.myuplink.config[p_name], value, log=True
-                )
+                f"v2/devices/{pers.myuplink.vvb_device_id}/points"
+            )
+        if result is not None:
+            datapoints = {
+                point["parameterName"]: point["value"] for point in json.loads(result)
+            }
+            for p_name, value in datapoints.items():
+                if p_name in pers.myuplink.config:
+                    await pers.openhab.set_item(
+                        pers.myuplink.config[p_name], value, log=True
+                    )
         if result is None:
             await asyncio.sleep(5)
 

@@ -3,7 +3,7 @@ import os
 
 import dotenv
 import pygeohash
-from aiohttp import ClientSession
+from aiohttp import ClientResponseError, ClientSession
 from myskoda import MySkoda
 
 import pyrotun
@@ -25,9 +25,12 @@ async def amain(pers=None, debug=False):
         myskoda = MySkoda(session, mqtt_enabled=False)
         await myskoda.connect(os.getenv("SKODA_USERNAME"), os.getenv("SKODA_PASSWORD"))
         vin = os.getenv("SKODA_VIN", "")
-        charge = await myskoda.get_charging(vin)
-        positions = await myskoda.get_positions(vin)
-        health = await myskoda.get_health(vin)
+        try:
+            charge = await myskoda.get_charging(vin)
+            positions = await myskoda.get_positions(vin)
+            health = await myskoda.get_health(vin)
+        except ClientResponseError as err:
+            logger.error(f"Skoda API not playing along, gave {err}")
 
     if health:
         await pers.openhab.set_item(

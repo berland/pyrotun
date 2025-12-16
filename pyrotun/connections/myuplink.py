@@ -104,6 +104,7 @@ class MyuplinkConnection:
             },
         ) as resp:
             if resp.status != 200:
+                print("mypuplink returned error:")
                 print(resp.status)
                 return None
             text_response = await resp.text()

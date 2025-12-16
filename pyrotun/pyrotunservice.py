@@ -93,6 +93,9 @@ def global_exception_handler(loop, context):
     # Pushover limit ~1024 chars
     message = message[-1000:]
 
+    if "identity.vwgroup.io/signin" in message:
+        return
+
     asyncio.create_task(
         send_pushover(
             title="Unhandled asyncio exception",
