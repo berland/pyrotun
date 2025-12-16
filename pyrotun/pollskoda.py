@@ -11,6 +11,7 @@ import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
 
+
 async def amain(pers=None, debug=False):
     close_pers = False
     if pers is None:
@@ -31,11 +32,12 @@ async def amain(pers=None, debug=False):
             health = await myskoda.get_health(vin)
         except ClientResponseError as err:
             logger.error(f"Skoda API not playing along, gave {err}")
+            raise RuntimeError(
+                "Kanske det må trykkes på en samtykke-webside, finn url i traceback"
+            ) from err
 
     if health:
-        await pers.openhab.set_item(
-            "EnyaqKm1", str(health.mileage_in_km), log=True
-        )
+        await pers.openhab.set_item("EnyaqKm1", str(health.mileage_in_km), log=True)
 
     if charge.status:
         await pers.openhab.set_item(
