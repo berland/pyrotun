@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 import watchfiles
 from geopy import distance
-from sqlalchemy import create_engine
 
 import pyrotun
 import pyrotun.persist
@@ -25,7 +24,6 @@ SATURDAY = 5
 EXERCISE_DIR = Path.home() / "polar_dump"
 
 logger = pyrotun.getLogger(__name__)
-
 
 # midpoints = pd.read_csv("intervaller.csv").groupby("category").agg("mean")[["lon", "lat"]]
 # midpoints.to_dict(orient="index")
@@ -484,12 +482,6 @@ async def analyze_all():
         sqlite3.connect(str(EXERCISE_DIR / "intervaller.db")),
         index=False,
         if_exists="replace",
-    )
-    postgres_engine = create_engine(
-        "postgresql+psycopg2://grafana@bobserv.r40:5432/grafana"
-    )
-    data.to_sql(
-        "intervaller", postgres_engine, if_exists="replace", index=False, method="multi"
     )
 
 
