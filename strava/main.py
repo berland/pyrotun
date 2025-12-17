@@ -32,11 +32,13 @@ SHOE_NOTIFICATIONS_SENT = set()
 logging.basicConfig(level=logging.INFO)
 
 HEARTBEAT = 240  # seconds
+
+
 async def heartbeat_logger():
     while True:
         counter = 0
         while counter < HEARTBEAT:
-            counter+=1
+            counter += 1
             await asyncio.sleep(1)  # Uvicorn will not exit during this second
         logger.info(f" [ strava-app heartbeat ({HEARTBEAT}s) ] ")
 
@@ -113,7 +115,6 @@ async def receive_event(payload: dict):
     return "", 200
 
 
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -183,7 +184,7 @@ async def process_activity_update(activity_id: str, aspect_type: str):
     activity: dict = response.json()
     print("*** ACTIVITY INFO ***")
     pprint.pprint(upper_dict_layer(activity))
-    #pprint.pprint(activity)
+    # pprint.pprint(activity)
     print("*** ACTIVITY END ***")
 
     updates = {}
@@ -204,7 +205,6 @@ async def process_activity_update(activity_id: str, aspect_type: str):
         print(f"Submitting activity updates: {updates}")
         update_activity(activity_id, updates)
 
-
     if "start_date_local" in activity:
         counter = 0
         tcxfilename = None
@@ -218,10 +218,13 @@ async def process_activity_update(activity_id: str, aspect_type: str):
                 print(f"Submitting activity updates: {updates}")
                 update_activity(activity_id, updates)
             else:
-                print(f"Computed updates, but not submitting ('Run' not present in name): {updates}")
+                print(
+                    f"Computed updates, but not submitting ('Run' not present in name): {updates}"
+                )
         else:
-            logger.error(f"TCX file never appeared on disk for {activity['start_date_local']=}")
-
+            logger.error(
+                f"TCX file never appeared on disk for {activity['start_date_local']=}"
+            )
 
     if aspect_type == "create" and "Run" in activity["name"]:
         await check_and_notify_about_undefined_shoe(activity)
@@ -240,15 +243,18 @@ async def check_and_notify_about_undefined_shoe(activity: dict):
         message = f"⚠️ Velg sko for Strava-økt: {edit_url}"
 
         data = {
-        "token": os.getenv("PUSHOVER_APIKEY", ""),
-        "user": os.getenv("PUSHOVER_USER", ""),
-        "title": "Strava skovalg",
-        "message": message,
-    }
+            "token": os.getenv("PUSHOVER_APIKEY", ""),
+            "user": os.getenv("PUSHOVER_USER", ""),
+            "title": "Strava skovalg",
+            "message": message,
+        }
 
-        pushover_resp = requests.post("https://api.pushover.net/1/messages.json", data=data)
+        pushover_resp = requests.post(
+            "https://api.pushover.net/1/messages.json", data=data
+        )
         print("Pushover sent:", pushover_resp.status_code)
         SHOE_NOTIFICATIONS_SENT.add(activity["id"])
+
 
 def update_activity(activity_id: str, data):
     access_token = refresh_token_if_needed()
@@ -264,8 +270,9 @@ def update_activity(activity_id: str, data):
         print(response.text)
         return None
 
+
 def find_nearby_file(iso_timestamp_from_strava, seconds_range=3) -> Path | None:
-    base_dir=Path("/home/berland/polar_dump")
+    base_dir = Path("/home/berland/polar_dump")
     fmt = "%Y-%m-%dT%H:%M:%S"
     base_time = datetime.datetime.strptime(iso_timestamp_from_strava.rstrip("Z"), fmt)
 
@@ -275,6 +282,7 @@ def find_nearby_file(iso_timestamp_from_strava, seconds_range=3) -> Path | None:
         if candidate_path.exists():
             return candidate_path.parent  # Return the first match
     return None
+
 
 async def download_tcx(activity_id: str, save_path: str) -> None:
     access_token = refresh_token_if_needed()
@@ -299,5 +307,10 @@ async def download_tcx(activity_id: str, save_path: str) -> None:
 
     print(response.text)
 
+
 def upper_dict_layer(d: dict) -> dict:
-    return {k: v for k, v in dict(d).items() if not isinstance(v, dict) and not isinstance(v, list)}
+    return {
+        k: v
+        for k, v in dict(d).items()
+        if not isinstance(v, dict) and not isinstance(v, list)
+    }

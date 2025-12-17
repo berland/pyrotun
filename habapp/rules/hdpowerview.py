@@ -40,8 +40,7 @@ class ActivatePowerviewScene(HABApp.Rule):
             self.activate_scene(self.scenes[requested_scene])
         else:
             print(
-                f"Unknown scene {requested_scene}, "
-                f"must be among {self.scenes.keys()}"
+                f"Unknown scene {requested_scene}, must be among {self.scenes.keys()}"
             )
 
     def activate_scene(self, scene: dict) -> None:

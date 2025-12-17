@@ -71,7 +71,6 @@ def test_estimate_currenthourusage():
 
 
 def test_estimate_currenthourusage_athourstart():
-
     # Series of length 1 (only valid for 1 sec):
     assert (
         powercontroller._estimate_currenthourusage(
