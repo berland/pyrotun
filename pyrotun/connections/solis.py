@@ -49,7 +49,7 @@ class SolisConnection:
         self.inverter_id = id_sn["id"]
         self.inverter_sn = id_sn["sn"]
 
-    async def get_solis_cloud_data(self, url_part, data) -> dict | None:
+    async def get_solis_cloud_data(self, url_part, data) -> dict:
         assert self.api_secret is not None
         assert self.api_id is not None
         assert self.websession is not None
@@ -82,16 +82,14 @@ class SolisConnection:
         async with self.websession.post(
             self.api_url + url_part, data=data.encode("utf-8"), headers=headers
         ) as response:
-            json_response: dict | None = await response.json()
+            json_response: dict = await response.json()
             return json_response
 
-    async def get_data(self) -> dict | None:
-        data: dict | None = await self.get_solis_cloud_data(
+    async def get_data(self):
+        data: dict = await self.get_solis_cloud_data(
             INVERTER_DETAIL,
             json.dumps({"id": self.inverter_id, "sn": self.inverter_sn}),
         )
-        if data is None:
-            return None
         # Fix units
         if (
             "data" in data
