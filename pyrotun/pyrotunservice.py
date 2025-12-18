@@ -301,7 +301,7 @@ def setup_crontabs(pers):
         logger.info(" ** Yrmelding")
         await pyrotun.yrmelding.main(pers)
 
-    @aiocron.crontab(EVERY_HOUR)
+    @aiocron.crontab(EVERY_DAY)
     async def sunheatingmodel():
         logger.info(" ** sunheating model")
         sunmodel = await pyrotun.powermodels.sunheating_model(pers)
