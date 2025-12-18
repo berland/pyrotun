@@ -93,7 +93,7 @@ class SolisConnection:
         # Fix units
         if (
             "data" in data
-            and "apparentPowerStr" in data["data"]
+            and "apparentPowerStr" in data.get("data", [])
             and data["data"]["apparentPowerStr"] == "kVA"
         ):
             data["data"]["apparentPower"] *= 1000
