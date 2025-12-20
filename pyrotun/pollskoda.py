@@ -31,10 +31,13 @@ async def amain(pers=None, debug=False):
             positions = await myskoda.get_positions(vin)
             health = await myskoda.get_health(vin)
         except ClientResponseError as err:
-            logger.error(f"Skoda API not playing along, gave {err}")
-            raise RuntimeError(
-                "Kanske det må trykkes på en samtykke-webside, finn url i traceback"
-            ) from err
+            if err.status == 500:
+                logger.warning("Skoda API gave Internal Server Error, probably transient failure")
+            else:
+                logger.error(f"Skoda API not playing along, gave {err}")
+                raise RuntimeError(
+                    "Kanske det må trykkes på en samtykke-webside, finn url i traceback"
+                ) from err
 
     if health:
         await pers.openhab.set_item("EnyaqKm1", str(health.mileage_in_km), log=True)
