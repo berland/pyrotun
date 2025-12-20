@@ -95,7 +95,7 @@ async def update_openhab(pers, data):
     # "Alarm state" is not a "device" in the homely API response. Handled
     # outside the yaml file..
     if data["name"].strip() == "Råtun 40":
-        alarmstate_map = {"ARMED_AWAY": "ON", "DISARMED": "OFF"}
+        alarmstate_map = {"ARMED_AWAY": "ON", "DISARMED": "OFF", "ARM_PENDING": "OFF"}
         await pers.openhab.set_item(
             ALARM_ARMED_ITEM, alarmstate_map[data["alarmState"]], log=True
         )
