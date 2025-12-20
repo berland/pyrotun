@@ -16,7 +16,7 @@ REQUIREMENTS = [
     "geopy",
     "gpxpy",
     "fastapi",
- #   "habapp", # no-go for py312 elvcat
+    #   "habapp", # no-go for py312 elvcat
     "holidays",
     "isodate",
     "lxml",
