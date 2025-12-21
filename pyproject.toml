@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyrotun"
+description = "Python code for Råtun 40"
+authors = [
+    { name = "Håvard Berland", email = "berland@pvv.ntnu.no" }
+]
+urls = { Homepage = "https://github.com/berland/pyrotun" }
+license = { text = "Private" }
+dynamic = ["version"]
+dependencies = [
+    "activereader",
+    "aiocron<2",  # aiocron 2.1 støtter ikke sekunder
+    "aiofiles",
+    "aiohttp",
+    "aioinflux",
+    "astral",
+    "asyncio",
+    "aiomqtt",
+    "defusedxml",
+    "geopy",
+    "gpxpy",
+    "fastapi",
+    # habapp er no-go for elvcat
+    "holidays",
+    "isodate",
+    "lxml",
+    "metpy",
+    "networkx",
+    "numpy",
+    "paho-mqtt",
+    "pandas",
+    "pygeohash",
+    "pylunar",
+    "python-dotenv",
+    "python-openhab",
+    "pytibber",
+    "pyyaml",
+    "requests",
+    "scikit-learn",
+    "skodaconnect",
+    "smappy",
+    "uvicorn",
+    "watchfiles",
+]
+
+[project.optional-dependencies]
+tests = [
+    "pytest",
+    "pytest-asyncio",
+    "rstcheck",
+]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["pyrotun*"]
+
+[tool.setuptools_scm]
+version_file = "pyrotun/version.py"
