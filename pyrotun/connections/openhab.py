@@ -35,17 +35,17 @@ class OpenHABConnection:
             self.openhab_url + "/items/" + str(item_name)
         ) as response:
             resp = await response.json()
-            if datatype == str:
+            if datatype is str:
                 if "state" not in resp:
                     raise KeyError(f"{item_name} not found in response {resp}")
                 return resp["state"]
-            elif datatype == float:
+            elif datatype is float:
                 try:
                     return float(resp["state"])
                 except ValueError:
                     logger.error(f"{item_name} was UNDEF")
                     return backupvalue
-            elif datatype == bool:
+            elif datatype is bool:
                 return resp["state"] == "ON"
 
     async def set_item(

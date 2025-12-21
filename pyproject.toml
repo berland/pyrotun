@@ -66,6 +66,7 @@ version_file = "pyrotun/version.py"
 [tool.ruff.lint]
 select = [
   "B",   # flake-8-bugbear
+  "E",
   "F",   # pyflakes
   "I",   # isort
   "PL",  # pylint

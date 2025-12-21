@@ -71,11 +71,11 @@ class InfluxDBConnection:
         resp = await self.client.query(
             f"SELECT last(value) FROM {item} where time < now() - {ago}{unit}"
         )
-        if datatype == int:
+        if datatype is int:
             return int(resp["last"].values[0])
-        if datatype == float:
+        if datatype is float:
             return float(resp["last"].values[0])
-        if datatype == bool:
+        if datatype is bool:
             return int(resp["last"].values[0]) == 1
         return str(resp["last"].values[0])
 

@@ -25,7 +25,8 @@ EXERCISE_DIR = Path.home() / "polar_dump"
 
 logger = pyrotun.getLogger(__name__)
 
-# midpoints = pd.read_csv("intervaller.csv").groupby("category").agg("mean")[["lon", "lat"]]
+# midpoints = pd.read_csv("intervaller.csv").groupby("category")
+#                          .agg("mean")[["lon", "lat"]]
 # midpoints.to_dict(orient="index")
 LAP_CENTROIDS = {
     "torsdag40s": {"lon": 5.282329871212935, "lat": 60.29923441179828},
@@ -265,7 +266,9 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
         else:
             desc_200 = ""
         return {
-            "name": f"BFG {sum(rows_1000)}x1000m, {name_500}{sum(rows_200)}x200m, 6x60m",
+            "name": (
+                f"BFG {sum(rows_1000)}x1000m, {name_500}{sum(rows_200)}x200m, 6x60m"
+            ),
             "description": f"{desc_1000}{desc_500}{desc_200}. ",
             "visibility": "everyone",
             "private": "false",
@@ -346,7 +349,10 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
                 (data[rows_400]["hr_avg"] - data[rows_400]["expected_hr_avg"]).mean(),
                 1,
             )
-            desc_400 = f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}s (pulskost {hr_cost_400}), "
+            desc_400 = (
+                f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}s "
+                f"(pulskost {hr_cost_400}), "
+            )
         else:
             desc_400 = ""
         if sum(rows_200):

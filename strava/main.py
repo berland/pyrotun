@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 import logging
@@ -15,7 +16,6 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pyrotun import exercise_analyzer
 
 app = FastAPI()
-import asyncio
 
 VERIFY_TOKEN = "vapourfly"
 logger = logging.getLogger(__name__)
@@ -122,9 +122,9 @@ async def health():
 
 @app.get("/oauth/callback")
 async def exchange_token(request: Request):
-    """This function is called by Strava when the User clicks 'Authorize' to authorize
-    this app. To get to the authorize webpage, use a browser where user is logged in at Strava
-    and visit
+    """This function is called by Strava when the User clicks 'Authorize' to
+    authorize this app. To get to the authorize webpage, use a browser where
+    user is logged in at Strava and visit
 
     https://www.strava.com/oauth/authorize?client_id=XXXXXXX&response_type=code&redirect_uri=https://XXXXXXXXX.ngrok-free.app/oauth/callback&scope=read,activity:read_all,activity:write&approval_prompt=force
     """
@@ -219,7 +219,8 @@ async def process_activity_update(activity_id: str, aspect_type: str):
                 update_activity(activity_id, updates)
             else:
                 print(
-                    f"Computed updates, but not submitting ('Run' not present in name): {updates}"
+                    "Computed updates, but not submitting "
+                    f"('Run' not present in name): {updates}"
                 )
         else:
             logger.error(
