@@ -65,13 +65,31 @@ version_file = "pyrotun/version.py"
 
 [tool.ruff.lint]
 select = [
+  "A",
+  "AIR",
   "B",   # flake-8-bugbear
+  "DJ",
   "E",
   "F",   # pyflakes
+  "FA",
+  "FAST",
+  "FLY",
   "I",   # isort
+  "INT",
+  "ISC",
+  "LOG",
+  "NPY",
   "PL",  # pylint
+  "PLC",
+  "PLE",
+  "PYI",
+  "Q",
   "SIM", # flake-8-simplify
+  "SLOT",
+  "TC",
+  "TID",
   "W",   # pycodestyle
+  "YTT"
 ]
 
 ignore = [
