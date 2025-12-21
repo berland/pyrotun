@@ -91,11 +91,9 @@ def process_dweets(pers):
                 logger.error(json.dumps(dweet, indent=2, sort_keys=True))
         except KeyError:
             print(f"Not able to parse dweet {dweet}")
-            pass
         except ValueError as err:
             print("Misconfiguration in OpenHAB?")
             print(err)
-            pass
 
 
 def _listen_for_dweets_from_response(response):

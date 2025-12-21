@@ -65,30 +65,31 @@ version_file = "pyrotun/version.py"
 
 [tool.ruff.lint]
 select = [
-  "RSE",
-  "PLW",
-  "FIX",
-  "FURB",
-  "BLE",
   "A",
   "AIR",
   "B",   # flake-8-bugbear
+  "BLE",
   "DJ",
   "E",
   "F",   # pyflakes
   "FA",
   "FAST",
+  "FIX",
   "FLY",
+  "FURB",
   "I",   # isort
   "INT",
   "ISC",
   "LOG",
   "NPY",
+  "PIE",
   "PL",  # pylint
   "PLC",
   "PLE",
+  "PLW",
   "PYI",
   "Q",
+  "RSE",
   "SIM", # flake-8-simplify
   "SLOT",
   "TC",

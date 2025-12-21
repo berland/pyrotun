@@ -393,7 +393,7 @@ class shadow:
             ],
         )
 
-        for i in range(0, len(DEGS)):
+        for i in range(len(DEGS)):
             j = 0 if i == len(DEGS) - 1 else i + 1
             if i % 2 == 0:
                 svg = svg + self.generateArc(
