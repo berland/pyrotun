@@ -65,12 +65,12 @@ version_file = "pyrotun/version.py"
 
 [tool.ruff.lint]
 select = [
-  "W",   # pycodestyle
-  "I",   # isort
   "B",   # flake-8-bugbear
-  "SIM", # flake-8-simplify
   "F",   # pyflakes
+  "I",   # isort
   "PL",  # pylint
+  "SIM", # flake-8-simplify
+  "W",   # pycodestyle
 ]
 
 ignore = [
