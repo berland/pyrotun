@@ -11,7 +11,7 @@ from pyrotun import persist, powercontroller
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "year, month, expected_bkk",
+    ("year", "month", "expected_bkk"),
     [
         (2022, 7, 8100),
         (2022, 6, 8010),
@@ -102,7 +102,7 @@ async def test_estimate_currenthourusage_for_real():
 
 
 @pytest.mark.parametrize(
-    "overshoot, powerload_df, expected_actions",
+    ("overshoot", "powerload_df", "expected_actions"),
     [
         pytest.param(0, pd.DataFrame(), [], id="zero"),
         pytest.param(1000, pd.DataFrame(), [], id="nothing_to_turn_off"),
@@ -200,7 +200,7 @@ def test_decide(overshoot, powerload_df, expected_actions):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "action, deviceinfo, expected_item, expected_value",
+    ("action", "deviceinfo", "expected_item", "expected_value"),
     [
         (
             "OFF",
@@ -253,7 +253,7 @@ safeguard = 50
 
 
 @pytest.mark.parametrize(
-    "hourmaxes, expected",
+    ("hourmaxes", "expected"),
     [
         ([10], baseline - safeguard),
         ([10000], baseline - safeguard),

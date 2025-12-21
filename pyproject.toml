@@ -87,12 +87,14 @@ select = [
   "PLC",
   "PLE",
   "PLW",
+  "PT",
   "PYI",
   "Q",
   "RSE",
   "SIM", # flake-8-simplify
   "SLOT",
   "TC",
+  "TD",
   "TID",
   "W",   # pycodestyle
   "YTT"
