@@ -65,6 +65,11 @@ version_file = "pyrotun/version.py"
 
 [tool.ruff.lint]
 select = [
+  "RSE",
+  "PLW",
+  "FIX",
+  "FURB",
+  "BLE",
   "A",
   "AIR",
   "B",   # flake-8-bugbear

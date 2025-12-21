@@ -316,7 +316,7 @@ async def turn(pers, action: str, device: Dict[str, Any], dryrun=False) -> None:
 async def estimate_currenthourusage(pers) -> int:
     """Estimates what the hour usage in Wh will be for the current hour (at end
     of the hour)"""
-    # TODO: This does not use the cumulative estimate, which would
+    # NB: This does not use the cumulative estimate, which would
     # be smart in case of hiatuses in the live data!
     lasthour: datetime.datetime = datetime.datetime.utcnow().replace(
         second=0, minute=0, microsecond=0
@@ -430,7 +430,7 @@ def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]) -> float:
         )
     if dayofmonth == 1:
         return max(todays_hourmax - safeguard, baseline - safeguard)
-    raise ValueError()  # If datetiem gives negative day
+    raise ValueError  # If datetiem gives negative day
 
 
 async def monthly_hourmaxes(

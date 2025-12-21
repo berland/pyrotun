@@ -258,7 +258,7 @@ class shadow:
         if self.debug:
             print("Min Point = ", minPoint)
             print("Max Point = ", maxPoint)
-            print("")
+            print()
 
         i = minPoint
         k = 0

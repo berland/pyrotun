@@ -159,7 +159,7 @@ async def make_heatingmodel(
             "Solhoyde"
         ].clip(lower=0)
 
-        # Todo: delete days where max(sunheight) == 0
+        # Should delete days where max(sunheight) == 0
 
         # No contribution from low sun (terrain)
         sunheight[sunheight < 5] = 0

@@ -20,7 +20,7 @@ class UpdateSonosArt(HABApp.Rule):
                 with open(SONOSART_STATICFILE, "wb") as filehandle:
                     filehandle.write(png_bytes)
                 print(f"Wrote {len(png_bytes)} PNG bytes to {SONOSART_STATICFILE}")
-            except Exception as ex:
+            except requests.HTTPError as ex:
                 print(f"Could not get URL {event.value}, {ex}")
         else:
             print(f"Not an URL for SonosArt: {event.value}")
