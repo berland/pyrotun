@@ -12,6 +12,7 @@ import logging
 import os
 
 import dotenv
+from aiohttp import ContentTypeError
 
 import pyrotun
 import pyrotun.persist
@@ -82,7 +83,11 @@ class SolisConnection:
         async with self.websession.post(
             self.api_url + url_part, data=data.encode("utf-8"), headers=headers
         ) as response:
-            json_response: dict = await response.json()
+            try:
+                json_response: dict = await response.json()
+            except ContentTypeError as err:
+                logger.error(err)
+                return {}
             return json_response
 
     async def get_data(self):
