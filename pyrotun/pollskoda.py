@@ -31,9 +31,10 @@ async def amain(pers=None, debug=False):
             positions = await myskoda.get_positions(vin)
             health = await myskoda.get_health(vin)
         except ClientResponseError as err:
-            if err.status == 500:
+            if err.status in (404, 500):
                 logger.warning(
-                    "Skoda API gave Internal Server Error, probably transient failure"
+                    "Skoda API gave Internal Server Error or 404, "
+                    f"probably transient failure: {err}"
                 )
             else:
                 logger.error(f"Skoda API not playing along, gave {err}")
