@@ -301,11 +301,11 @@ def setup_crontabs(pers):
         logger.info(" ** Yrmelding")
         await pyrotun.yrmelding.main(pers)
 
-    @aiocron.crontab(EVERY_DAY)
-    async def sunheatingmodel():
-        logger.info(" ** sunheating model")
-        sunmodel = await pyrotun.powermodels.sunheating_model(pers)
-        pers.powermodels.sunheatingmodel = sunmodel
+    # @aiocron.crontab(EVERY_DAY)
+    # async def sunheatingmodel():
+    #     logger.info(" ** sunheating model")
+    #     sunmodel = await pyrotun.powermodels.sunheating_model(pers)
+    #     pers.powermodels.sunheatingmodel = sunmodel
 
     @aiocron.crontab(EVERY_15_MINUTE)
     async def houseshadow():
