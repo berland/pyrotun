@@ -28,7 +28,7 @@ async def main(pers=None):
     if pers is None:
         pers = persist.PyrotunPersistence()
         close_pers_here = True
-    await pers.ainit(requested=["openhab", "yr", "powermodels", "influxdb"])
+        await pers.ainit(requested=["openhab", "yr", "powermodels", "influxdb"])
 
     # print(pers.yr.symbolcodedict)
     forecast_df = await pers.yr.forecast()
