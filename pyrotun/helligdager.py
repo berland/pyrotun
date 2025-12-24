@@ -10,7 +10,8 @@ logger = pyrotun.getLogger(__name__)
 
 
 async def main(pers):
-    if datetime.datetime.now() in holidays.Norway():
+    now = datetime.datetime.now()
+    if now in holidays.Norway() or (now.day == 24 and now.month == 12):
         logger.info("Det er fridag")
         await pers.openhab.set_item("Fridag", "ON")
     else:
@@ -18,8 +19,12 @@ async def main(pers):
         await pers.openhab.set_item("Fridag", "OFF")
 
 
-if __name__ == "__main__":
+async def amain():
     pers = pyrotun.persist.PyrotunPersistence()
-    asyncio.run(pers.ainit())
-    asyncio.run(main(pers))
-    asyncio.run(pers.aclose())
+    await pers.ainit(["openhab"])
+    await main(pers)
+    await pers.aclose()
+
+
+if __name__ == "__main__":
+    asyncio.run(amain())
