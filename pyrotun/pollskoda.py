@@ -26,6 +26,7 @@ async def amain(pers=None, debug=False):
         myskoda = MySkoda(session, mqtt_enabled=False)
         await myskoda.connect(os.getenv("SKODA_USERNAME"), os.getenv("SKODA_PASSWORD"))
         vin = os.getenv("SKODA_VIN", "")
+        charge, positions, health = None, None, None
         try:
             charge = await myskoda.get_charging(vin)
             positions = await myskoda.get_positions(vin)
@@ -45,7 +46,7 @@ async def amain(pers=None, debug=False):
     if health:
         await pers.openhab.set_item("EnyaqKm1", str(health.mileage_in_km), log=True)
 
-    if charge.status:
+    if charge and charge.status:
         await pers.openhab.set_item(
             "EnyaqChargeState", str(charge.status.state), log=True
         )
