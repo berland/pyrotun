@@ -9,6 +9,7 @@ import asyncio
 import datetime
 import math
 import os
+import socket
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -83,109 +84,116 @@ async def get_powerloads(pers) -> pd.DataFrame:
 
     loads: List[dict] = []
 
-    loads.append(
-        {
-            "switch_item": "Verksted_varmekabler_nattsenking",
-            "inverted_switch": True,
-            "wattage": 1700,
-            "lastchange": await pers.influxdb.item_age(
-                "Verksted_varmekabler_nattsenking", unit="minutes"
-            ),
-            "on_need": round(
-                max(
-                    12
-                    - await pers.openhab.get_item(
-                        "Sensor_Verkstedgulv_temperatur", datatype=float, backupvalue=15
-                    ),
-                    0,
-                ),
-                5,
-            ),
-            "sensor_item": "Sensor_Verkstedgulv_temperatur",
-        }
-    )
-    loads.append(
-        {
-            "switch_item": "Garasje_varmekabler_nattsenking",
-            "inverted_switch": True,
-            "wattage": 1700,
-            "lastchange": await pers.influxdb.item_age(
-                "Garasje_varmekabler_nattsenking", unit="minutes"
-            ),
-            "on_need": round(
-                max(
-                    6
-                    - await pers.openhab.get_item(
-                        "Sensor_Garasjegulv_temperatur", datatype=float, backupvalue=10
-                    ),
-                    0,
-                ),
-                6,
-            ),
-            "sensor_item": "Sensor_Garasjegulv_temperatur",
-        }
-    )
-
-    loads.append(
-        {
-            "switch_name": "Varmtvannsbereder_bryter",
-            "wattage": 2800,
-            "is_on": await pers.openhab.get_item("Varmtvannsbereder_bryter"),
-            "lastchange": await pers.influxdb.item_age(
-                "Varmtvannsbereder_bryter", unit="minutes"
-            ),
-        }
-    )
-
-    async with aiofiles.open(FLOORSFILE, "r", encoding="utf-8") as filehandle:
-        contents = await filehandle.read()
-    floors = yaml.safe_load(contents)
-
-    # Varmepumpe? Don't touch it...!
-
-    for floor in floors:
-        thisfloor = floors[floor].copy()  # needed?
-        if isinstance(thisfloor["setpoint_item"], list):
-            bryter_name = thisfloor["setpoint_item"][0].replace(
-                "SetpointHeating", "bryter"
-            )
-        else:
-            bryter_name = thisfloor["setpoint_item"].replace(
-                "SetpointHeating", "bryter"
-            )
-
-        if "sensor_item" in thisfloor:
-            meas_temp = await pers.openhab.get_item(
-                thisfloor["sensor_item"], datatype=float
-            )
-            thisfloor.update({"meas_temp": meas_temp})
-            target_temp = 25 + thisfloor.get("delta", 0)
-            if meas_temp is not None:
-                on_need = round(max(target_temp - meas_temp, 0), 6)
-                thisfloor.update(
-                    {
-                        "on_need": on_need,
-                    }
-                )
-            if isinstance(thisfloor["setpoint_item"], str):
-                # Can be a list for floors with multiple thermostats
-                thisfloor.update(
-                    {
-                        "is_on": await pers.openhab.get_item(bryter_name),
-                    }
-                )
-        else:
-            print(f"no sensor for floor {floor}")
-        thisfloor.update(
+    if "elvcat" in socket.gethostname():
+        pass
+    else:
+        loads.append(
             {
+                "switch_item": "Verksted_varmekabler_nattsenking",
+                "inverted_switch": True,
+                "wattage": 1700,
                 "lastchange": await pers.influxdb.item_age(
-                    bryter_name,
-                    unit="minutes",
-                )
+                    "Verksted_varmekabler_nattsenking", unit="minutes"
+                ),
+                "on_need": round(
+                    max(
+                        12
+                        - await pers.openhab.get_item(
+                            "Sensor_Verkstedgulv_temperatur",
+                            datatype=float,
+                            backupvalue=15,
+                        ),
+                        0,
+                    ),
+                    5,
+                ),
+                "sensor_item": "Sensor_Verkstedgulv_temperatur",
+            }
+        )
+        loads.append(
+            {
+                "switch_item": "Garasje_varmekabler_nattsenking",
+                "inverted_switch": True,
+                "wattage": 1700,
+                "lastchange": await pers.influxdb.item_age(
+                    "Garasje_varmekabler_nattsenking", unit="minutes"
+                ),
+                "on_need": round(
+                    max(
+                        6
+                        - await pers.openhab.get_item(
+                            "Sensor_Garasjegulv_temperatur",
+                            datatype=float,
+                            backupvalue=10,
+                        ),
+                        0,
+                    ),
+                    6,
+                ),
+                "sensor_item": "Sensor_Garasjegulv_temperatur",
             }
         )
 
-        loads.append(thisfloor)
+        loads.append(
+            {
+                "switch_name": "Varmtvannsbereder_bryter",
+                "wattage": 2800,
+                "is_on": await pers.openhab.get_item("Varmtvannsbereder_bryter"),
+                "lastchange": await pers.influxdb.item_age(
+                    "Varmtvannsbereder_bryter", unit="minutes"
+                ),
+            }
+        )
+
+        async with aiofiles.open(FLOORSFILE, "r", encoding="utf-8") as filehandle:
+            contents = await filehandle.read()
+        floors = yaml.safe_load(contents)
+
+        # Varmepumpe? Don't touch it...!
+
+        for floor in floors:
+            thisfloor = floors[floor].copy()  # needed?
+            if isinstance(thisfloor["setpoint_item"], list):
+                bryter_name = thisfloor["setpoint_item"][0].replace(
+                    "SetpointHeating", "bryter"
+                )
+            else:
+                bryter_name = thisfloor["setpoint_item"].replace(
+                    "SetpointHeating", "bryter"
+                )
+
+            if "sensor_item" in thisfloor:
+                meas_temp = await pers.openhab.get_item(
+                    thisfloor["sensor_item"], datatype=float
+                )
+                thisfloor.update({"meas_temp": meas_temp})
+                target_temp = 25 + thisfloor.get("delta", 0)
+                if meas_temp is not None:
+                    on_need = round(max(target_temp - meas_temp, 0), 6)
+                    thisfloor.update(
+                        {
+                            "on_need": on_need,
+                        }
+                    )
+                if isinstance(thisfloor["setpoint_item"], str):
+                    # Can be a list for floors with multiple thermostats
+                    thisfloor.update(
+                        {
+                            "is_on": await pers.openhab.get_item(bryter_name),
+                        }
+                    )
+            else:
+                print(f"no sensor for floor {floor}")
+            thisfloor.update(
+                {
+                    "lastchange": await pers.influxdb.item_age(
+                        bryter_name,
+                        unit="minutes",
+                    )
+                }
+            )
+
+            loads.append(thisfloor)
 
     return pd.DataFrame(loads).drop(["cooling_rate", "heating_rate"], axis="columns")
 
