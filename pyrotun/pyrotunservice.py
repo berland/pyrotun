@@ -96,6 +96,9 @@ def global_exception_handler(loop, context):
     # Pushover limit ~1024 chars
     message = message[-1000:]
 
+    if "503 Service Temporarily Unavailable" in message:
+        return
+
     if "identity.vwgroup.io/signin" in message:
         return
 
