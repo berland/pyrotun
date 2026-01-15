@@ -86,6 +86,8 @@ async def send_pushover(message: str, title: str = "Async App Error"):
 def global_exception_handler(loop, context):
     exc = context.get("exception")
 
+    logger.exception("Caught exception and sending it to pushover", exc_info=exc)
+
     if exc:
         tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         message = tb
