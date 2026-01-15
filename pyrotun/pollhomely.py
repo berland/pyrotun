@@ -38,8 +38,14 @@ async def amain(pers=None, dryrun=False, debug=False, do_websocket=False):
 
     if not dryrun:
         for location_data in data:
-            await update_openhab(PERS, location_data)
-
+            try:
+                await update_openhab(PERS, location_data)
+            except KeyError as err:
+                logger.exception(
+                    "There is no key data in what came from homely, "
+                    f"look: {location_data}, got error {err}"
+                )
+                raise err
     if do_websocket:
         websocket_supervisor = asyncio.create_task(supervise_websocket(PERS))
         await asyncio.wait([websocket_supervisor])
