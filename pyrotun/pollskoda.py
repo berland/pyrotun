@@ -24,7 +24,16 @@ async def amain(pers=None, debug=False):
 
     async with ClientSession() as session:
         myskoda = MySkoda(session, mqtt_enabled=False)
-        await myskoda.connect(os.getenv("SKODA_USERNAME"), os.getenv("SKODA_PASSWORD"))
+        try:
+            await myskoda.connect(
+                os.getenv("SKODA_USERNAME"), os.getenv("SKODA_PASSWORD")
+            )
+        except Exception as err:
+            if "terms" in str(err):
+                logger.exception("Terms and condition error from Skoda, sigh")
+                return
+            else:
+                raise err
         vin = os.getenv("SKODA_VIN", "")
         charge, positions, health = None, None, None
         try:
