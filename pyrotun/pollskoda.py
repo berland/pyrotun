@@ -32,6 +32,12 @@ async def amain(pers=None, debug=False):
             if "terms" in str(err):
                 logger.exception("Terms and condition error from Skoda, sigh")
                 return
+            if "AuthorizationFailed" in str(err):
+                logger.exception("AuthorizationFailed from Skoda, flaky, sigh")
+                return
+            if "identity.vwgroup.io/signin" in str(err):
+                logger.exception("Skoda redirecting to signin webpage, sigh")
+                return
             else:
                 raise err
         vin = os.getenv("SKODA_VIN", "")
