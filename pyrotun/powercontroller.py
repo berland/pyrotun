@@ -378,7 +378,7 @@ async def update_effekttrinn(pers):
     top_watts = hourmaxes.sort_values(ascending=False)[0:3]
     mean = sum(top_watts) / len(top_watts)
     await pers.openhab.set_item(POWER_FOR_EFFEKTTRINN, str(int(mean)), log=True)
-    for idx in [1, 2, 3]:
+    for idx in [_0idx + 1 for _0idx in range(len(top_watts))]:
         await pers.openhab.set_item(
             MONTHLYHOURMAX + str(idx),
             f"{str(top_watts.index[idx - 1])[0:16]}: "
