@@ -83,7 +83,11 @@ async def send_pushover(message: str, title: str = "Async App Error"):
             logger.error(f"Failed to send pushover: {err}")
 
 
+PUSHED_EXCEPTIONS = set()
+
+
 def global_exception_handler(loop, context):
+    global PUSHED_EXCEPTIONS
     exc = context.get("exception")
 
     logger.exception("Caught exception and sending it to pushover", exc_info=exc)
@@ -101,15 +105,20 @@ def global_exception_handler(loop, context):
     if "503 Service Temporarily Unavailable" in message:
         return
 
-    if "identity.vwgroup.io/signin" in message:
-        return
-
-    asyncio.create_task(
-        send_pushover(
-            title="Unhandled asyncio exception",
-            message=message,
+    if message not in PUSHED_EXCEPTIONS:
+        asyncio.create_task(
+            send_pushover(
+                title="Unhandled asyncio exception",
+                message=message,
+            )
         )
-    )
+        PUSHED_EXCEPTIONS.add(message)
+
+
+@aiocron.crontab(EVERY_HOUR)
+async def clear_pushed_exceptions() -> None:
+    global PUSHED_EXCEPTIONS
+    PUSHED_EXCEPTIONS = set()
 
 
 def get_alexa_serial_to_devicename() -> dict:
