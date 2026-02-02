@@ -12,7 +12,7 @@ import logging
 import os
 
 import dotenv
-from aiohttp import ContentTypeError
+from aiohttp import ConnectionTimeoutError, ContentTypeError
 
 import pyrotun
 import pyrotun.persist
@@ -80,17 +80,21 @@ class SolisConnection:
             "Date": now,
             "Authorization": authorization,
         }
-        async with self.websession.post(
-            self.api_url + url_part, data=data.encode("utf-8"), headers=headers
-        ) as response:
-            try:
-                json_response: dict = await response.json()
-            except ContentTypeError as err:
-                logger.error(err)
-                return {}
-            return json_response
+        try:
+            async with self.websession.post(
+                self.api_url + url_part, data=data.encode("utf-8"), headers=headers
+            ) as response:
+                try:
+                    json_response: dict = await response.json()
+                except ContentTypeError as err:
+                    logger.error(err)
+                    return {}
+                return json_response
+        except ConnectionTimeoutError:
+            logger.exception("Solis cloud temporarily down")
+            return {}
 
-    async def get_data(self):
+    async def get_data(self) -> dict:
         data: dict = await self.get_solis_cloud_data(
             INVERTER_DETAIL,
             json.dumps({"id": self.inverter_id, "sn": self.inverter_sn}),
