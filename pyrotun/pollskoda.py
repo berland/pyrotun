@@ -29,10 +29,11 @@ async def amain(pers=None, debug=False):
                 os.getenv("SKODA_USERNAME"), os.getenv("SKODA_PASSWORD")
             )
         except Exception as err:
+            logger.error(f"Got this text in skoda-exception: {str(err)}")
             if "terms" in str(err):
                 logger.exception("Terms and condition error from Skoda, sigh")
                 return
-            if "AuthorizationFailed" in str(err):
+            if "AuthorizationFailedError" in str(err):
                 logger.exception("AuthorizationFailed from Skoda, flaky, sigh")
                 return
             if "identity.vwgroup.io/signin" in str(err):

@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+from contextlib import suppress
 
 import dotenv
 
@@ -57,9 +58,10 @@ async def update_openhab(pers):
     attempt = 0
     while result is None and attempt < 5:
         attempt += 1
-        result = await pers.myuplink.get(
-            f"v2/devices/{pers.myuplink.vvb_device_id}/points"
-        )
+        with suppress(asyncio.TimeoutError):
+            result = await pers.myuplink.get(
+                f"v2/devices/{pers.myuplink.vvb_device_id}/points"
+            )
         if result is not None:
             datapoints = {
                 point["parameterName"]: point["value"] for point in json.loads(result)
