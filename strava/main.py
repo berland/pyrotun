@@ -17,7 +17,7 @@ from pyrotun import exercise_analyzer
 
 app = FastAPI()
 
-VERIFY_TOKEN = "vapourfly"
+VERIFY_TOKEN = "vapourfly"  # Only used for initial handshake
 logger = logging.getLogger(__name__)
 load_dotenv()
 app = FastAPI()
@@ -110,53 +110,6 @@ async def receive_event(payload: dict) -> tuple[str, int]:
     await process_activity_update(activity_id, payload.get("aspect_type", ""))
 
     return "", 200
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@app.get("/oauth/callback")
-async def exchange_token(request: Request):
-    """This function is called by Strava when the User clicks 'Authorize' to
-    authorize this app. To get to the authorize webpage, use a browser where
-    user is logged in at Strava and visit
-
-    https://www.strava.com/oauth/authorize?client_id=XXXXXXX&response_type=code&redirect_uri=https://XXXXXXXXX.ngrok-free.app/oauth/callback&scope=read,activity:read_all,activity:write&approval_prompt=force
-    """
-    params = dict(request.query_params)
-    code = params.get("code")
-    if not code:
-        raise HTTPException(status_code=400, detail="Missing code parameter")
-    token_url = "https://www.strava.com/api/v3/oauth/token"
-
-    data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "code": code,
-        "grant_type": "authorization_code",
-    }
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(token_url, data=data)
-
-    if response.status_code != 200:
-        return "Invalid signature", 403
-
-    tokens = response.json()
-
-    save_tokens(
-        {
-            "access_token": tokens["access_token"],
-            "refresh_token": tokens["refresh_token"],
-            "expires_at": tokens["expires_at"],
-            "expires_at_iso": datetime.datetime.fromtimestamp(
-                tokens["expires_at"]
-            ).isoformat(),
-        }
-    )
-    return RedirectResponse(url="/dashboard")
 
 
 def print_athlete_info():
@@ -289,3 +242,50 @@ def upper_dict_layer(d: dict) -> dict:
         for k, v in dict(d).items()
         if not isinstance(v, dict) and not isinstance(v, list)
     }
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/oauth/callback")
+async def exchange_token(request: Request):
+    """This function is called by Strava when the User clicks 'Authorize' to
+    authorize this app. To get to the authorize webpage, use a browser where
+    user is logged in at Strava and visit
+
+    https://www.strava.com/oauth/authorize?client_id=XXXXXXX&response_type=code&redirect_uri=https://XXXXXXXXX.ngrok-free.app/oauth/callback&scope=read,activity:read_all,activity:write&approval_prompt=force
+    """
+    params = dict(request.query_params)
+    code = params.get("code")
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing code parameter")
+    token_url = "https://www.strava.com/api/v3/oauth/token"
+
+    data = {
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "code": code,
+        "grant_type": "authorization_code",
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(token_url, data=data)
+
+    if response.status_code != 200:
+        return "Invalid signature", 403
+
+    tokens = response.json()
+
+    save_tokens(
+        {
+            "access_token": tokens["access_token"],
+            "refresh_token": tokens["refresh_token"],
+            "expires_at": tokens["expires_at"],
+            "expires_at_iso": datetime.datetime.fromtimestamp(
+                tokens["expires_at"]
+            ).isoformat(),
+        }
+    )
+    return RedirectResponse(url="/dashboard")
