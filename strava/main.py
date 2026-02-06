@@ -28,10 +28,9 @@ CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
 SHOE_NOTIFICATIONS_SENT = set()
 
+HEARTBEAT = 240  # seconds
 
 logging.basicConfig(level=logging.INFO)
-
-HEARTBEAT = 240  # seconds
 
 
 async def heartbeat_logger():
