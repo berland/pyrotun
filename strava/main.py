@@ -283,30 +283,6 @@ def find_nearby_file(iso_timestamp_from_strava, seconds_range=3) -> Path | None:
     return None
 
 
-async def download_tcx(activity_id: str, save_path: str) -> None:
-    access_token = refresh_token_if_needed()
-    url = f"https://www.strava.com/api/v3/activities/{activity_id}"
-    tcx_url = f"https://www.strava.com/activities/{activity_id}/export_tcx"
-    headers = {"Authorization": f"Bearer {access_token}"}
-    print(f"Headers when downloacing tcx: {headers}")
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers)
-
-    # print("*** ACT info again")
-    # pprint.pprint(response.text)
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(tcx_url, headers=headers)
-
-    if response.status_code != 200:
-        raise HTTPException(
-            status_code=response.status_code, detail="Failed to download TCX"
-        )
-
-    print(response.text)
-
-
 def upper_dict_layer(d: dict) -> dict:
     """Strips dict values that are dicts or lists"""
     return {
