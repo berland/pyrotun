@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 app = FastAPI()
 
-TOKEN_FILE = "/home/berland/.stra_tokens"
+TOKEN_FILE = Path("/home/berland/.stra_tokens")
 CLIENT_SECRET = os.environ.get("STRAVA_CLIENT_SECRET")
 CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
@@ -39,30 +39,28 @@ async def heartbeat_logger():
         counter = 0
         while counter < HEARTBEAT:
             counter += 1
-            await asyncio.sleep(1)  # Uvicorn will not exit during this second
+            await asyncio.sleep(1)
         logger.info(f" [ strava-app heartbeat ({HEARTBEAT}s) ] ")
 
 
-def load_tokens():
+def load_tokens() -> dict[str, str | int]:
     try:
-        with open(TOKEN_FILE, "r") as f:
-            return json.load(f)
+        return json.loads(TOKEN_FILE.read_text(encoding="utf-8"))
     except FileNotFoundError as e:
         raise Exception(f"No tokens found. Construct {TOKEN_FILE}") from e
 
 
-def save_tokens(tokens):
+def save_tokens(tokens: dict[str, str | int]):
     logger.info("Persisting tokens to disk")
-    with open(TOKEN_FILE, "w") as f:
-        json.dump(tokens, f, indent=2)
+    TOKEN_FILE.write_text(json.dumps(tokens, indent=2), encoding="utf-8")
 
 
-def refresh_token_if_needed(force=False):
+def refresh_token_if_needed(force: bool = False) -> str:
     tokens = load_tokens()
     now = int(time.time())
     if force:
         logger.info("Force refresh of tokens")
-    if force or ("expires_at" not in tokens or tokens["expires_at"] <= now):
+    if force or ("expires_at" not in tokens or int(tokens["expires_at"]) <= now):
         if not force:
             logger.info("Access token expired, refreshing...")
         response = requests.post(
@@ -89,7 +87,7 @@ def refresh_token_if_needed(force=False):
             raise Exception(
                 f"Failed to refresh token: {response.status_code} {response.text}"
             )
-    return tokens["access_token"]
+    return str(tokens["access_token"])
 
 
 @app.get("/strava-webhook")
@@ -102,7 +100,7 @@ def verify_subscription(request: Request):
 
 
 @app.post("/strava-webhook")
-async def receive_event(payload: dict):
+async def receive_event(payload: dict) -> tuple[str, int]:
     print("Received event from Strava:")
     pprint.pprint(payload)
 
@@ -310,6 +308,7 @@ async def download_tcx(activity_id: str, save_path: str) -> None:
 
 
 def upper_dict_layer(d: dict) -> dict:
+    """Strips dict values that are dicts or lists"""
     return {
         k: v
         for k, v in dict(d).items()
