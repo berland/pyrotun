@@ -5,6 +5,7 @@ import logging
 import os
 import pprint
 import time
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 import httpx
@@ -15,18 +16,34 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from pyrotun import exercise_analyzer
 
-app = FastAPI()
-
 VERIFY_TOKEN = "vapourfly"  # Only used for initial handshake
 logger = logging.getLogger(__name__)
 load_dotenv()
-app = FastAPI()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task1 = asyncio.create_task(heartbeat_logger())
+    task2 = asyncio.create_task(shoe_poller())
+    yield
+    task1.cancel()
+    task2.cancel()
+    with suppress(asyncio.CancelledError):
+        await task1
+    with suppress(asyncio.CancelledError):
+        await task2
+
+
+app = FastAPI(lifespan=lifespan)
 
 TOKEN_FILE = Path("/home/berland/.stra_tokens")
 CLIENT_SECRET = os.environ.get("STRAVA_CLIENT_SECRET")
 CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 
-SHOE_NOTIFICATIONS_SENT = set()
+SHOE_NOTIFICATIONS_SENT: set[str] = set()
+GEAR_ID_PR_DATE: dict[datetime.date, str] = {}
+ACTIVITIES_TO_BE_POLLED_FOR_GEAR: set[str] = set()
+UNDEFINED_SHOE: str = "g25935987"
 
 HEARTBEAT = 240  # seconds
 
@@ -36,10 +53,28 @@ logging.basicConfig(level=logging.INFO)
 async def heartbeat_logger():
     while True:
         counter = 0
+        logger.info(f" [ strava-app heartbeat ({HEARTBEAT}s) ] ")
+        logger.info(f"   {ACTIVITIES_TO_BE_POLLED_FOR_GEAR=}")
+        logger.info(f"   {GEAR_ID_PR_DATE=}")
+        logger.info(f"   {SHOE_NOTIFICATIONS_SENT=}")
         while counter < HEARTBEAT:
             counter += 1
             await asyncio.sleep(1)
-        logger.info(f" [ strava-app heartbeat ({HEARTBEAT}s) ] ")
+
+
+async def shoe_poller():
+    while True:
+        for activity_id in ACTIVITIES_TO_BE_POLLED_FOR_GEAR:
+            activity = await get_activity(activity_id)
+            if activity["gear_id"] != UNDEFINED_SHOE:
+                GEAR_ID_PR_DATE[
+                    datetime.datetime.fromisoformat(
+                        str(activity["start_date_local"])
+                    ).date()
+                ] = activity["gear_id"]
+                ACTIVITIES_TO_BE_POLLED_FOR_GEAR.remove(activity_id)
+                await asyncio.sleep(1)
+        await asyncio.sleep(60 * 5)
 
 
 def load_tokens() -> dict[str, str | int]:
@@ -112,6 +147,17 @@ async def receive_event(payload: dict) -> tuple[str, int]:
     return "", 200
 
 
+async def get_activity(activity_id: str) -> dict:
+    access_token = refresh_token_if_needed()
+    url = f"https://www.strava.com/api/v3/activities/{activity_id}"
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
 def print_athlete_info():
     access_token = refresh_token_if_needed()
     url = "https://www.strava.com/api/v3/athlete"
@@ -153,6 +199,8 @@ async def process_activity_update(activity_id: str, aspect_type: str):
     updates = await exercise_analyzer.make_description_from_stravaactivity(activity)
     if updates and "Run" in activity["name"]:
         print(f"Submitting activity updates: {updates}")
+        if "Til jobb" in updates["name"]:
+            ACTIVITIES_TO_BE_POLLED_FOR_GEAR.add(activity["id"])
         update_activity(activity_id, updates)
 
     if "start_date_local" in activity:
@@ -179,6 +227,25 @@ async def process_activity_update(activity_id: str, aspect_type: str):
 
     if aspect_type == "create" and "Run" in activity["name"]:
         await check_and_notify_about_undefined_shoe(activity)
+
+    if aspect_type == "update" and "jobb" in activity.get("name", ""):
+        activity_date = datetime.datetime.fromisoformat(
+            activity.get("start_date_local", "")
+        ).date()
+        if (
+            "Til jobb" in activity.get("name", "")
+            and activity.get("gear_id", "") != UNDEFINED_SHOE
+        ):
+            GEAR_ID_PR_DATE[activity_date] = activity.get("gear_id", "")
+            print(f"User actually has set gear id to something: {GEAR_ID_PR_DATE=}")
+        if (
+            "Hjem fra jobb" in activity.get("name", "")
+            and activity.get("gear_id", "") == UNDEFINED_SHOE
+            and activity_date in GEAR_ID_PR_DATE
+        ):
+            updates["gear_id"] = GEAR_ID_PR_DATE[activity_date]
+            print(f"Sending update, now we have shoe pair: {updates}")
+            update_activity(activity_id, updates)
 
 
 async def check_and_notify_about_undefined_shoe(activity: dict):
