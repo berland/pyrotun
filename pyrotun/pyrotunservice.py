@@ -90,7 +90,7 @@ def global_exception_handler(loop, context):
     global PUSHED_EXCEPTIONS
     exc = context.get("exception")
 
-    logger.exception("Caught exception and sending it to pushover", exc_info=exc)
+    logger.exception(f"Caught exception and sending it to pushover {exc}", exc_info=exc)
 
     if exc:
         tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))

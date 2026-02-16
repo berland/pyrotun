@@ -31,13 +31,13 @@ async def amain(pers=None, debug=False):
         except Exception as err:
             logger.error(f"Got this text in skoda-exception: {str(err)}")
             if "terms" in str(err):
-                logger.exception("Terms and condition error from Skoda, sigh")
+                logger.error(f"Terms and condition error from Skoda, sigh, {err}")
                 return
             if "AuthorizationFailedError" in str(err):
-                logger.exception("AuthorizationFailed from Skoda, flaky, sigh")
+                logger.error(f"AuthorizationFailed from Skoda, flaky, sigh, {err}")
                 return
             if "identity.vwgroup.io/signin" in str(err):
-                logger.exception("Skoda redirecting to signin webpage, sigh")
+                logger.error(f"Skoda redirecting to signin webpage, sigh, {err}")
                 return
             else:
                 raise err
