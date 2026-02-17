@@ -32,6 +32,9 @@ async def main(pers=None):
 
     # print(pers.yr.symbolcodedict)
     forecast_df = await pers.yr.forecast()
+    if forecast_df.empty:
+        logger.warning("Got empty dataframe from yr forecast.")
+        return
 
     svg = await pers.yr.get_svg_meteogram(MET_LOCATION_ID)
     svg = pyrotun.connections.yr.crop_svg_meteogram(svg)

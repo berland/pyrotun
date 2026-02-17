@@ -65,7 +65,10 @@ class YrConnection:
             auth=aiohttp.BasicAuth(MET_CLIENT_ID, ""),
             headers={"User-Agent": "Custom smarthouse using OpenHAB"},
         ) as response:
-            result = await response.json()
+            try:
+                result = await response.json()
+            except aiohttp.ContentTypeError:
+                return pd.DataFrame()
             time_index = [x["time"] for x in result["properties"]["timeseries"]]
             dframe = pd.DataFrame(
                 index=time_index,
