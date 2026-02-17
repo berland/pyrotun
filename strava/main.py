@@ -65,8 +65,10 @@ async def heartbeat_logger():
 async def shoe_poller():
     while True:
         for activity_id in ACTIVITIES_TO_BE_POLLED_FOR_GEAR:
+            logger.info(f"Polling activity {activity_id} for gear")
             activity = await get_activity(activity_id)
             if activity["gear_id"] != UNDEFINED_SHOE:
+                logger.info(f" * Success, found gear to be {activity['gear_id']}")
                 GEAR_ID_PR_DATE[
                     datetime.datetime.fromisoformat(
                         str(activity["start_date_local"])
