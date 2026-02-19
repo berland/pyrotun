@@ -64,6 +64,7 @@ async def heartbeat_logger():
 
 async def shoe_poller():
     while True:
+        logger.info("Shoe-poller heartbeat")
         for activity_id in ACTIVITIES_TO_BE_POLLED_FOR_GEAR:
             logger.info(f"Polling activity {activity_id} for gear")
             activity = await get_activity(activity_id)
@@ -210,11 +211,27 @@ async def process_activity_update(activity_id: str, aspect_type: str):
         tcxfilename = None
         while counter < 30 * 60 and tcxfilename is None:
             tcxfilename = find_nearby_file(activity["start_date_local"])
+            if not tcxfilename:
+                # Looks like Polar API is giving wrong start_date and the file is put
+                # an hour ahead.
+                tcxfilename = find_nearby_file(
+                    activity["start_date_local"], hourdelta=-1
+                )
             counter += 1
             await asyncio.sleep(1)
         if tcxfilename:
             updates = await exercise_analyzer.make_description_from_tcx(tcxfilename)
             if updates and "Run" in activity["name"]:
+                activity_date = datetime.datetime.fromisoformat(
+                    activity.get("start_date_local", "")
+                )
+                if (
+                    updates.get("name") == "Hjem fra jobb"
+                    and activity_date
+                    and activity.get("gear_id", "") == UNDEFINED_SHOE
+                    and activity_date in GEAR_ID_PR_DATE
+                ):
+                    updates["gear_id"] = GEAR_ID_PR_DATE[activity_date]
                 print(f"Submitting activity updates: {updates}")
                 update_activity(activity_id, updates)
             else:
@@ -291,11 +308,13 @@ def update_activity(activity_id: str, data):
         return None
 
 
-def find_nearby_file(iso_timestamp_from_strava, seconds_range=3) -> Path | None:
+def find_nearby_file(
+    iso_timestamp_from_strava: str, seconds_range=3, hourdelta: int = 0
+) -> Path | None:
     base_dir = Path("/home/berland/polar_dump")
     fmt = "%Y-%m-%dT%H:%M:%S"
     base_time = datetime.datetime.strptime(iso_timestamp_from_strava.rstrip("Z"), fmt)
-
+    base_time -= datetime.timedelta(hours=hourdelta)
     for delta_sec in range(-seconds_range, seconds_range + 1):
         candidate_time = base_time + datetime.timedelta(seconds=delta_sec)
         candidate_path = base_dir / candidate_time.strftime(fmt) / "tcx"
