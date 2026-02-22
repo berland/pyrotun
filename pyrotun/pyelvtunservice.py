@@ -7,10 +7,13 @@ from asyncio at regular intervals (similar to crontab)
 """
 
 import asyncio
+import os
 from typing import Any, List
 
 import aiocron
 import dotenv
+import requests
+from requests.auth import HTTPBasicAuth
 
 import pyrotun
 import pyrotun.connections.homely
@@ -41,6 +44,21 @@ EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
 EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
+
+OH_BASIC_AUTH = HTTPBasicAuth(os.getenv("OPENHAB_USER"), os.getenv("OPENHAB_PASSWORD"))
+
+
+def set_thing_enabled(uid: str, enabled: bool) -> None:
+    url = f"http://localhost:8080/rest/things/{uid}/enable"
+    payload = "true" if enabled else "false"
+    response = requests.put(
+        url,
+        data="true" if enabled else "false",
+        headers={"Content-Type": "text/plain", "Accept": "application/json"},
+        auth=OH_BASIC_AUTH,
+    )
+    if response.status_code != 200:
+        logger.error(response)
 
 
 def setup_crontabs(pers):
@@ -96,6 +114,15 @@ def setup_crontabs(pers):
     async def polltibber():
         logger.info(" ** Polling tibber")
         await pyrotun.polltibber.main(pers)
+
+    @aiocron.crontab(EVERY_MINUTE)
+    async def restart_tibber_thing_on_undef_power():
+        current_state = await pers.openhab.get_item("TibberAPILivePower")
+        if str(current_state).lower() == "undef":
+            logger.error(" ** Tibber binding needs to be kicked!")
+            set_thing_enabled("tibber:tibberapi:elvatunet19", False)
+            await asyncio.sleep(5)
+            set_thing_enabled("tibber:tibberapi:elvatunet19", True)
 
     @aiocron.crontab(EVERY_HOUR)
     async def yrmelding():
