@@ -31,7 +31,12 @@ async def amain(pers=None, dryrun=False, debug=False, do_websocket=False):
             update_openhab_from_websocket_message, PERS
         )
 
-    data: List[dict] = await PERS.homely.get_data()  # One item pr. location
+    try:
+        data: List[dict] = await PERS.homely.get_data()  # One item pr. location
+    except ValueError as ex:
+        if "504 Gateway Time-out" in str(ex):
+            return
+        raise ex
 
     if debug:
         pprint.pprint(data)
