@@ -25,10 +25,17 @@ from pyrotun import persist
 logger = pyrotun.getLogger(__name__)
 
 CURRENT_POWER_ITEM = "AMSpower"
-CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
+
+match socket.gethostname():
+    case "raaserv":
+        CURRENT_POWER_ITEM = "AMSpower"
+        CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
+    case "elvcat":
+        CUMULATIVE_WH_ITEM = "TibberAPITotalConsumption"
+        CURRENT_POWER_ITEM = "TibberAPILivePower"
+
 HOURUSAGE_ESTIMATE_ITEM = "WattHourEstimate"
 POWER_FOR_EFFEKTTRINN = "NettleieWatt"
-CUMULATIVE_WH_ITEM = "AMS_cumulative_Wh"
 MONTHLYHOURMAX = "MonthlyHourmax"  # integer 1,2,3 is to be added to this.
 FLOORSFILE = Path(__file__).absolute().parent / "floors.yml"
 
@@ -397,7 +404,7 @@ def currentlimit_from_hourmaxes(hourmaxes_pr_day: List[float]) -> float:
       forrige måned, vil avgjøre hva slags trinn du havner i.
     """
 
-    baseline = 10000  # Car charger makes it meaningless to try to be below 10k
+    baseline = 5000
     step = 5000
     safeguard = 50
 
@@ -481,6 +488,7 @@ async def monthly_hourmaxes(
     cumulative_hour_usage_thismonth: pd.Series = await pers.influxdb.get_series(
         CUMULATIVE_WH_ITEM, since=monthstart, upuntil=monthend
     )
+
     # Get local timezone again:
     cumulative_hour_usage_thismonth.index = (
         cumulative_hour_usage_thismonth.index.tz_convert(TZ)
@@ -512,7 +520,8 @@ async def amain(
         await pers.ainit(["influxdb", "openhab"])
         close_pers = True
 
-    await fix_powerstate(pers)
+    if socket.gethostname() == "raaserv":
+        await fix_powerstate(pers)
 
     if upperlimit is None:
         hourmaxes_df = await monthly_hourmaxes(pers)
@@ -525,6 +534,9 @@ async def amain(
 
     est: int = await estimate_currenthourusage(pers)
     logger.info(f"Estimated power usage for current hour is: {est} Wh")
+    if socket.gethostname() == "elvcat":
+        await pers.openhab.set_item("EstimatedWh_thishour", est)
+        return
     powerload_df: pd.DataFrame = await get_powerloads(pers)
 
     if est > upperlimit:

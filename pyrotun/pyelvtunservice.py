@@ -7,6 +7,7 @@ from asyncio at regular intervals (similar to crontab)
 """
 
 import asyncio
+import datetime
 import os
 from typing import Any, List
 
@@ -28,6 +29,7 @@ import pyrotun.persist
 import pyrotun.pollhomely
 import pyrotun.polltibber
 import pyrotun.poweranalysis
+import pyrotun.powercontroller
 import pyrotun.powermodels
 import pyrotun.yrmelding
 
@@ -50,7 +52,6 @@ OH_BASIC_AUTH = HTTPBasicAuth(os.getenv("OPENHAB_USER"), os.getenv("OPENHAB_PASS
 
 def set_thing_enabled(uid: str, enabled: bool) -> None:
     url = f"http://localhost:8080/rest/things/{uid}/enable"
-    payload = "true" if enabled else "false"
     response = requests.put(
         url,
         data="true" if enabled else "false",
@@ -133,6 +134,21 @@ def setup_crontabs(pers):
     async def spikes():
         logger.info(" ** Dataspike remover")
         await pyrotun.dataspike_remover.main(pers, readonly=False)
+
+    @aiocron.crontab(EVERY_MINUTE)
+    async def update_thishour_powerestimate():
+        estimate = await pyrotun.powercontroller.estimate_currenthourusage(pers)
+        await pers.openhab.set_item("EstimatedKWh_thishour", estimate)
+
+    @aiocron.crontab(EVERY_HOUR)
+    async def update_thismonth_nettleie():
+        if datetime.datetime.now().hour == 0:
+            # We have a bug that prevents correct calculation
+            # the first hour of every day..
+            return
+        await asyncio.sleep(30)  # Wait for AMS data to propagate to Influx
+        logger.info(" ** Updating nettleie")
+        await pyrotun.powercontroller.update_effekttrinn(pers)
 
 
 async def at_startup(pers) -> List[Any]:
