@@ -7,10 +7,14 @@ from asyncio at regular intervals (similar to crontab)
 """
 
 import asyncio
+import datetime
+import os
 from typing import Any, List
 
 import aiocron
 import dotenv
+import requests
+from requests.auth import HTTPBasicAuth
 
 import pyrotun
 import pyrotun.connections.homely
@@ -25,6 +29,7 @@ import pyrotun.persist
 import pyrotun.pollhomely
 import pyrotun.polltibber
 import pyrotun.poweranalysis
+import pyrotun.powercontroller
 import pyrotun.powermodels
 import pyrotun.yrmelding
 
@@ -41,6 +46,20 @@ EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
 EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
+
+OH_BASIC_AUTH = HTTPBasicAuth(os.getenv("OPENHAB_USER"), os.getenv("OPENHAB_PASSWORD"))
+
+
+def set_thing_enabled(uid: str, enabled: bool) -> None:
+    url = f"http://localhost:8080/rest/things/{uid}/enable"
+    response = requests.put(
+        url,
+        data="true" if enabled else "false",
+        headers={"Content-Type": "text/plain", "Accept": "application/json"},
+        auth=OH_BASIC_AUTH,
+    )
+    if response.status_code != 200:
+        logger.error(response)
 
 
 def setup_crontabs(pers):
@@ -97,6 +116,15 @@ def setup_crontabs(pers):
         logger.info(" ** Polling tibber")
         await pyrotun.polltibber.main(pers)
 
+    @aiocron.crontab(EVERY_MINUTE)
+    async def restart_tibber_thing_on_undef_power():
+        current_state = await pers.openhab.get_item("TibberAPILivePower")
+        if str(current_state).lower() == "undef":
+            logger.error(" ** Tibber binding needs to be kicked!")
+            set_thing_enabled("tibber:tibberapi:elvatunet19", False)
+            await asyncio.sleep(5)
+            set_thing_enabled("tibber:tibberapi:elvatunet19", True)
+
     @aiocron.crontab(EVERY_HOUR)
     async def yrmelding():
         logger.info(" ** Yrmelding")
@@ -106,6 +134,21 @@ def setup_crontabs(pers):
     async def spikes():
         logger.info(" ** Dataspike remover")
         await pyrotun.dataspike_remover.main(pers, readonly=False)
+
+    @aiocron.crontab(EVERY_MINUTE)
+    async def update_thishour_powerestimate():
+        estimate = await pyrotun.powercontroller.estimate_currenthourusage(pers)
+        await pers.openhab.set_item("EstimatedKWh_thishour", estimate)
+
+    @aiocron.crontab(EVERY_HOUR)
+    async def update_thismonth_nettleie():
+        if datetime.datetime.now().hour == 0:
+            # We have a bug that prevents correct calculation
+            # the first hour of every day..
+            return
+        await asyncio.sleep(30)  # Wait for AMS data to propagate to Influx
+        logger.info(" ** Updating nettleie")
+        await pyrotun.powercontroller.update_effekttrinn(pers)
 
 
 async def at_startup(pers) -> List[Any]:
