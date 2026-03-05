@@ -65,7 +65,7 @@ async def heartbeat_logger():
 async def shoe_poller():
     while True:
         logger.info("Shoe-poller heartbeat")
-        for activity_id in ACTIVITIES_TO_BE_POLLED_FOR_GEAR:
+        for activity_id in list(ACTIVITIES_TO_BE_POLLED_FOR_GEAR):
             logger.info(f"Polling activity {activity_id} for gear")
             activity = await get_activity(activity_id)
             if activity["gear_id"] != UNDEFINED_SHOE:
