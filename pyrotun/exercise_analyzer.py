@@ -43,7 +43,8 @@ LAP_CENTROIDS = {
 }
 
 
-def speed_to_pace(speed_mps):
+def speed_to_pace(speed_mps: float) -> str:
+    """convert meters pr seconds (as a float) to a runner readable pace string"""
     if speed_mps <= 0:
         return float("inf")  # Avoid division by zero or negative speeds
     pace_min_per_km = (1000 / speed_mps) / 60
@@ -52,7 +53,8 @@ def speed_to_pace(speed_mps):
     return f"{minutes}:{seconds:02d}"
 
 
-def seconds_pr_km_to_pace(seconds):
+def seconds_pr_km_to_pace(seconds: int) -> str:
+    """convert seconds pr kilometer to runner readable pace string"""
     minutes = int(seconds / 60)
     seconds = int(seconds - minutes * 60)
     return f"{minutes}:{seconds:02d}"
@@ -407,6 +409,47 @@ async def analyze_torsdag(directory: Path) -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
+async def analyze_potential_race(directory: Path) -> pd.DataFrame | None:
+    reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
+    if reader.activities[0].sport != "Running":
+        return
+    distance_km = reader.distance_m / 1000
+    minutes_used = sum(lap.total_time_s for lap in reader.laps) / 60  # Avoids pauses
+    if not distance_km:
+        return
+    min_pr_km = minutes_used / distance_km
+
+    category = distance = None
+    if 41 < distance_km < 44 and 3 < min_pr_km < 4.2:
+        category = "marathon"
+        distance = 42195
+    elif 20 < distance_km < 22.5 and 3 < min_pr_km < 3.8:
+        category = "half-marathon"
+        distance = 21098
+    elif 9.8 < distance_km < 10.5 and 3 < min_pr_km < 3.6:
+        category = "10k"
+        distance = 10000
+    elif 4.8 < distance_km < 5.2 and 3 < min_pr_km < 3.6:
+        category = "5k"
+        distance = 5000
+
+    if category and distance:
+        hrs = [point.hr for point in reader.trackpoints if point.hr is not None]
+        record = {
+            "category": category,
+            "date": str(reader.trackpoints[0].time.date()),
+            "epoch": int(reader.trackpoints[0].time.timestamp()),
+            "distance": distance,
+            "hr_avg": sum(hrs) / len(hrs),
+            "hr_max": max(hrs),
+            "time": minutes_used * 60,
+            "pace": speed_to_pace(distance / minutes_used / 60),
+            "speed_ms": float(distance) / (minutes_used * 60),
+        }
+        return pd.DataFrame.from_records([record])
+    return None
+
+
 async def analyze_lordag(directory: Path) -> pd.DataFrame:
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
     records: list[dict] = []
@@ -467,13 +510,17 @@ async def analyze_all():
         if cache_file.is_file():
             exercise_data = pd.read_pickle(cache_file)
         else:
-            if d.weekday() == TUESDAY and d.hour == 18:
+            race_data = await analyze_potential_race(Path(_dir))
+            if race_data is not None:
+                exercise_data = race_data
+                print(race_data)
+            elif d.weekday() == TUESDAY and d.hour == 18:
                 logger.info(f"Analyzing tirsdag {_dir}")
                 exercise_data = await analyze_tirsdag(Path(_dir))
-            if d.weekday() == THURSDAY and d.hour == 18:
+            elif d.weekday() == THURSDAY and d.hour == 18:
                 logger.info(f"Analyzing torsdag {_dir}")
                 exercise_data = await analyze_torsdag(Path(_dir))
-            if d.weekday() == SATURDAY and d.hour == 9:
+            elif d.weekday() == SATURDAY and d.hour == 9:
                 logger.info(f"Analyzing siljustøl {_dir}")
                 exercise_data = await analyze_lordag(Path(_dir))
 
@@ -514,7 +561,7 @@ async def main(pers=None, dryrun=False):
                 dirnames.add(Path(change[1]).parent.absolute())
         logger.info(f"Will process directories {dirnames}")
         # dirnames are timestamps
-        interval_session_found = False
+        interval_session_found = True
         for _dirname in dirnames:
             dirname = Path(_dirname)
             if not dirname.is_dir():
@@ -539,4 +586,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # asyncio.run(main())
     asyncio.run(analyze_all())
-    asyncio.run(describe())
+    # asyncio.run(describe())
