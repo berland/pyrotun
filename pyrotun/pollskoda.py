@@ -2,6 +2,7 @@ import asyncio
 import os
 
 import dotenv
+import mashumaro
 import pygeohash
 from aiohttp import ClientResponseError, ClientSession
 from myskoda import MySkoda
@@ -47,6 +48,8 @@ async def amain(pers=None, debug=False):
             charge = await myskoda.get_charging(vin)
             positions = await myskoda.get_positions(vin)
             health = await myskoda.get_health(vin)
+        except mashumaro.exceptions.InvalidFieldValue:
+            logger.warning("myskoda-koden som ikke er oppdatert mot skoda api")
         except ClientResponseError as err:
             if err.status in (404, 500):
                 logger.warning(
