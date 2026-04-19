@@ -37,16 +37,16 @@ class ActivatePowerviewScene(HABApp.Rule):
     def on_change(self, event: ValueUpdateEvent) -> None:
         requested_scene: str = event.value
         if requested_scene in self.scenes:
-            self.activate_scene(self.scenes[requested_scene])
+            self.activate_scene(requested_scene, self.scenes[requested_scene])
         else:
             print(
                 f"Unknown scene {requested_scene}, must be among {self.scenes.keys()}"
             )
 
-    def activate_scene(self, scene: dict) -> None:
-        print(f"running scene {scene}")
+    def activate_scene(self, scene_name: str, scene: dict) -> None:
+        print(f"running scene {scene_name} : {scene}")
         url = f"http://{HUB}/api/scenes?sceneId={scene['id']}"
-        print(f"queryign url {url}")
+        print(f"querying url {url}")
         response = requests.get(url)
         print(f"ok from powerview? : {response.ok}")
 
