@@ -198,6 +198,19 @@ async def process_activity_update(activity_id: str, aspect_type: str):
             updates["description"] = "Zwift"
         print(f"Submitting activity updates: {updates}")
         update_activity(activity_id, updates)
+    elif activity.get("sport_type", "") == "WeightTraining":
+        start_time = datetime.datetime.fromisoformat(str(activity["start_date_local"]))
+        if start_time.weekday() == 0 and 8 < start_time.hour < 11:  # Mandag
+            updates["name"] = "Gym på jobben"
+            updates["description"] = (
+                "Mandagsstyrkeprogram: legg, lår, hofte og litt mage."
+            )
+        if float(activity.get("moving_time", "0")) < 30 * 60:
+            updates["name"] = "Ministyrkeøkt"
+            updates["description"] = ""
+            updates["hide_from_home"] = True
+        print(f"Submitting activity updates: {updates}")
+        update_activity(activity_id, updates)
 
     updates = await exercise_analyzer.make_description_from_stravaactivity(activity)
     if updates and "Run" in activity["name"]:
