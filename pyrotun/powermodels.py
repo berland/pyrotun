@@ -1,9 +1,16 @@
 import argparse
 import asyncio
+import datetime
+import math
+import os
 from contextlib import suppress
 
+import astral
+import astral.sun
 import dotenv
+import numpy as np
 import pandas as pd
+import seaborn as sns
 import sklearn
 from matplotlib import pyplot
 
@@ -21,6 +28,7 @@ class Powermodels:
         self.powermodel = None
         self.tempmodel = None
         self.sunheatingmodel = None
+        self.solarpanel_heatmapdata: pd.DataFrame | None = None
 
         self.pers = None
 
@@ -36,6 +44,14 @@ class Powermodels:
             self.tempmodel = models["tempmodel"]
             await asyncio.sleep(0.01)
             self.sunheatingmodel = await sunheating_model(self.pers)
+
+            df = await self.pers.influxdb.get_series("SolcelleWatt")
+            self.heatmap_data = make_solarwatt_heatmap(df)
+
+    def predict_solarwatt_by_timestamp(
+        self, timestamp: datetime.datetime | None = None
+    ) -> float:
+        return float(predict_solarwatt(self.heatmap_data, timestamp))
 
 
 async def sunheating_model(pers, plot=False):
@@ -281,6 +297,89 @@ async def non_heating_powerusage(pers):
     return cum_usage_hourly[(cum_usage_hourly > 0) & (cum_usage_hourly < 3.0)]
 
 
+def make_solarwatt_heatmap(df: pd.DataFrame) -> pd.DataFrame:
+    observer = astral.Observer(
+        latitude=float(os.getenv("LOCAL_LATITUDE", "0")),
+        longitude=float(os.getenv("LOCAL_LONGITUDE", "0")),
+        elevation=58,
+    )
+    df["Solhoyde"] = df.index.map(lambda t: astral.sun.elevation(observer, t))
+    df["Solposisjon"] = df.index.map(lambda t: astral.sun.azimuth(observer, t))
+    df["hour"] = df.index.hour  # UTC!! (kan ikke bruke lokal tid pga sommertid)
+
+    az_min, az_max = (
+        math.floor(df["Solposisjon"].min()),
+        math.ceil(df["Solposisjon"].max()),
+    )
+    el_min, el_max = 0, math.ceil(df["Solhoyde"].max())
+
+    h_bins = np.arange(el_min, el_max + 2, 1)
+    a_bins = np.arange(az_min, az_max + 5, 5)
+    df["h_bin"] = pd.cut(df["Solhoyde"], bins=h_bins)
+    df["a_bin"] = pd.cut(df["Solposisjon"], bins=a_bins)
+    heatmap_data = (
+        df.groupby(["h_bin", "a_bin"], observed=False)["SolcelleWatt"].max().unstack()
+    )
+    heatmap_data.sort_index(ascending=True)
+    heatmap_data = heatmap_data.cummax(axis=0)
+    return heatmap_data
+
+
+def plot_solarpanel_heatmapdata(heatmap_data: pd.DataFrame) -> None:
+    pyplot.figure(figsize=(14, 7))
+    sns.heatmap(
+        heatmap_data.astype(float),
+        cmap="viridis",
+        cbar_kws={"label": "Max wattage"},
+    )
+    pyplot.title("Maximum solar output by sun position")
+
+    pyplot.xlabel("Sun azimuth (Degrees)")
+    pyplot.ylabel("Sun elevation (Degrees)")
+
+    # Invert y-axis so 90° (zenith) is at the top
+    pyplot.gca().invert_yaxis()
+    pyplot.show()
+
+
+def predict_solarwatt(
+    heatmap_data: pd.DataFrame, timestamp: datetime.datetime | None = None
+) -> None:
+    observer = astral.Observer(
+        latitude=float(os.getenv("LOCAL_LATITUDE", "0")),
+        longitude=float(os.getenv("LOCAL_LONGITUDE", "0")),
+        elevation=58,
+    )
+    if timestamp is None:
+        timestamp = datetime.datetime.now(datetime.UTC)
+    sun_height = astral.sun.elevation(observer, timestamp)
+    sun_azimuth = astral.sun.azimuth(observer, timestamp)
+
+    height_index = [idx for idx in heatmap_data.index if sun_height in idx][0]
+    azimuth_index = [idx for idx in heatmap_data.columns if sun_azimuth in idx][0]
+
+    assert height_index is not None
+    assert azimuth_index is not None
+    return heatmap_data.loc[height_index, azimuth_index]
+
+
+async def solarpanelmodel(pers=None):
+    closepers = False
+    if pers is None:
+        pers = pyrotun.persist.PyrotunPersistence()
+        await pers.ainit(["influxdb"])
+        closepers = True
+
+    df = await pers.influxdb.get_series("SolcelleWatt")
+
+    heatmap_data = make_solarwatt_heatmap(df)
+    predict_solarwatt(heatmap_data)
+    plot_solarpanel_heatmapdata(heatmap_data)
+
+    if closepers:
+        await pers.aclose()
+
+
 async def elva_main(pers=None):
     closepers = False
     if pers is None:
@@ -335,4 +434,5 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     parser = get_parser()
     args = parser.parse_args()
-    asyncio.run(elva_main(pers=None))
+    # asyncio.run(elva_main(pers=None))
+    asyncio.run(solarpanelmodel(pers=None))

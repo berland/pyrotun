@@ -315,6 +315,12 @@ def setup_crontabs(pers):
         logger.info(" ** Yrmelding")
         await pyrotun.yrmelding.main(pers)
 
+    @aiocron.crontab(EVERY_MINUTE)
+    async def solcellemaksprediksjon():
+        logger.info(" ** Prediker maks solcelleproduksjon")
+        maks_prod = pers.powermodels.predict_solarwatt_by_timestamp()
+        await pers.openhab.set_item("SolcelleMaksprediksjon", maks_prod)
+
     # @aiocron.crontab(EVERY_DAY)
     # async def sunheatingmodel():
     #     logger.info(" ** sunheating model")
