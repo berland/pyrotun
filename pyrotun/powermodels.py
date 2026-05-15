@@ -370,7 +370,9 @@ async def solarpanelmodel(pers=None):
         await pers.ainit(["influxdb"])
         closepers = True
 
-    df = await pers.influxdb.get_series("SolcelleWatt")
+    # Apply 15 minute average to avoid unnatural spikes occuring
+    # when clouds are passing by (roughly one datapoint pr 5 minute)
+    df = await pers.influxdb.get_series_grouped("SolcelleWatt", time="15m")
 
     heatmap_data = make_solarwatt_heatmap(df)
     predict_solarwatt(heatmap_data)
