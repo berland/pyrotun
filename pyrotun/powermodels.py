@@ -45,7 +45,7 @@ class Powermodels:
             await asyncio.sleep(0.01)
             self.sunheatingmodel = await sunheating_model(self.pers)
 
-            df = await self.pers.influxdb.get_series("SolcelleWatt")
+            df = await self.pers.influxdb.get_series_grouped("SolcelleWatt", time="15m")
             self.heatmap_data = make_solarwatt_heatmap(df)
 
     def predict_solarwatt_by_timestamp(
