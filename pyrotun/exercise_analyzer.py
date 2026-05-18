@@ -551,6 +551,8 @@ async def main(pers=None, dryrun=False):
         logger.info(f"Detected filesystem change: {changes}")
         dirnames = set()
         for change in changes:
+            if Path(change[1]).name == "intervaller.csv":
+                continue
             if Path(change[1]).name == "done":
                 continue
             if Path(change[1]).name == "analyzed.pkl":
@@ -577,8 +579,9 @@ async def main(pers=None, dryrun=False):
             if date.weekday() == SATURDAY and date.hour == 9:
                 interval_session_found = True
         if interval_session_found:
-            logger.info("Analyzing tcx for all intervals")
+            logger.info("Analyzing tcx for all intervals, ")
             await analyze_all()
+            logger.info("Finished analyzing tcx for all intervals")
 
 
 if __name__ == "__main__":
