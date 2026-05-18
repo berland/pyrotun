@@ -58,10 +58,11 @@ class InfluxDBConnection:
         return resp[[item]]
 
     async def get_series_grouped(
-        self, item, aggregator="mean", time="1h", condition=""
+        self, item, aggregator="mean", time="1h", condition="", offset="0h"
     ) -> pd.DataFrame:
         query = (
-            f"SELECT {aggregator}(value) FROM {item} {condition} group by time({time})"
+            f"SELECT {aggregator}(value) FROM {item} "
+            f"{condition} group by time({time},{offset})"
         )
         resp = await self.client.query(query)
         resp.columns = [item]

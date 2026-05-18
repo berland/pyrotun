@@ -33,6 +33,7 @@ dependencies = [
     "numpy",
     "paho-mqtt",
     "pandas",
+    "pvlib",
     "pygeohash",
     "pylunar",
     "python-dotenv",

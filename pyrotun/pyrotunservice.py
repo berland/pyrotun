@@ -319,7 +319,8 @@ def setup_crontabs(pers):
     async def solcellemaksprediksjon():
         logger.info(" ** Prediker maks solcelleproduksjon")
         maks_prod = pers.powermodels.predict_solarwatt_by_timestamp()
-        await pers.openhab.set_item("SolcelleMaksprediksjon", maks_prod)
+        if maks_prod is not None:
+            await pers.openhab.set_item("SolcelleMaksprediksjon", maks_prod)
 
     # @aiocron.crontab(EVERY_DAY)
     # async def sunheatingmodel():

@@ -10,6 +10,7 @@ import astral.sun
 import dotenv
 import numpy as np
 import pandas as pd
+import pvlib
 import seaborn as sns
 import sklearn
 from matplotlib import pyplot
@@ -33,9 +34,9 @@ class Powermodels:
         self.pers = None
 
     async def ainit(self, pers):
-        logger.info("PowerHeatingModels.ainit()")
+        logger.info("PowerHeatingModels.ainit() (as background task)")
         self.pers = pers
-        await self.update_heatingmodel()
+        self._update_heatingmodel_task = asyncio.create_task(self.update_heatingmodel())
 
     async def update_heatingmodel(self):
         with suppress(Exception):
@@ -45,13 +46,21 @@ class Powermodels:
             await asyncio.sleep(0.01)
             self.sunheatingmodel = await sunheating_model(self.pers)
 
-            df = await self.pers.influxdb.get_series_grouped("SolcelleWatt", time="15m")
-            self.heatmap_data = make_solarwatt_heatmap(df)
+            logger.info("Getting averaged SolcelleWatt for all history")
+            df = await self.pers.influxdb.get_series_grouped(
+                "SolcelleWatt", time="15m", offset="-7m30s"
+            )
+            logger.info("Making solarwatt heatmap")
+            self.solarpanel_heatmapdata = await make_solarwatt_heatmap(df)
+            logger.info("Solarwatt heatmap data available")
 
     def predict_solarwatt_by_timestamp(
         self, timestamp: datetime.datetime | None = None
-    ) -> float:
-        return float(predict_solarwatt(self.heatmap_data, timestamp))
+    ) -> float | None:
+        if self.solarpanel_heatmapdata is None:
+            logger.warning("Heatmap data for solar not ready (yet?)")
+            return None
+        return float(predict_solarwatt(self.solarpanel_heatmapdata, timestamp))
 
 
 async def sunheating_model(pers, plot=False):
@@ -297,14 +306,30 @@ async def non_heating_powerusage(pers):
     return cum_usage_hourly[(cum_usage_hourly > 0) & (cum_usage_hourly < 3.0)]
 
 
-def make_solarwatt_heatmap(df: pd.DataFrame) -> pd.DataFrame:
-    observer = astral.Observer(
-        latitude=float(os.getenv("LOCAL_LATITUDE", "0")),
-        longitude=float(os.getenv("LOCAL_LONGITUDE", "0")),
-        elevation=58,
+def recalculate_sun_positions(df: pd.DataFrame) -> pd.DataFrame:
+    """Recalculate solar elevation and azimuth using pvlib.
+    (pvlib is faster than astral as it supports vectorized operations)
+    """
+    latitude = float(os.getenv("LOCAL_LATITUDE", "0"))
+    longitude = float(os.getenv("LOCAL_LONGITUDE", "0"))
+
+    sun_positions = pvlib.solarposition.get_solarposition(
+        time=df.index,
+        latitude=latitude,
+        longitude=longitude,
+        altitude=58,
     )
-    df["Solhoyde"] = df.index.map(lambda t: astral.sun.elevation(observer, t))
-    df["Solposisjon"] = df.index.map(lambda t: astral.sun.azimuth(observer, t))
+
+    df = df.copy()
+    df["Solhoyde"] = sun_positions["apparent_elevation"].to_numpy()
+    df["Solposisjon"] = sun_positions["azimuth"].to_numpy()
+    return df
+
+
+async def make_solarwatt_heatmap(df: pd.DataFrame) -> pd.DataFrame:
+    logger.info("Recalculating sun positions")
+    df = await asyncio.to_thread(recalculate_sun_positions, df)
+    logger.info("Recalculating sun positions - done!")
     df["hour"] = df.index.hour  # UTC!! (kan ikke bruke lokal tid pga sommertid)
 
     az_min, az_max = (
@@ -372,7 +397,9 @@ async def solarpanelmodel(pers=None):
 
     # Apply 15 minute average to avoid unnatural spikes occuring
     # when clouds are passing by (roughly one datapoint pr 5 minute)
-    df = await pers.influxdb.get_series_grouped("SolcelleWatt", time="15m")
+    df = await pers.influxdb.get_series_grouped(
+        "SolcelleWatt", time="15m", offset="-7m30s"
+    )
 
     heatmap_data = make_solarwatt_heatmap(df)
     predict_solarwatt(heatmap_data)
