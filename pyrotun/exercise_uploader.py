@@ -67,9 +67,9 @@ def diffgpxdf(gpxdf):
         axis=1,
     ).dropna()
     ddf["dist"] = ddf.apply(
-        lambda row: distance.distance(
-            (row["lat1"], row["lon1"]), (row["lat2"], row["lon2"])
-        ).m,
+        lambda row: (
+            distance.distance((row["lat1"], row["lon1"]), (row["lat2"], row["lon2"])).m
+        ),
         axis=1,
     )
     ddf["t_delta"] = (ddf["datetime2"] - ddf["datetime1"]).dt.total_seconds()
