@@ -57,10 +57,22 @@ class Powermodels:
     def predict_solarwatt_by_timestamp(
         self, timestamp: datetime.datetime | None = None
     ) -> float | None:
+        if timestamp is None:
+            timestamp = datetime.datetime.now(datetime.UTC)
         if self.solarpanel_heatmapdata is None:
             logger.warning("Heatmap data for solar not ready (yet?)")
             return None
-        return float(predict_solarwatt(self.solarpanel_heatmapdata, timestamp))
+        stencil = [-5, 0, 5]
+        stencil_prediction = [
+            float(
+                predict_solarwatt(
+                    self.solarpanel_heatmapdata,
+                    timestamp + datetime.timedelta(minutes=stencil_element),
+                )
+            )
+            for stencil_element in stencil
+        ]
+        return float(np.mean(stencil_prediction))
 
 
 async def sunheating_model(pers, plot=False):
