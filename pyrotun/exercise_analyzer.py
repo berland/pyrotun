@@ -224,7 +224,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
         logger.info(f"Detected commute run {commute}")
         return commute
     d = datetime.datetime.fromisoformat(directory.name)
-    if d.weekday() == TUESDAY and d.hour == 18:
+    if d.weekday() == TUESDAY and d.hour in {17, 18}:
         data = await analyze_tirsdag(directory)
         if data.empty:
             logger.warning("Muligens tirsdagsintervall, men klarte ikke analysere")
@@ -275,7 +275,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
             "visibility": "everyone",
             "private": "false",
         }
-    if d.weekday() == THURSDAY and d.hour == 18:
+    if d.weekday() == THURSDAY and d.hour in {17, 18}:
         data = await analyze_torsdag(directory)
         if data.empty:
             logger.warning("Muligens torsdagsintervall, men klarte ikke analysere")
