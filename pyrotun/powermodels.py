@@ -62,17 +62,17 @@ class Powermodels:
         if self.solarpanel_heatmapdata is None:
             logger.warning("Heatmap data for solar not ready (yet?)")
             return None
-        stencil = [-5, 0, 5]
+        stencil = [-10, -5, 0, 5, 10]
         stencil_prediction = [
-            float(
-                predict_solarwatt(
-                    self.solarpanel_heatmapdata,
-                    timestamp + datetime.timedelta(minutes=stencil_element),
-                )
+            predict_solarwatt(
+                self.solarpanel_heatmapdata,
+                timestamp + datetime.timedelta(minutes=stencil_element),
             )
             for stencil_element in stencil
         ]
-        return float(np.mean(stencil_prediction))
+        return float(
+            np.mean([value for value in stencil_prediction if value is not None])
+        )
 
 
 async def sunheating_model(pers, plot=False):
@@ -381,7 +381,7 @@ def plot_solarpanel_heatmapdata(heatmap_data: pd.DataFrame) -> None:
 
 def predict_solarwatt(
     heatmap_data: pd.DataFrame, timestamp: datetime.datetime | None = None
-) -> None:
+) -> float | None:
     observer = astral.Observer(
         latitude=float(os.getenv("LOCAL_LATITUDE", "0")),
         longitude=float(os.getenv("LOCAL_LONGITUDE", "0")),
@@ -392,12 +392,20 @@ def predict_solarwatt(
     sun_height = astral.sun.elevation(observer, timestamp)
     sun_azimuth = astral.sun.azimuth(observer, timestamp)
 
-    height_index = [idx for idx in heatmap_data.index if sun_height in idx][0]
-    azimuth_index = [idx for idx in heatmap_data.columns if sun_azimuth in idx][0]
+    height_indexes = [idx for idx in heatmap_data.index if sun_height in idx]
+    if not height_indexes:
+        return None
+    else:
+        height_index = height_indexes[0]
+    azimuth_indexes = [idx for idx in heatmap_data.columns if sun_azimuth in idx]
+    if not azimuth_indexes:
+        return None
+    else:
+        azimuth_index = azimuth_indexes[0]
 
     assert height_index is not None
     assert azimuth_index is not None
-    return heatmap_data.loc[height_index, azimuth_index]
+    return float(heatmap_data.loc[height_index, azimuth_index])
 
 
 async def solarpanelmodel(pers=None):
