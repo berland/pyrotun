@@ -317,7 +317,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
             "visibility": "everyone",
             "private": "false",
         }
-    if d.weekday() == SATURDAY and d.hour == 9:
+    if d.weekday() == SATURDAY and d.hour in {8, 9}:
         data = await analyze_lordag(directory)
         if data.empty:
             logger.warning("Muligens lørdagsintervall, men klarte ikke analysere")
@@ -457,8 +457,10 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
     order400 = 0
     order200 = 0
     for lap in reader.laps:
-        if 7 * 60 + 45 < lap.total_time_s < 10 * 60 and "2024-09-21" not in str(
-            lap.start_time.date()
+        if (
+            7 * 60 + 45 < lap.total_time_s < 10 * 60
+            and 1800 < lap.distance_m < 2300
+            and "2024-09-21" not in str(lap.start_time.date())
         ):
             # 2023-11-25 er BFG i tunnellen og treffes nesten
             # 2024-09-21 er oslo maraton og treffes :(
