@@ -46,6 +46,7 @@ import pyrotun.polltibber
 import pyrotun.poweranalysis
 import pyrotun.powercontroller
 import pyrotun.powermodels
+import pyrotun.update_polar_nightly
 import pyrotun.vent_calculations
 import pyrotun.yrmelding
 
@@ -60,6 +61,7 @@ EVERY_5_MINUTE = "*/5 * * * *"
 EVERY_8_MINUTE = "*/8 * * * *"
 EVERY_15_MINUTE = "*/15 * * * *"
 EVERY_HOUR = "0 * * * *"
+EVERY_3_HOUR = "23 */3 * * *"
 EVERY_DAY = "0 0 * * *"
 EVERY_MIDNIGHT = EVERY_DAY
 
@@ -339,10 +341,29 @@ def setup_crontabs(pers):
         logger.info(" ** Polar dumper")
         pyrotun.polar_dump.main()
 
+    @aiocron.crontab(EVERY_3_HOUR)
+    async def get_polar_nightly():
+        await _update_polar_nightly()
+
     @aiocron.crontab(EVERY_15_MINUTE)
     async def spikes():
         logger.info(" ** Dataspike remover")
         await pyrotun.dataspike_remover.main(pers, readonly=False)
+
+
+async def _update_polar_nightly():
+    logger.info("Fetching polar nightly data")
+    polar_dir = Path("/home/berland/polar_dump")
+    result = await pyrotun.update_polar_nightly.update_polar_nightly_store(
+        token=os.getenv("POLAR_ACCESS_TOKEN", ""),
+        csv_path=polar_dir / "polar_nightly.csv",
+        sqlite_path=polar_dir / "polar_nightly.sqlite",
+        events_csv=polar_dir / "events.csv",
+        periods_csv=polar_dir / "periods.csv",
+    )
+    logger.info("Polar nightly update complete")
+    for key, value in result.items():
+        logger.info(f"polar_nightly - {key}: {value}")
 
 
 async def at_startup(pers) -> List[Any]:
@@ -352,6 +373,7 @@ async def at_startup(pers) -> List[Any]:
     # Keep a strong reference to each task we construct, in
     # order to avoid them being garbage collected before completion:
     tasks = []
+    tasks.append(asyncio.create_task(_update_polar_nightly()))
     tasks.append(
         asyncio.create_task(pyrotun.dataspike_remover.main(pers, readonly=False))
     )
