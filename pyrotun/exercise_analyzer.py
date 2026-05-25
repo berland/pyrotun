@@ -33,6 +33,7 @@ LAP_CENTROIDS = {
     "torsdag3000": {"lon": 5.2924457330164, "lat": 60.29050007675862},
     "siljulang": {"lon": 5.304600518840247, "lat": 60.29737223157386},
     "silju200": {"lon": 5.317422952368899, "lat": 60.291241335829895},
+    "siljubakkedrag": {"lon": 5.310992, "lat": 60.292640},
     "silju400": {"lon": 5.317486788439951, "lat": 60.29053396667061},
     "torsdag200": {"lon": 5.318714879288788, "lat": 60.29041950444813},
     "tirsdag200": {"lon": 5.319548818252679, "lat": 60.29029686700665},
@@ -323,10 +324,11 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
             logger.warning("Muligens lørdagsintervall, men klarte ikke analysere")
             return {}
         rows_lang = data["category"] == "siljulang"
+        rows_bakkedrag = data["category"] == "siljubakkedrag"
         rows_400 = data["category"] == "silju400"
         rows_200 = data["category"] == "silju200"
         if sum(rows_lang):
-            # _startfart_lang = seconds_pr_km_to_pace(
+            # _startfart_lang = seconds_pr_km_to_pace(sum
             #    data[rows_lang]["time"].head(1).values[0]
             # )
             # _sluttfart_lang = seconds_pr_km_to_pace(
@@ -344,6 +346,15 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
             )
         else:
             desc_lang = ""
+        if sum(rows_bakkedrag):
+            startfartbakkedrag = int(data[rows_bakkedrag]["time"].head(1).values[0])
+            sluttfartbakkedrag = int(data[rows_bakkedrag]["time"].tail(1).values[0])
+            desc_bakkedrag = (
+                f"{sum(rows_bakkedrag)} bakkedrag "
+                f"{startfartbakkedrag}->{sluttfartbakkedrag}s, "
+            )
+        else:
+            desc_bakkedrag = ""
         if sum(rows_400):
             startfart400 = int(data[rows_400]["time"].head(1).values[0])
             sluttfart400 = int(data[rows_400]["time"].tail(1).values[0])
@@ -365,7 +376,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
             desc_200 = ""
         return {
             "name": "BFG Siljustøl" if sum(rows_400) else "BFG-lørdag",
-            "description": f"{desc_lang}{desc_400}{desc_200}6x60m. ",
+            "description": f"{desc_lang}{desc_bakkedrag}{desc_400}{desc_200}6x60m. ",
             "visibility": "everyone",
             "private": "false",
         }
@@ -454,12 +465,14 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
     records: list[dict] = []
     ordersiljulang = 0
+    orderbakkedrag = 0
     order400 = 0
     order200 = 0
     for lap in reader.laps:
+        lap_dict: dict = lap_to_dict(lap)
         if (
             7 * 60 + 45 < lap.total_time_s < 10 * 60
-            and 1800 < lap.distance_m < 2300
+            and 2170 * 0.85 < lap.distance_m < 2170 * 1.15
             and "2024-09-21" not in str(lap.start_time.date())
         ):
             # 2023-11-25 er BFG i tunnellen og treffes nesten
@@ -470,6 +483,17 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
                 "order": ordersiljulang,
                 "category": "siljulang",
                 **lap_to_dict(lap, explicit_distance=2170),
+            }
+            records.append(record)
+        if (
+            35 < lap.total_time_s < 60
+            and lap_centroid_dist("siljubakkedrag", lap_dict) < 100
+        ):
+            orderbakkedrag += 1
+            record = {
+                "order": orderbakkedrag,
+                "category": "siljubakkedrag",
+                **lap_to_dict(lap, explicit_distance=175),
             }
             records.append(record)
         if 350 < lap.distance_m < 450 and 50 < lap.total_time_s < 90:
@@ -503,7 +527,7 @@ async def describe():
 
 async def analyze_all():
     dfs = []
-    dirs = sorted(glob.glob(str(EXERCISE_DIR / "202*")))
+    dirs = sorted(glob.glob(str(EXERCISE_DIR / "20*")))
     for _dir in dirs:
         cache_file = Path(_dir) / "analyzed.pkl"
         await asyncio.sleep(0.1)
@@ -516,16 +540,15 @@ async def analyze_all():
             if race_data is not None:
                 exercise_data = race_data
                 print(race_data)
-            elif d.weekday() == TUESDAY and d.hour == 18:
+            elif d.weekday() == TUESDAY and d.hour in {17, 18}:
                 logger.info(f"Analyzing tirsdag {_dir}")
                 exercise_data = await analyze_tirsdag(Path(_dir))
-            elif d.weekday() == THURSDAY and d.hour == 18:
+            elif d.weekday() == THURSDAY and d.hour in {17, 18}:
                 logger.info(f"Analyzing torsdag {_dir}")
                 exercise_data = await analyze_torsdag(Path(_dir))
-            elif d.weekday() == SATURDAY and d.hour == 9:
+            elif d.weekday() == SATURDAY and d.hour in {8, 9}:
                 logger.info(f"Analyzing siljustøl {_dir}")
                 exercise_data = await analyze_lordag(Path(_dir))
-
             if exercise_data is not None:
                 exercise_data.to_pickle(cache_file)
         if exercise_data is not None:
