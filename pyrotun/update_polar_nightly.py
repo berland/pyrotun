@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env pythonn3
 import argparse
 import asyncio
 import datetime as dt
+import logging
 import os
 import sqlite3
 from pathlib import Path
@@ -12,6 +13,8 @@ import dotenv
 import pandas as pd
 
 BASE_URL = "https://www.polaraccesslink.com/v3"
+
+logger = logging.getLogger(__name__)
 
 
 def daterange(start: dt.date, end: dt.date):
@@ -83,6 +86,7 @@ async def fetch_recent_rows(
     async with aiohttp.ClientSession(headers=headers) as session:
         for d in daterange(start, end):
             ds = d.isoformat()
+            logger.info(f"Fetching nightly data for {d} from polar")
             payload = await get_json(session, f"/users/nightly-recharge/{ds}")
             if payload and payload.get("date"):
                 rows.append(flatten(payload))
@@ -388,7 +392,6 @@ async def update_polar_nightly_store(
     sqlite_path = Path(sqlite_path)
     events_csv_path = Path(events_csv) if events_csv else None
     periods_csv_path = Path(periods_csv) if periods_csv else None
-
     recent_rows = await fetch_recent_rows(
         token=token,
         days_back=days_back,
@@ -450,7 +453,7 @@ async def async_main() -> int:
     )
     parser.add_argument(
         "--sqlite",
-        default=polar_files / "polar_nightly.sqlite",
+        default=polar_files / "polar_nightly.db",
         help="Path to SQLite database",
     )
     parser.add_argument(

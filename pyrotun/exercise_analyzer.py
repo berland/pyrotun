@@ -576,11 +576,13 @@ async def main(pers=None, dryrun=False):
         logger.info(f"Detected filesystem change: {changes}")
         dirnames = set()
         for change in changes:
-            if Path(change[1]).name == "intervaller.csv":
+            if Path(change[1]).name.endswith(".csv"):
                 continue
-            if Path(change[1]).name == "done":
+            if Path(change[1]).name.endswith(".db"):
                 continue
             if Path(change[1]).name == "analyzed.pkl":
+                continue
+            if Path(change[1]).name == "polar_dump":
                 continue
             if Path(change[1]).is_dir():
                 dirnames.add(Path(change[1]).absolute())
@@ -588,7 +590,7 @@ async def main(pers=None, dryrun=False):
                 dirnames.add(Path(change[1]).parent.absolute())
         logger.info(f"Will process directories {dirnames}")
         # dirnames are timestamps
-        interval_session_found = True
+        interval_session_found = False
         for _dirname in dirnames:
             dirname = Path(_dirname)
             if not dirname.is_dir():

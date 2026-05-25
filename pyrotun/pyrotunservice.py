@@ -357,7 +357,7 @@ async def _update_polar_nightly():
     result = await pyrotun.update_polar_nightly.update_polar_nightly_store(
         token=os.getenv("POLAR_ACCESS_TOKEN", ""),
         csv_path=polar_dir / "polar_nightly.csv",
-        sqlite_path=polar_dir / "polar_nightly.sqlite",
+        sqlite_path=polar_dir / "polar_nightly.db",
         events_csv=polar_dir / "events.csv",
         periods_csv=polar_dir / "periods.csv",
     )
