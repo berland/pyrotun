@@ -265,16 +265,45 @@ async def sync_payloads(
     }
 
 
+def build_grafana_session_kwargs(
+    token: Optional[str] = None,
+    basic_user: Optional[str] = None,
+    basic_password: Optional[str] = None,
+    x_grafana_token: Optional[str] = None,
+) -> dict:
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    auth = None
+
+    if basic_user is None:
+        headers["Authorization"] = f"Bearer {token}"
+    else:
+        headers["X-Grafana-Token"] = token
+
+    if basic_user is not None:
+        auth = aiohttp.BasicAuth(basic_user, basic_password or "", encoding="utf-8")
+
+    return {
+        "headers": headers,
+        "auth": auth,
+    }
+
+
 async def sync_grafana_annotations(
     grafana_url: str,
     token: str,
-    events_csv: Optional[str | Path] = None,
-    periods_csv: Optional[str | Path] = None,
-    dashboard_uid: Optional[str] = None,
-    panel_id: Optional[int] = None,
+    basic_user: str | None = None,
+    basic_password: str | None = None,
+    events_csv: str | Path | None = None,
+    periods_csv: str | Path | None = None,
+    dashboard_uid: str | None = None,
+    panel_id: int | None = None,
     dry_run: bool = False,
-) -> Dict[str, int]:
-    payloads: List[dict] = []
+) -> dict[str, int]:
+    payloads: list[dict] = []
 
     if events_csv:
         print("loading events")
@@ -298,16 +327,23 @@ async def sync_grafana_annotations(
 
     min_time = min(p["time"] for p in payloads)
     max_time = max(p.get("timeEnd", p["time"]) for p in payloads)
+    print(grafana_url)
+    print(
+        build_grafana_session_kwargs(
+            token=token,
+            basic_user=basic_user,
+            basic_password=basic_password,
+        )
+    )
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-    }
-
-    timeout = aiohttp.ClientTimeout(total=60)
-
-    async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+    async with aiohttp.ClientSession(
+        timeout=aiohttp.ClientTimeout(total=60),
+        **build_grafana_session_kwargs(
+            token=token,
+            basic_user=basic_user,
+            basic_password=basic_password,
+        ),
+    ) as session:
         existing = await fetch_existing_annotations(
             session=session,
             grafana_url=grafana_url,
@@ -368,6 +404,19 @@ async def async_main() -> int:
         panel_id=args.panel_id,
         dry_run=args.dry_run,
     )
+
+    if os.getenv("BOBSERV_GRAFANA_URL"):
+        result = await sync_grafana_annotations(
+            grafana_url=os.getenv("BOBSERV_GRAFANA_URL"),
+            token=os.getenv("BOBSERV_GRAFANA_API_KEY"),
+            basic_user=os.getenv("RAASERVNO_HTTP_BASIC_AUTH_USER"),
+            basic_password=os.getenv("RAASERVNO_HTTP_BASIC_AUTH_PASSWORD"),
+            events_csv=args.events,
+            periods_csv=args.periods,
+            dashboard_uid=args.dashboard_uid,
+            panel_id=args.panel_id,
+            dry_run=args.dry_run,
+        )
 
     print(json.dumps(result, indent=2), flush=True)
     return 0
