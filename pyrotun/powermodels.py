@@ -70,9 +70,8 @@ class Powermodels:
             )
             for stencil_element in stencil
         ]
-        return float(
-            np.mean([value for value in stencil_prediction if value is not None])
-        )
+        non_nones = [value for value in stencil_prediction if value is not None]
+        return float(np.mean(non_nones)) if non_nones else 0
 
 
 async def sunheating_model(pers, plot=False):
