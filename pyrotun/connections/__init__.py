@@ -4,6 +4,7 @@ from . import (  # noqa
     influxdb,
     myuplink,
     openhab,
+    polar_token_manager,
     smappee,
     solis,
     tibber,

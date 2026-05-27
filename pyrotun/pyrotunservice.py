@@ -22,6 +22,7 @@ import pyrotun
 import pyrotun.connections.hass
 import pyrotun.connections.homely
 import pyrotun.connections.openhab
+import pyrotun.connections.polar_token_manager
 import pyrotun.connections.smappee
 import pyrotun.connections.solis
 import pyrotun.connections.tibber
@@ -353,9 +354,14 @@ def setup_crontabs(pers):
 
 async def _update_polar_nightly():
     logger.info("Fetching polar nightly data")
+    token_manager = pyrotun.connections.polar_token_manager.PolarTokenManager(
+        client_id=os.getenv("POLAR_V4_CLIENT_ID"),
+        client_secret=os.getenv("POLAR_V4_CLIENT_SECRET"),
+        token_file=Path("/home/berland/.polar_tokens.json"),
+    )
     polar_dir = Path("/home/berland/polar_dump")
     result = await pyrotun.update_polar_nightly.update_polar_nightly_store(
-        token=os.getenv("POLAR_ACCESS_TOKEN", ""),
+        manager=token_manager,
         csv_path=polar_dir / "polar_nightly.csv",
         sqlite_path=polar_dir / "polar_nightly.db",
         events_csv=polar_dir / "events.csv",
