@@ -91,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-async def async_main() -> int:
+async def async_main() -> int:  # noqa: PLR0911
     parser = build_parser()
     args = parser.parse_args()
 
@@ -122,43 +122,38 @@ async def async_main() -> int:
         token_file=args.token_file,
     )
 
-    try:
-        if args.command == "init":
-            token_data = await manager.exchange_authorization_code(args.code)
-            print(json.dumps(token_data, indent=2, sort_keys=True))
-            return 0
+    if args.command == "init":
+        token_data = await manager.exchange_authorization_code(args.code)
+        print(json.dumps(token_data, indent=2, sort_keys=True))
+        return 0
 
-        if args.command == "token":
-            access_token = await manager.get_valid_access_token()
-            print(access_token)
-            return 0
+    if args.command == "token":
+        access_token = await manager.get_valid_access_token()
+        print(access_token)
+        return 0
 
-        if args.command == "hello":
-            result = await manager.authorized_get(
-                "https://www.polaraccesslink.com/v4/data/hello",
-                accept="text/plain",
-            )
-            print(result.get("text", result))
-            return 0
+    if args.command == "hello":
+        result = await manager.authorized_get(
+            "https://www.polaraccesslink.com/v4/data/hello",
+            accept="text/plain",
+        )
+        print(result.get("text", result))
+        return 0
 
-        if args.command == "nightly-recharge":
-            result = await manager.authorized_get(
-                "https://www.polaraccesslink.com/v4/data/nightly-recharge-results",
-                params={
-                    "from": args.from_date,
-                    "to": args.to_date,
-                },
-                accept="application/json",
-            )
-            print(json.dumps(result, indent=2, sort_keys=True))
-            return 0
+    if args.command == "nightly-recharge":
+        result = await manager.authorized_get(
+            "https://www.polaraccesslink.com/v4/data/nightly-recharge-results",
+            params={
+                "from": args.from_date,
+                "to": args.to_date,
+            },
+            accept="application/json",
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
 
-        print(f"ERROR: unknown command {args.command}", file=sys.stderr)
-        return 2
-
-    except Exception as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
+    print(f"ERROR: unknown command {args.command}", file=sys.stderr)
+    return 2
 
 
 def main() -> None:

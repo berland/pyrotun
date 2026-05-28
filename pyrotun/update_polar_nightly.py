@@ -553,7 +553,8 @@ async def update_polar_nightly_store(
 async def async_main() -> int:
     dotenv.load_dotenv()
     parser = argparse.ArgumentParser(
-        description="Async Polar nightly updater: fetch recent v4 nightly recharge data, "
+        description="Async Polar nightly updater: "
+        "fetch recent v4 nightly recharge data, "
         "update CSV, and mirror nightly/events/periods into SQLite."
     )
     polar_files = Path("/home/berland/polar_dump")

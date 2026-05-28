@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -7,6 +8,7 @@ from typing import Any, Dict, Optional
 import aiohttp
 
 TOKEN_URL = "https://auth.polar.com/oauth/token"
+logger = logging.getLogger(__name__)
 
 
 class PolarTokenManager:
@@ -25,6 +27,7 @@ class PolarTokenManager:
         self.token_file = Path(token_file)
         self.refresh_skew_seconds = refresh_skew_seconds
         self._lock = asyncio.Lock()
+        logger.info("Initializing polar_token_manager")
 
     async def load_tokens(self) -> Dict[str, Any]:
         if not self.token_file.exists():
@@ -32,6 +35,7 @@ class PolarTokenManager:
         return json.loads(self.token_file.read_text())
 
     async def save_tokens(self, token_data: Dict[str, Any]) -> None:
+        logger.info("Saving new Polar tokens to disk")
         token_data = dict(token_data)
         expires_in = token_data.get("expires_in")
         if expires_in is not None:
@@ -42,14 +46,16 @@ class PolarTokenManager:
         auth = aiohttp.BasicAuth(self.client_id, self.client_secret, encoding="utf-8")
         timeout = aiohttp.ClientTimeout(total=30)
 
-        async with aiohttp.ClientSession(auth=auth, timeout=timeout) as session:
-            async with session.post(TOKEN_URL, data=data) as response:
-                text = await response.text()
-                if response.status >= 400:
-                    raise RuntimeError(
-                        f"Token request failed: HTTP {response.status}: {text}"
-                    )
-                return await response.json()
+        async with (
+            aiohttp.ClientSession(auth=auth, timeout=timeout) as session,
+            session.post(TOKEN_URL, data=data) as response,
+        ):
+            text = await response.text()
+            if response.status >= 400:
+                raise RuntimeError(
+                    f"Token request failed: HTTP {response.status}: {text}"
+                )
+            return await response.json()
 
     async def exchange_authorization_code(
         self,
@@ -117,41 +123,44 @@ class PolarTokenManager:
         access_token = await self.get_valid_access_token()
         timeout = aiohttp.ClientTimeout(total=60)
 
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(
+        async with (
+            aiohttp.ClientSession(timeout=timeout) as session,
+            session.get(
                 url,
                 params=params,
                 headers={
                     "Authorization": f"Bearer {access_token}",
                     "Accept": accept,
                 },
-            ) as response:
-                if response.status == 401:
-                    async with self._lock:
-                        refreshed = await self.refresh_access_token()
-                        access_token = refreshed["access_token"]
+            ) as response,
+        ):
+            if response.status == 401:
+                async with self._lock:
+                    refreshed = await self.refresh_access_token()
+                    access_token = refreshed["access_token"]
 
-                    async with session.get(
-                        url,
-                        params=params,
-                        headers={
-                            "Authorization": f"Bearer {access_token}",
-                            "Accept": accept,
-                        },
-                    ) as retry_response:
-                        text = await retry_response.text()
-                        if retry_response.status >= 400:
-                            raise RuntimeError(
-                                f"GET failed after refresh: HTTP {retry_response.status}: {text}"
-                            )
-                        if accept == "application/json":
-                            return await retry_response.json()
-                        return {"text": text}
+                async with session.get(
+                    url,
+                    params=params,
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Accept": accept,
+                    },
+                ) as retry_response:
+                    text = await retry_response.text()
+                    if retry_response.status >= 400:
+                        raise RuntimeError(
+                            "GET failed after refresh: "
+                            f"HTTP {retry_response.status}: {text}"
+                        )
+                    if accept == "application/json":
+                        return await retry_response.json()
+                    return {"text": text}
 
-                text = await response.text()
-                if response.status >= 400:
-                    raise RuntimeError(f"GET failed: HTTP {response.status}: {text}")
+            text = await response.text()
+            if response.status >= 400:
+                raise RuntimeError(f"GET failed: HTTP {response.status}: {text}")
 
-                if accept == "application/json":
-                    return await response.json()
-                return {"text": text}
+            if accept == "application/json":
+                return await response.json()
+            return {"text": text}

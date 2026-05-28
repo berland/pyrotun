@@ -359,6 +359,7 @@ async def _update_polar_nightly():
         client_secret=os.getenv("POLAR_V4_CLIENT_SECRET"),
         token_file=Path("/home/berland/.polar_tokens.json"),
     )
+    logger.info("We have a token manager")
     polar_dir = Path("/home/berland/polar_dump")
     result = await pyrotun.update_polar_nightly.update_polar_nightly_store(
         manager=token_manager,
