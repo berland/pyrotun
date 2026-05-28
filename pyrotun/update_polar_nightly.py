@@ -172,15 +172,19 @@ def add_enrichment(df: pd.DataFrame) -> pd.DataFrame:
 
     numeric_cols = [
         "ans_rate",
-        "mean_nightly_recovery_rri",
-        "mean_nightly_recovery_rmssd",
-        "mean_nightly_recovery_respiration_interval",
-        "baseline_mean_rri",
-        "baseline_sd_rri",
-        "baseline_mean_rmssd",
-        "baseline_sd_rmssd",
         "baseline_mean_respiration_interval",
+        "baseline_mean_rmssd",
+        "baseline_mean_rri",
         "baseline_sd_respiration_interval",
+        "baseline_sd_rmssd",
+        "baseline_sd_rri",
+        "beat_to_beat_avg",
+        "breathing_rate_avg",
+        "heart_rate_avg",
+        "heart_rate_variability_avg",
+        "mean_nightly_recovery_respiration_interval",
+        "mean_nightly_recovery_rmssd",
+        "mean_nightly_recovery_rri",
     ]
     for col in numeric_cols:
         if col in df.columns:
@@ -193,6 +197,50 @@ def add_enrichment(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     df["date_epoch"] = (df["date"].astype("int64") // 10**9).astype("int64")
+
+    # Backward-compatible rolling means using legacy-style columns
+    df["hr_7d"] = df["heart_rate_avg"].rolling(7, min_periods=4).mean()
+    df["hrv_7d"] = df["heart_rate_variability_avg"].rolling(7, min_periods=4).mean()
+
+    df["hr_14d"] = df["heart_rate_avg"].rolling(14, min_periods=7).mean()
+    df["hrv_14d"] = df["heart_rate_variability_avg"].rolling(14, min_periods=7).mean()
+
+    df["hr_21d"] = df["heart_rate_avg"].rolling(21, min_periods=10).mean()
+    df["hrv_21d"] = df["heart_rate_variability_avg"].rolling(21, min_periods=10).mean()
+
+    df["hr_28d"] = df["heart_rate_avg"].rolling(28, min_periods=14).mean()
+    df["hrv_28d"] = df["heart_rate_variability_avg"].rolling(28, min_periods=14).mean()
+
+    df["hr_42d"] = df["heart_rate_avg"].rolling(42, min_periods=21).mean()
+    df["hrv_42d"] = df["heart_rate_variability_avg"].rolling(42, min_periods=21).mean()
+
+    # Backward-compatible rolling std
+    df["hr_42d_std"] = df["heart_rate_avg"].rolling(42, min_periods=21).std()
+    df["hrv_42d_std"] = (
+        df["heart_rate_variability_avg"].rolling(42, min_periods=21).std()
+    )
+
+    # Backward-compatible deviations
+    df["hr_delta_42d"] = df["heart_rate_avg"] - df["hr_42d"]
+    df["hrv_delta_42d"] = df["heart_rate_variability_avg"] - df["hrv_42d"]
+
+    # Backward-compatible relative values
+    df["hr_pct_of_42d"] = 100.0 * df["heart_rate_avg"] / df["hr_42d"]
+    df["hrv_pct_of_42d"] = 100.0 * df["heart_rate_variability_avg"] / df["hrv_42d"]
+
+    # Backward-compatible Z-scores
+    df["hr_z_42d"] = df["hr_delta_42d"] / df["hr_42d_std"]
+    df["hrv_z_42d"] = df["hrv_delta_42d"] / df["hrv_42d_std"]
+
+    # Backward-compatible combined strain
+    df["strain_score"] = df["hr_z_42d"] - df["hrv_z_42d"]
+
+    # Backward-compatible rolling correlation
+    df["hr_hrv_corr_30d"] = (
+        df["heart_rate_avg"]
+        .rolling(30, min_periods=15)
+        .corr(df["heart_rate_variability_avg"])
+    )
 
     # Rolling means for v4 core signals
     df["rri_7d"] = df["mean_nightly_recovery_rri"].rolling(7, min_periods=4).mean()
@@ -449,6 +497,15 @@ async def update_polar_nightly_store(
     recent_df = pd.DataFrame(recent_rows)
     existing_df = read_existing_csv(csv_path)
 
+    existing_unique_dates = 0
+    if not existing_df.empty and "date" in existing_df.columns:
+        existing_unique_dates = (
+            pd.to_datetime(existing_df["date"], errors="coerce")
+            .dt.strftime("%Y-%m-%d")
+            .dropna()
+            .nunique()
+        )
+
     frames = [df for df in (existing_df, recent_df) if not df.empty]
     if not frames:
         raise RuntimeError("No recent Polar data fetched and no existing CSV found.")
@@ -459,6 +516,11 @@ async def update_polar_nightly_store(
         raise RuntimeError("Combined dataset is missing 'date' column.")
 
     enriched = add_enrichment(combined)
+
+    final_unique_dates = 0
+    if not enriched.empty and "date" in enriched.columns:
+        final_unique_dates = enriched["date"].nunique()
+    new_rows_added = max(0, final_unique_dates - existing_unique_dates)
 
     write_csv(enriched, csv_path)
 
@@ -475,6 +537,7 @@ async def update_polar_nightly_store(
 
     return {
         "recent_rows_fetched": len(recent_df),
+        "new_rows_added": new_rows_added,
         "total_rows_written": len(enriched),
         "csv_path": str(csv_path),
         "sqlite_path": str(sqlite_path),
