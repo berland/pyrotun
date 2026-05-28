@@ -1,10 +1,12 @@
 import argparse
 import asyncio
+import datetime
 import json
 import os
 import sys
 import urllib.parse
 
+import dotenv
 from polar_token_manager import PolarTokenManager
 
 #
@@ -47,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--token-file",
-        default=os.environ.get("POLAR_TOKEN_FILE", "polar_tokens.json"),
+        default=os.environ.get("POLAR_TOKEN_FILE", "/home/berland/.polar_tokens.json"),
         help="Path to token JSON file",
     )
 
@@ -85,13 +87,24 @@ def build_parser() -> argparse.ArgumentParser:
     nr_parser = subparsers.add_parser(
         "nightly-recharge", help="Fetch v4 Nightly Recharge data"
     )
-    nr_parser.add_argument("--from-date", required=True, help="Start date YYYY-MM-DD")
-    nr_parser.add_argument("--to-date", required=True, help="End date YYYY-MM-DD")
+    nr_parser.add_argument(
+        "--from-date",
+        default=(datetime.datetime.now() - datetime.timedelta(days=1))
+        .date()
+        .isoformat(),
+        help="Start date YYYY-MM-DD",
+    )
+    nr_parser.add_argument(
+        "--to-date",
+        default=datetime.datetime.now().date().isoformat(),
+        help="End date YYYY-MM-DD",
+    )
 
     return parser
 
 
 async def async_main() -> int:  # noqa: PLR0911
+    dotenv.load_dotenv()
     parser = build_parser()
     args = parser.parse_args()
 
@@ -146,6 +159,7 @@ async def async_main() -> int:  # noqa: PLR0911
             params={
                 "from": args.from_date,
                 "to": args.to_date,
+                "features": "",  # "samples"
             },
             accept="application/json",
         )
