@@ -9,6 +9,7 @@ import activereader
 import dotenv
 import numpy as np
 import pandas as pd
+import statsmodels.formula.api as smf
 import watchfiles
 from geopy import distance
 
@@ -64,6 +65,7 @@ def seconds_pr_km_to_pace(seconds: int) -> str:
 def lap_to_dict(
     lap: activereader.tcx.Lap,
     explicit_distance=None,
+    suspicious_hr: bool = False,  # Set to true if optical HR has been used
     recovery_lap: activereader.tcx.Lap
     | None = None,  # Recovery lap is the preceding lap
 ) -> dict:
@@ -76,9 +78,10 @@ def lap_to_dict(
         # Meters per second
         pace = lap.avg_speed_ms
     expected_hr_avg = None
-    if pace is not None and pace > 3.0:
+    if not suspicious_hr and pace is not None and pace > 3.0:
+        # This model is deprecated..
         expected_hr_avg = 130 + (pace - 3.854) * (170 - 130) / (5.04 - 3.854)
-    if recovery_lap is not None:
+    if recovery_lap is not None and not suspicious_hr:
         try:
             hr_drop = recovery_lap.trackpoints[0].hr - recovery_lap.trackpoints[-1].hr
         except (TypeError, ValueError):
@@ -90,11 +93,15 @@ def lap_to_dict(
         "epoch": int(lap.start_time.timestamp()),
         "distance": round(lap.distance_m, 1),
         "speed_ms": round(lap.avg_speed_ms or 0, 3),
-        "hr_start": lap.trackpoints[0].hr,
-        "hr_avg": lap.hr_avg if lap.hr_avg and 120 < lap.hr_avg < 180 else None,
+        "hr_start": lap.trackpoints[0].hr if not suspicious_hr else None,
+        "hr_avg": lap.hr_avg
+        if not suspicious_hr and lap.hr_avg and 120 < lap.hr_avg < 180
+        else None,
         "expected_hr_avg": round(expected_hr_avg, 1) if expected_hr_avg else None,
-        "hr_max": lap.hr_max if lap.hr_max and 140 < lap.hr_max < 190 else None,
-        "hr_drop": hr_drop,
+        "hr_max": lap.hr_max
+        if not suspicious_hr and lap.hr_max and 140 < lap.hr_max < 190
+        else None,
+        "hr_drop": hr_drop if not suspicious_hr else None,
         "time": lap.total_time_s,
         "gps_pace": speed_to_pace(lap.avg_speed_ms or 0),
         "pace": speed_to_pace(pace or 0),
@@ -122,6 +129,7 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
     order1000 = 0
     order500 = 0
     order200 = 0
+    suspicious_hr = (directory / "suspicious_hr").is_file()
     for recovery_lap, lap in zip(
         [None, *reader.laps], [*reader.laps, None], strict=True
     ):
@@ -143,7 +151,10 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
                 "order": order1000,
                 "category": "tirsdag1000",
                 **lap_to_dict(
-                    lap, explicit_distance=1000, recovery_lap=verified_recovery_lap
+                    lap,
+                    explicit_distance=1000,
+                    suspicious_hr=suspicious_hr,
+                    recovery_lap=verified_recovery_lap,
                 ),
             }
             record["cat_centroid_dist"] = lap_centroid_dist("tirsdag1000", centroid)
@@ -575,7 +586,10 @@ async def analyze_all():
         exercise_data: pd.DataFrame | None = None
         if cache_file.is_file():
             exercise_data = pd.read_pickle(cache_file)
-        else:
+            if (Path(_dir) / "suspicious_hr").is_file() and exercise_data.hr_avg.any():
+                print(" - Newly flagged as suspicious, must reanalyze")
+                exercise_data = None
+        elif exercise_data is None:
             race_data = await analyze_potential_race(Path(_dir))
             if race_data is not None:
                 exercise_data = race_data
@@ -593,7 +607,16 @@ async def analyze_all():
                 exercise_data.to_pickle(cache_file)
         if exercise_data is not None:
             dfs.append(exercise_data)
-    data = pd.concat(dfs)
+    if dfs:
+        data = pd.concat(dfs)
+    data = pd.read_csv(EXERCISE_DIR / "intervaller.csv")
+    print(" ** Making Tuesday model")
+    data, model = recompute_hr_model_features(
+        data,
+        category="tirsdag1000",
+    )
+    print(model.summary)
+
     data.to_csv(EXERCISE_DIR / "intervaller.csv")
     data.to_sql(
         "intervaller",
@@ -601,6 +624,140 @@ async def analyze_all():
         index=False,
         if_exists="replace",
     )
+
+
+def recompute_hr_model_features(
+    data: pd.DataFrame,
+    category: str,
+    formula: str = "hr_avg ~ speed_ms + hr_start + hr_drop",
+    model_name: str = "hr_model_b_v1",
+    session_col: str = "date",
+    min_train_rows: int = 20,
+):
+    """
+    Refit HR model on all rows in `data` for one category, then recompute
+    predictions/residuals for all applicable rows in that same dataframe.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Full historical dataframe.
+    category : str
+        Category to model, e.g. 'tirsdag1000'
+    formula : str
+        statsmodels formula
+    model_name : str
+        Label stored in output
+    session_col : str
+        Column identifying a session, usually 'date'
+    min_train_rows : int
+        Minimum rows required to fit model
+
+    Returns
+    -------
+    out : pd.DataFrame
+        DataFrame with model columns updated
+    model : fitted statsmodels result or None
+    """
+    out = data.copy()
+
+    string_cols_existing = [c for c in ["category", "date"] if c in out.columns]
+    for col in string_cols_existing:
+        out[col] = out[col].astype("string")
+
+    # model metadata columns
+    string_model_cols = [
+        "hr_model_name",
+        "hr_model_formula",
+        "hr_model_category",
+    ]
+    for col in string_model_cols:
+        if col not in out.columns:
+            out[col] = pd.Series(pd.NA, index=out.index, dtype="string")
+        else:
+            out[col] = out[col].astype("string")
+
+    # numeric model output columns
+    numeric_model_cols = [
+        "hr_model_pred",
+        "hr_model_resid",
+        "hr_model_abs_resid",
+        "hr_model_r2",
+        "hr_model_train_n",
+        "hr_model_session_mean_resid",
+        "hr_model_session_mean_abs_resid",
+    ]
+    for col in numeric_model_cols:
+        if col not in out.columns:
+            out[col] = np.nan
+
+    # optional boolean flag
+    if "hr_model_ok" not in out.columns:
+        out["hr_model_ok"] = False
+
+    # only rows of this category are modeled
+    cat_mask = out["category"].eq(category)
+
+    # columns required by model B
+    needed = ["hr_avg", "speed_ms", "hr_start", "hr_drop"]
+    valid_mask = cat_mask & out[needed].notna().all(axis=1)
+
+    fit_df = out.loc[valid_mask].copy()
+
+    if len(fit_df) < min_train_rows:
+        return out, None
+
+    model = smf.ols(formula, data=fit_df).fit()
+
+    # predict for all valid rows in this category
+    pred = model.predict(out.loc[valid_mask])
+
+    out.loc[valid_mask, "hr_model_pred"] = pred
+    out.loc[valid_mask, "hr_model_resid"] = out.loc[valid_mask, "hr_avg"] - pred
+    out.loc[valid_mask, "hr_model_abs_resid"] = out.loc[
+        valid_mask, "hr_model_resid"
+    ].abs()
+    out.loc[valid_mask, "hr_model_name"] = model_name
+    out.loc[valid_mask, "hr_model_formula"] = formula
+    out.loc[valid_mask, "hr_model_category"] = category
+    out.loc[valid_mask, "hr_model_r2"] = model.rsquared
+    out.loc[valid_mask, "hr_model_train_n"] = len(fit_df)
+
+    # session-level summaries for this category
+    if session_col in out.columns:
+        sess = (
+            out.loc[valid_mask]
+            .groupby(session_col, as_index=False)
+            .agg(
+                hr_model_session_mean_resid=("hr_model_resid", "mean"),
+                hr_model_session_mean_abs_resid=("hr_model_abs_resid", "mean"),
+            )
+        )
+
+        # clear old values for this category before merging back
+        out.loc[cat_mask, "hr_model_session_mean_resid"] = np.nan
+        out.loc[cat_mask, "hr_model_session_mean_abs_resid"] = np.nan
+
+        out = out.merge(sess, on=session_col, how="left", suffixes=("", "_new"))
+
+        out.loc[cat_mask, "hr_model_session_mean_resid"] = out.loc[
+            cat_mask, "hr_model_session_mean_resid_new"
+        ]
+        out.loc[cat_mask, "hr_model_session_mean_abs_resid"] = out.loc[
+            cat_mask, "hr_model_session_mean_abs_resid_new"
+        ]
+
+        drop_cols = [
+            c
+            for c in [
+                "hr_model_session_mean_resid_new",
+                "hr_model_session_mean_abs_resid_new",
+            ]
+            if c in out.columns
+        ]
+        out = out.drop(columns=drop_cols)
+
+    return out, model
 
 
 async def main(pers=None, dryrun=False):
@@ -630,7 +787,7 @@ async def main(pers=None, dryrun=False):
                 dirnames.add(Path(change[1]).parent.absolute())
         logger.info(f"Will process directories {dirnames}")
         # dirnames are timestamps
-        interval_session_found = False  # Set to True to force analysis of all
+        interval_session_found = False
         for _dirname in dirnames:
             dirname = Path(_dirname)
             if not dirname.is_dir():
