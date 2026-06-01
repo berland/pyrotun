@@ -279,9 +279,9 @@ def build_grafana_session_kwargs(
     auth = None
 
     if basic_user is None:
-        headers["Authorization"] = f"Bearer {token}"
+        headers["Authorization"] = f"Bearer {token}"  # For raaserv
     else:
-        headers["X-Grafana-Token"] = token
+        headers["X-Grafana-Token"] = token  # for bobserv gjennom nginx
 
     if basic_user is not None:
         auth = aiohttp.BasicAuth(basic_user, basic_password or "", encoding="utf-8")

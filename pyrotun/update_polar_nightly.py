@@ -483,13 +483,12 @@ async def update_polar_nightly_store(
             sleep_s=sleep_s,
         )
     else:
-        today = dt.date.today()
-        recent_end = today - dt.timedelta(days=1)
-        recent_start = recent_end - dt.timedelta(days=days_back - 1)
+        today = dt.date.today() + dt.timedelta(days=1)
+        recent_start = today - dt.timedelta(days=days_back - 1)
         recent_rows = await fetch_historical_rows_chunked(
             manager=manager,
             start=recent_start,
-            end=recent_end,
+            end=today,
             chunk_days=chunk_days,
             sleep_s=sleep_s,
         )
@@ -632,7 +631,7 @@ async def async_main() -> int:
     end_date = None
 
     if args.bootstrap_days is not None:
-        end_date = dt.date.today() - dt.timedelta(days=1)
+        end_date = dt.date.today() + dt.timedelta(days=1)
         start_date = end_date - dt.timedelta(days=args.bootstrap_days - 1)
     elif args.start_date or args.end_date:
         if not args.start_date or not args.end_date:

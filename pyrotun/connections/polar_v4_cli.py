@@ -89,14 +89,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     nr_parser.add_argument(
         "--from-date",
-        default=(datetime.datetime.now() - datetime.timedelta(days=1))
+        default=(datetime.datetime.now() - datetime.timedelta(days=0))
         .date()
         .isoformat(),
         help="Start date YYYY-MM-DD",
     )
     nr_parser.add_argument(
         "--to-date",
-        default=datetime.datetime.now().date().isoformat(),
+        default=(datetime.datetime.now() + datetime.timedelta(days=1))
+        .date()
+        .isoformat(),
         help="End date YYYY-MM-DD",
     )
 
