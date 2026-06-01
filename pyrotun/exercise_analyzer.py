@@ -61,7 +61,12 @@ def seconds_pr_km_to_pace(seconds: int) -> str:
     return f"{minutes}:{seconds:02d}"
 
 
-def lap_to_dict(lap: activereader.tcx.Lap, explicit_distance=None) -> dict:
+def lap_to_dict(
+    lap: activereader.tcx.Lap,
+    explicit_distance=None,
+    recovery_lap: activereader.tcx.Lap
+    | None = None,  # Recovery lap is the preceding lap
+) -> dict:
     lats = [p.lat for p in lap.trackpoints if p.lat is not None]
     lons = [p.lon for p in lap.trackpoints if p.lon is not None]
     if explicit_distance is not None:
@@ -73,14 +78,23 @@ def lap_to_dict(lap: activereader.tcx.Lap, explicit_distance=None) -> dict:
     expected_hr_avg = None
     if pace is not None and pace > 3.0:
         expected_hr_avg = 130 + (pace - 3.854) * (170 - 130) / (5.04 - 3.854)
+    if recovery_lap is not None:
+        try:
+            hr_drop = recovery_lap.trackpoints[0].hr - recovery_lap.trackpoints[-1].hr
+        except (TypeError, ValueError):
+            hr_drop = None
+    else:
+        hr_drop = None
     return {
         "date": str(lap.start_time.date()),
         "epoch": int(lap.start_time.timestamp()),
         "distance": round(lap.distance_m, 1),
         "speed_ms": round(lap.avg_speed_ms or 0, 3),
+        "hr_start": lap.trackpoints[0].hr,
         "hr_avg": lap.hr_avg if lap.hr_avg and 120 < lap.hr_avg < 180 else None,
         "expected_hr_avg": round(expected_hr_avg, 1) if expected_hr_avg else None,
         "hr_max": lap.hr_max if lap.hr_max and 140 < lap.hr_max < 190 else None,
+        "hr_drop": hr_drop,
         "time": lap.total_time_s,
         "gps_pace": speed_to_pace(lap.avg_speed_ms or 0),
         "pace": speed_to_pace(pace or 0),
@@ -101,12 +115,18 @@ def lap_centroid_dist(category: str, centroid_dict: dict) -> float:
 
 
 async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
+    # Each row represents one lap. Metrics from the 60 seconds pause
+    # can be included in the preceding lap.
     reader = activereader.Tcx.from_file((directory / "tcx").read_text(encoding="utf-8"))
     records: list[dict] = []
     order1000 = 0
     order500 = 0
     order200 = 0
-    for lap in reader.laps:
+    for recovery_lap, lap in zip(
+        [None, *reader.laps], [*reader.laps, None], strict=True
+    ):
+        if lap is None:
+            continue
         centroid = lap_to_dict(lap)
         if (
             900 < lap.distance_m < 1100
@@ -114,10 +134,17 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
             and lap_centroid_dist("tirsdag1000", centroid) < 4500
         ):
             order1000 = order1000 + 1
+
+            if not (50 < recovery_lap.total_time_s < 70):
+                verified_recovery_lap = None
+            else:
+                verified_recovery_lap = recovery_lap
             record = {
                 "order": order1000,
                 "category": "tirsdag1000",
-                **lap_to_dict(lap, explicit_distance=1000),
+                **lap_to_dict(
+                    lap, explicit_distance=1000, recovery_lap=verified_recovery_lap
+                ),
             }
             record["cat_centroid_dist"] = lap_centroid_dist("tirsdag1000", centroid)
             records.append(record)
@@ -127,19 +154,31 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
             and lap_centroid_dist("tirsdag500", centroid) < 4000
         ):
             order500 = order500 + 1
+            if not (50 < recovery_lap.total_time_s < 70):
+                verified_recovery_lap = None
+            else:
+                verified_recovery_lap = recovery_lap
             record = {
                 "order": order500,
                 "category": "tirsdag500",
-                **lap_to_dict(lap, explicit_distance=500),
+                **lap_to_dict(
+                    lap, explicit_distance=500, recovery_lap=verified_recovery_lap
+                ),
             }
             record["cat_centroid_dist"] = lap_centroid_dist("tirsdag500", centroid)
             records.append(record)
         if 150 < lap.distance_m < 250 and 25 < lap.total_time_s < 45:
             order200 = order200 + 1
+            if not (35 < recovery_lap.total_time_s < 45):
+                verified_recovery_lap = None
+            else:
+                verified_recovery_lap = recovery_lap
             record = {
                 "order": order200,
                 "category": "tirsdag200",
-                **lap_to_dict(lap, explicit_distance=200),
+                **lap_to_dict(
+                    lap, explicit_distance=200, recovery_lap=verified_recovery_lap
+                ),
             }
             record["cat_centroid_dist"] = lap_centroid_dist("tirsdag200", centroid)
             records.append(record)
@@ -527,10 +566,11 @@ async def describe():
 
 async def analyze_all():
     dfs = []
-    dirs = sorted(glob.glob(str(EXERCISE_DIR / "20*")))
+    dirs = sorted(glob.glob(str(EXERCISE_DIR / "202*")))
     for _dir in dirs:
+        print(_dir)
         cache_file = Path(_dir) / "analyzed.pkl"
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0)
         d = datetime.datetime.fromisoformat(Path(_dir).name)
         exercise_data: pd.DataFrame | None = None
         if cache_file.is_file():
@@ -590,7 +630,7 @@ async def main(pers=None, dryrun=False):
                 dirnames.add(Path(change[1]).parent.absolute())
         logger.info(f"Will process directories {dirnames}")
         # dirnames are timestamps
-        interval_session_found = False
+        interval_session_found = False  # Set to True to force analysis of all
         for _dirname in dirnames:
             dirname = Path(_dirname)
             if not dirname.is_dir():
