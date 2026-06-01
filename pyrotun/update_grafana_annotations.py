@@ -206,6 +206,18 @@ async def update_annotation(
         return json.loads(text)
 
 
+async def delete_annotation(
+    session: aiohttp.ClientSession,
+    grafana_url: str,
+    ann_id: int,
+) -> None:
+    url = grafana_url.rstrip("/") + f"/api/annotations/{ann_id}"
+    async with session.delete(url) as resp:
+        text = await resp.text()
+        if resp.status >= 400:
+            raise RuntimeError(f"DELETE {url} failed: HTTP {resp.status}: {text}")
+
+
 def build_existing_indexes(existing_annotations: List[dict]):
     exact = {}
     logical = {}
@@ -227,11 +239,15 @@ async def sync_payloads(
     created = 0
     updated = 0
     skipped = 0
+    deleted = 0
+
+    matched_ids: set[int] = set()
 
     for payload in payloads:
         exact_match = exact_idx.get(annotation_key(payload))
         if exact_match:
             skipped += 1
+            matched_ids.add(exact_match["id"])
             print(f"skip   : {payload['text']}", flush=True)
             continue
 
@@ -245,6 +261,7 @@ async def sync_payloads(
                 await update_annotation(session, grafana_url, ann_id, payload)
                 print(f"update : {payload['text']} (id={ann_id})", flush=True)
             updated += 1
+            matched_ids.add(ann_id)
 
             candidate_updated = dict(candidate)
             candidate_updated.update(payload)
@@ -258,10 +275,22 @@ async def sync_payloads(
             print(f"create : {payload['text']}", flush=True)
         created += 1
 
+    for ann in existing_annotations:
+        ann_id = ann["id"]
+        if ann_id not in matched_ids:
+            text = ann.get("text", "")
+            if dry_run:
+                print(f"delete : {text} (id={ann_id})", flush=True)
+            else:
+                await delete_annotation(session, grafana_url, ann_id)
+                print(f"delete : {text} (id={ann_id})", flush=True)
+            deleted += 1
+
     return {
         "created": created,
         "updated": updated,
         "skipped": skipped,
+        "deleted": deleted,
     }
 
 
@@ -323,6 +352,7 @@ async def sync_grafana_annotations(
             "created": 0,
             "updated": 0,
             "skipped": 0,
+            "deleted": 0,
         }
 
     min_time = min(p["time"] for p in payloads)
