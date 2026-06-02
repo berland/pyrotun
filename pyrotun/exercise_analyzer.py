@@ -105,6 +105,7 @@ def lap_to_dict(
         "time": lap.total_time_s,
         "gps_pace": speed_to_pace(lap.avg_speed_ms or 0),
         "pace": speed_to_pace(pace or 0),
+        "pace_ms": pace,  # Meters pr second
         "lon": np.nanmean(lons) if lons else None,
         "lat": np.nanmean(lats) if lats else None,
     }
@@ -480,6 +481,8 @@ async def analyze_potential_race(directory: Path) -> pd.DataFrame | None:
         return
     min_pr_km = minutes_used / distance_km
 
+    suspicious_hr = (directory / "suspicious_hr").is_file()
+
     category = distance = None
     if 41 < distance_km < 44 and 3 < min_pr_km < 4.2:
         category = "marathon"
@@ -501,8 +504,8 @@ async def analyze_potential_race(directory: Path) -> pd.DataFrame | None:
             "date": str(reader.trackpoints[0].time.date()),
             "epoch": int(reader.trackpoints[0].time.timestamp()),
             "distance": distance,
-            "hr_avg": sum(hrs) / len(hrs),
-            "hr_max": max(hrs),
+            "hr_avg": sum(hrs) / len(hrs) if not suspicious_hr else None,
+            "hr_max": max(hrs) if not suspicious_hr else None,
             "time": minutes_used * 60,
             "pace": speed_to_pace(distance / minutes_used / 60),
             "speed_ms": float(distance) / (minutes_used * 60),
@@ -518,13 +521,22 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
     orderbakkedrag = 0
     order400 = 0
     order200 = 0
-    for lap in reader.laps:
+    suspicious_hr = (directory / "suspicious_hr").is_file()
+    for recovery_lap, lap in zip(
+        [None, *reader.laps], [*reader.laps, None], strict=True
+    ):
+        if lap is None:
+            continue
         lap_dict: dict = lap_to_dict(lap)
         if (
             7 * 60 + 45 < lap.total_time_s < 10 * 60
             and 2170 * 0.85 < lap.distance_m < 2170 * 1.15
             and "2024-09-21" not in str(lap.start_time.date())
         ):
+            if not (50 < recovery_lap.total_time_s < 70):
+                verified_recovery_lap = None
+            else:
+                verified_recovery_lap = recovery_lap
             # 2023-11-25 er BFG i tunnellen og treffes nesten
             # 2024-09-21 er oslo maraton og treffes :(
             # 2023-11-11 har en delt langrunde som kan detekteres ved summasjon
@@ -532,7 +544,12 @@ async def analyze_lordag(directory: Path) -> pd.DataFrame:
             record = {
                 "order": ordersiljulang,
                 "category": "siljulang",
-                **lap_to_dict(lap, explicit_distance=2170),
+                **lap_to_dict(
+                    lap,
+                    explicit_distance=2170,
+                    suspicious_hr=suspicious_hr,
+                    recovery_lap=verified_recovery_lap,
+                ),
             }
             records.append(record)
         if (
@@ -609,13 +626,15 @@ async def analyze_all():
             dfs.append(exercise_data)
     if dfs:
         data = pd.concat(dfs)
-    data = pd.read_csv(EXERCISE_DIR / "intervaller.csv")
+        data.to_csv(EXERCISE_DIR / "intervaller.csv")
+    else:
+        data = pd.read_csv(EXERCISE_DIR / "intervaller.csv")
     print(" ** Making Tuesday model")
     data, model = recompute_hr_model_features(
         data,
         category="tirsdag1000",
     )
-    print(model.summary)
+    print(model.summary())
 
     data.to_csv(EXERCISE_DIR / "intervaller.csv")
     data.to_sql(
@@ -629,7 +648,7 @@ async def analyze_all():
 def recompute_hr_model_features(
     data: pd.DataFrame,
     category: str,
-    formula: str = "hr_avg ~ speed_ms + hr_start + hr_drop",
+    formula: str = "hr_avg ~ pace_ms + hr_start + hr_drop",
     model_name: str = "hr_model_b_v1",
     session_col: str = "date",
     min_train_rows: int = 20,
@@ -699,10 +718,13 @@ def recompute_hr_model_features(
     cat_mask = out["category"].eq(category)
 
     # columns required by model B
-    needed = ["hr_avg", "speed_ms", "hr_start", "hr_drop"]
+    needed = ["hr_avg", "pace_ms", "hr_start", "hr_drop"]
     valid_mask = cat_mask & out[needed].notna().all(axis=1)
 
     fit_df = out.loc[valid_mask].copy()
+
+    # Let us use 2025 and 2026 as baseline for the model:
+    fit_df = fit_df[fit_df["date"].astype(str).str.contains(r"2025|2026", na=False)]
 
     if len(fit_df) < min_train_rows:
         return out, None
