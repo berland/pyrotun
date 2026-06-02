@@ -219,7 +219,11 @@ async def process_activity_update(activity_id: str, aspect_type: str):
             ACTIVITIES_TO_BE_POLLED_FOR_GEAR.add(activity["id"])
         update_activity(activity_id, updates)
 
+    activity_date = None
     if "start_date_local" in activity:
+        activity_date = datetime.datetime.fromisoformat(
+            activity.get("start_date_local", "")
+        )
         counter = 0
         tcxfilename = None
         while counter < 30 * 60 and tcxfilename is None:
@@ -235,9 +239,6 @@ async def process_activity_update(activity_id: str, aspect_type: str):
         if tcxfilename:
             updates = await exercise_analyzer.make_description_from_tcx(tcxfilename)
             if updates and "Run" in activity["name"]:
-                activity_date = datetime.datetime.fromisoformat(
-                    activity.get("start_date_local", "")
-                )
                 if (
                     updates.get("name") == "Hjem fra jobb"
                     and activity_date
@@ -257,7 +258,16 @@ async def process_activity_update(activity_id: str, aspect_type: str):
                 f"TCX file never appeared on disk for {activity['start_date_local']=}"
             )
 
-    if aspect_type == "create" and "Run" in activity["name"]:
+    if (
+        aspect_type == "create"
+        and "Run" in activity["name"]
+        and not (
+            # Avoid pushing notification if we already know the shoe pair
+            "Fra jobb" in updates["name"]
+            and activity_date
+            and activity_date in GEAR_ID_PR_DATE
+        )
+    ):
         await check_and_notify_about_undefined_shoe(activity)
 
     if aspect_type == "update" and "jobb" in activity.get("name", ""):
