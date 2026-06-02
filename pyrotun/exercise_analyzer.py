@@ -629,10 +629,18 @@ async def analyze_all():
         data.to_csv(EXERCISE_DIR / "intervaller.csv")
     else:
         data = pd.read_csv(EXERCISE_DIR / "intervaller.csv")
+
+    polar_nightly = pd.read_csv(EXERCISE_DIR / "polar_nightly.csv")
+    polar_nightly["date"] = pd.to_datetime(polar_nightly["date"]).dt.normalize()
+    data["date"] = pd.to_datetime(data["date"]).dt.normalize()
+    overlap_cols = data.columns.intersection(polar_nightly.columns).drop("date")
+    data = data.drop(columns=overlap_cols)
+
     print(" ** Making Tuesday model")
     data, model = recompute_hr_model_features(
-        data,
+        data.merge(polar_nightly, on="date", how="left"),
         category="tirsdag1000",
+        formula="hr_avg ~ pace_ms + hr_start + hr_14d",
     )
     print(model.summary())
 
@@ -648,7 +656,7 @@ async def analyze_all():
 def recompute_hr_model_features(
     data: pd.DataFrame,
     category: str,
-    formula: str = "hr_avg ~ pace_ms + hr_start + hr_drop",
+    formula: str = "hr_avg ~ pace_ms + hr_start",
     model_name: str = "hr_model_b_v1",
     session_col: str = "date",
     min_train_rows: int = 20,
@@ -718,7 +726,15 @@ def recompute_hr_model_features(
     cat_mask = out["category"].eq(category)
 
     # columns required by model B
-    needed = ["hr_avg", "pace_ms", "hr_start", "hr_drop"]
+    needed = {"hr_avg", "pace_ms", "hr_start", "hr_drop"}
+    formula_needs = set(
+        formula.replace("~", "").replace("+", "").replace(":", " ").split()
+    )
+    needed = list(needed.union(formula_needs))
+    print(needed)
+    # We don't necessarily use hr_drop, but when we include it, we skip the first
+    # rep and that gives a better fit.
+
     valid_mask = cat_mask & out[needed].notna().all(axis=1)
 
     fit_df = out.loc[valid_mask].copy()
