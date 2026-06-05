@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import os
 
 import dotenv
@@ -58,9 +59,12 @@ async def amain(pers=None, debug=False):
                 )
             else:
                 logger.error(f"Skoda API not playing along, gave {err}")
-                raise RuntimeError(
-                    "Kanske det må trykkes på en samtykke-webside, finn url i traceback"
-                ) from err
+                if 16 < datetime.datetime.now().hour < 23:
+                    # Får denne når bilen er på verksted, så ikke raise på dagtid
+                    raise RuntimeError(
+                        "Kanskje det må trykkes på en samtykke-webside, "
+                        "finn url i traceback"
+                    ) from err
 
     if health:
         await pers.openhab.set_item("EnyaqKm1", str(health.mileage_in_km), log=True)
