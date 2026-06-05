@@ -213,7 +213,12 @@ async def process_activity_update(activity_id: str, aspect_type: str):
         update_activity(activity_id, updates)
 
     updates = await exercise_analyzer.make_description_from_stravaactivity(activity)
-    if updates and "Run" in activity["name"]:
+    if updates and (
+        "Run" in activity["name"]
+        or "med løping" in activity["name"]
+        or "Løping på" in activity["name"]
+        or "Løping om" in activity["name"]
+    ):
         print(f"Submitting activity updates: {updates}")
         if "Til jobb" in updates["name"]:
             ACTIVITIES_TO_BE_POLLED_FOR_GEAR.add(activity["id"])
