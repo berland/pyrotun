@@ -12,7 +12,7 @@ import logging
 import os
 
 import dotenv
-from aiohttp import ConnectionTimeoutError, ContentTypeError
+from aiohttp import ClientConnectorDNSError, ConnectionTimeoutError, ContentTypeError
 
 import pyrotun
 import pyrotun.persist
@@ -90,7 +90,7 @@ class SolisConnection:
                     logger.error(err)
                     return {}
                 return json_response
-        except ConnectionTimeoutError:
+        except (ConnectionTimeoutError, ClientConnectorDNSError):
             logger.exception("Solis cloud temporarily down")
             return {}
 

@@ -41,6 +41,9 @@ async def amain(pers=None, debug=False):
             if "identity.vwgroup.io/signin" in str(err):
                 logger.error(f"Skoda redirecting to signin webpage, sigh, {err}")
                 return
+            if "ClientConnectorDNSError" in str(err):
+                logger.error("Temporary DNS problems, lets just ignore")
+                return
             else:
                 raise err
         vin = os.getenv("SKODA_VIN", "")
