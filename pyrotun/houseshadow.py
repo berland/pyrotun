@@ -89,6 +89,7 @@ class shadow:
             FILENAME = Path(Path(FILENAME).name)
             logger.warning("Requested directory for svg file did not exist")
 
+        self.timezone = timezone
         self.city = astral.LocationInfo(
             "HOME", os.getenv("LOCAL_CITY"), os.getenv("TIMEZOME"), LATITUDE, LONGITUDE
         )
@@ -105,6 +106,8 @@ class shadow:
             self.city.observer, self.sun["sunrise"]
         )
         self.sunset_azimuth = astral.sun.azimuth(self.city.observer, self.sun["sunset"])
+        self.noon_azimuth = astral.sun.azimuth(self.city.observer, self.sun["noon"])
+        self.noon_elevation = astral.sun.elevation(self.city.observer, self.sun["noon"])
 
         for i in range(0, 24, HOURS):
             a = astral.sun.azimuth(
@@ -209,6 +212,15 @@ class shadow:
         coordinates["y"] = cy + math.cos(math.radians(d2)) * r
 
         return coordinates
+
+    def generateLabel(self, azimuth, text):
+        pos = self.degreesToPoint(azimuth, int(WIDTH / 2) + 6)
+        return (
+            f'<text x="{pos["x"]:.1f}" y="{pos["y"]:.1f}" '
+            f'text-anchor="middle" dominant-baseline="middle" '
+            f'font-size="5" fill="{LIGHT_COLOR}" font-family="sans-serif">'
+            f"{text}</text>"
+        )
 
     def generateSVG(self):
         realSun_pos = self.degreesToPoint(self.sun_azimuth, 10000)
@@ -393,43 +405,13 @@ class shadow:
             ],
         )
 
-        for i in range(len(DEGS)):
-            j = 0 if i == len(DEGS) - 1 else i + 1
-            if i % 2 == 0:
-                svg = svg + self.generateArc(
-                    int(WIDTH / 2) + 8,
-                    PRIMARY_COLOR,
-                    "none",
-                    DEGS[i],
-                    DEGS[j],
-                    'stroke-width="3" stroke-opacity="0.2"',
-                )
-            else:
-                svg = svg + self.generateArc(
-                    int(WIDTH / 2) + 8,
-                    PRIMARY_COLOR,
-                    "none",
-                    DEGS[i],
-                    DEGS[j],
-                    'stroke-width="3" ',
-                )
-
-        svg = svg + self.generatePath(
-            LIGHT_COLOR,
-            "none",
-            [
-                self.degreesToPoint(DEGS[0], int(WIDTH / 2) + 5),
-                self.degreesToPoint(DEGS[0], int(WIDTH / 2) + 11),
-            ],
-        )
-        svg = svg + self.generatePath(
-            LIGHT_COLOR,
-            "none",
-            [
-                self.degreesToPoint(DEGS[int((len(DEGS)) / 2)], int(WIDTH / 2) + 5),
-                self.degreesToPoint(DEGS[int((len(DEGS)) / 2)], int(WIDTH / 2) + 11),
-            ],
-        )
+        sunrise_str = self.sun["sunrise"].astimezone(self.timezone).strftime("%H:%M")
+        sunset_str = self.sun["sunset"].astimezone(self.timezone).strftime("%H:%M")
+        noon_str = self.sun["noon"].astimezone(self.timezone).strftime("%H:%M")
+        noon_label = f"{self.noon_elevation:.1f}° @ {noon_str}"
+        svg = svg + self.generateLabel(self.sunrise_azimuth, sunrise_str)
+        svg = svg + self.generateLabel(self.sunset_azimuth, sunset_str)
+        svg = svg + self.generateLabel(self.noon_azimuth, noon_label)
 
         # moon drawing: compute left and right arcs
         phase = moon.phase(self.now)
