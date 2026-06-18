@@ -218,7 +218,7 @@ class shadow:
         return (
             f'<text x="{pos["x"]:.1f}" y="{pos["y"]:.1f}" '
             f'text-anchor="middle" dominant-baseline="middle" '
-            f'font-size="5" fill="{LIGHT_COLOR}" font-family="sans-serif">'
+            f'font-size="7" fill="{SUN_COLOR}" font-family="sans-serif">'
             f"{text}</text>"
         )
 
