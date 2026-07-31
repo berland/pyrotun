@@ -138,7 +138,7 @@ async def analyze_tirsdag(directory: Path) -> pd.DataFrame:
             continue
         centroid = lap_to_dict(lap)
         if (
-            900 < lap.distance_m < 1100
+            850 < lap.distance_m < 1150
             and 180 < lap.total_time_s < 270
             and lap_centroid_dist("tirsdag1000", centroid) < 4500
         ):
@@ -347,7 +347,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
                 (data[rows_3000]["hr_avg"] - data[rows_3000]["expected_hr_avg"]).mean(),
                 1,
             )
-            puls_str = f" (pulskostnad {hr_cost})" if hr_cost else ""
+            puls_str = ""  # f" (pulskostnad {hr_cost})" if hr_cost else ""
             desc_3000 = (
                 seconds_pr_km_to_pace(data[rows_3000]["time"].values[0] / 3)
                 + f" på 3000m{puls_str}, "
@@ -392,9 +392,9 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
                 (data[rows_lang]["hr_avg"] - data[rows_lang]["expected_hr_avg"]).mean(),
                 1,
             )
-            desc_lang = (
-                f"{sum(rows_lang)} lange på {langefarter} (pulskost {hr_cost_lang}), "
-            )
+
+            puls_str = ""  # f" (pulskostnad {hr_cost_lang})" if hr_cost_lang else ""
+            desc_lang = f"{sum(rows_lang)} lange på {langefarter}{puls_str}, "
         else:
             desc_lang = ""
         if sum(rows_bakkedrag):
@@ -413,10 +413,7 @@ async def make_description_from_tcx(directory: Path) -> dict[str, str]:  # noqa:
                 (data[rows_400]["hr_avg"] - data[rows_400]["expected_hr_avg"]).mean(),
                 1,
             )
-            desc_400 = (
-                f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}s "
-                f"(pulskost {hr_cost_400}), "
-            )
+            desc_400 = f"{sum(rows_400)}x400m {startfart400}->{sluttfart400}s,"
         else:
             desc_400 = ""
         if sum(rows_200):
