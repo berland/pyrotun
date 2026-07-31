@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
+def strava_defaulted_activity_name(name: str) -> bool:
+    return (
+        "Run" in name
+        or "med løping" in name
+        or "Løping på" in name
+        or "Løping om" in name
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task1 = asyncio.create_task(heartbeat_logger())
@@ -213,12 +222,7 @@ async def process_activity_update(activity_id: str, aspect_type: str):
         update_activity(activity_id, updates)
 
     updates = await exercise_analyzer.make_description_from_stravaactivity(activity)
-    if updates and (
-        "Run" in activity["name"]
-        or "med løping" in activity["name"]
-        or "Løping på" in activity["name"]
-        or "Løping om" in activity["name"]
-    ):
+    if updates and strava_defaulted_activity_name(activity["name"]):
         print(f"Submitting activity updates: {updates}")
         if "Til jobb" in updates["name"]:
             ACTIVITIES_TO_BE_POLLED_FOR_GEAR.add(activity["id"])
@@ -243,7 +247,7 @@ async def process_activity_update(activity_id: str, aspect_type: str):
             await asyncio.sleep(1)
         if tcxfilename:
             updates = await exercise_analyzer.make_description_from_tcx(tcxfilename)
-            if updates and "Run" in activity["name"]:
+            if updates and strava_defaulted_activity_name(activity["name"]):
                 if (
                     updates.get("name") == "Hjem fra jobb"
                     and activity_date
