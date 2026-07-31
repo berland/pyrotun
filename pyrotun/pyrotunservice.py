@@ -214,7 +214,7 @@ def setup_crontabs(pers):
             logger.error(stdout_data.decode())
             logger.error(stderr_data.decode())
 
-    @aiocron.crontab(EVERY_10_SECOND)
+    @aiocron.crontab(EVERY_15_SECOND)
     async def poll_homely():
         logger.info(" ** Polling Homely")
         await pyrotun.pollhomely.amain(pers)
