@@ -41,6 +41,11 @@ async def amain(pers=None, debug=False):
             if "identity.vwgroup.io/signin" in str(err):
                 logger.error(f"Skoda redirecting to signin webpage, sigh, {err}")
                 return
+            if "orjson.JSONDecodeError: unexcpected character: line 1 column 1" in str(
+                err
+            ):
+                logger.error("Tired of all skoda exceptions..")
+                return
             if "ClientConnectorDNSError" in str(err):
                 logger.error("Temporary DNS problems, lets just ignore")
                 return
@@ -132,11 +137,17 @@ async def amain(pers=None, debug=False):
             await pers.openhab.set_item(
                 "EnyaqCoordinatesGeohash",
                 f"{geohash}",
-                log=False,
+                log=True,
             )
             async with ClientSession() as session:
+                headers = {
+                    "User-Agent": (
+                        "RaatunHomeAutomation/1.0 (contact: berland@pvv.ntnu.no)"
+                    )
+                }
                 response = await session.get(
-                    f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+                    f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json",
+                    headers=headers,
                 )
 
                 if response.status == 200:
@@ -152,6 +163,8 @@ async def amain(pers=None, debug=False):
                         f"{address['county']}{country}",
                         log=True,
                     )
+                else:
+                    logger.warning(f"Reverse geohash lookup failed {response}")
 
     if close_pers:
         await pers.aclose()
