@@ -60,22 +60,30 @@ async def main(pers):
     enthalpies = {}
     mixs = {}
 
-    pressure = float(await pers.openhab.get_item("Netatmo_stue_trykk"))
-
+    try:
+        pressure = float(await pers.openhab.get_item("Netatmo_stue_trykk"))
+    except ValueError:
+        logger.error("NULL fra Netatmo_stue_trykk")
+        return
     testitem = await pers.openhab.get_item("Sensor_inntak_temperatur")
     if testitem == "UNDEF":
         logger.error("Sensor_inntak_temperatur UNDEF, giving up")
         return
 
     for sensor in SENSORS:
-        temps[sensor] = float(
-            await pers.openhab.get_item("Sensor_" + sensor + "_temperatur")
-        )
-        #  RH in unit 0 to 1, not percent.
-        rhs[sensor] = round(
-            float(await pers.openhab.get_item("Sensor_" + sensor + "_fuktighet")) / 100,
-            4,
-        )
+        try:
+            temps[sensor] = float(
+                await pers.openhab.get_item("Sensor_" + sensor + "_temperatur")
+            )
+            #  RH in unit 0 to 1, not percent.
+            rhs[sensor] = round(
+                float(await pers.openhab.get_item("Sensor_" + sensor + "_fuktighet"))
+                / 100,
+                4,
+            )
+        except ValueError:
+            logger.error("Fikk NULL verdier fra OpenHAB, gir opp")
+            return
         enthalpies[sensor] = round(enthalpy(temps[sensor], rhs[sensor], pressure), 4)
 
         mixs[sensor] = round(hum_ratio(rhs[sensor], temps[sensor], pressure), 6)
