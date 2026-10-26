@@ -17,6 +17,11 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pyrotun import exercise_analyzer
 
 VERIFY_TOKEN = "vapourfly"  # Only used for initial handshake
+
+# Permanent public URL, reverse-proxied by nginx on bobserv to this
+# machine's FastAPI port. Replaces the old ngrok tunnel.
+CALLBACK_BASE_URL = "https://strava.raaserv.no"
+
 logger = logging.getLogger(__name__)
 load_dotenv()
 
@@ -375,7 +380,7 @@ async def exchange_token(request: Request):
     authorize this app. To get to the authorize webpage, use a browser where
     user is logged in at Strava and visit
 
-    https://www.strava.com/oauth/authorize?client_id=XXXXXXX&response_type=code&redirect_uri=https://XXXXXXXXX.ngrok-free.app/oauth/callback&scope=read,activity:read_all,activity:write&approval_prompt=force
+    https://www.strava.com/oauth/authorize?client_id=XXXXXXX&response_type=code&redirect_uri={CALLBACK_BASE_URL}/oauth/callback&scope=read,activity:read_all,activity:write&approval_prompt=force
     """
     params = dict(request.query_params)
     code = params.get("code")
