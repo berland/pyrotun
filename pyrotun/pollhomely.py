@@ -13,6 +13,18 @@ logger = pyrotun.getLogger(__name__)
 
 ALARM_ARMED_ITEM = "AlarmArmert"
 
+ALARM_LOCATION_NAME = "Råtun 40"
+
+# States not listed (ARMED_STAY, ARMED_NIGHT, BREACHED) leave the item untouched
+ALARMSTATE_MAP = {
+    "ARMED_AWAY": "ON",
+    "DISARMED": "OFF",
+    "ARM_PENDING": "OFF",
+    "ARM_AWAY_PENDING": "OFF",
+    "ARM_STAY_PENDING": "OFF",
+    "ARM_NIGHT_PENDING": "OFF",
+}
+
 PERS = None
 
 
@@ -27,9 +39,6 @@ async def amain(pers=None, dryrun=False, debug=False, do_websocket=False):
     if PERS.homely is None:
         await PERS.ainit(["homely", "openhab"])
         assert PERS is not None
-        PERS.homely.message_handler = partial(
-            update_openhab_from_websocket_message, PERS
-        )
 
     try:
         data: List[dict] = await PERS.homely.get_data()  # One item pr. location
@@ -51,25 +60,43 @@ async def amain(pers=None, dryrun=False, debug=False, do_websocket=False):
                     f"look: {location_data}, got error {err}"
                 )
     if do_websocket:
-        websocket_supervisor = asyncio.create_task(supervise_websocket(PERS))
+        websocket_supervisor = asyncio.create_task(
+            supervise_websocket(PERS, dryrun=dryrun)
+        )
         await asyncio.wait([websocket_supervisor])
 
     if close_pers:
         await PERS.aclose()
 
 
-async def supervise_websocket(pers):
-    """Retry the websocket indefinetely..."""
-    errors = 0
+async def print_websocket_message(data):
+    print(f"Websocket message: {pprint.pformat(data)}", flush=True)
+
+
+async def supervise_websocket(pers, dryrun=False):
+    """Keep the homely websocket alive indefinitely, with backoff.
+
+    In dryrun mode, messages are only printed, not sent to OpenHAB."""
+    if dryrun:
+        pers.homely.message_handler = print_websocket_message
+    else:
+        pers.homely.message_handler = partial(
+            update_openhab_from_websocket_message, pers
+        )
+    delay = 2
     while True:
-        ws_task = asyncio.create_task(pers.homely.run_websocket())
-        await asyncio.wait([ws_task])
-        errors += 1
-        if errors > 10:
-            logger.error("Giving up on homely websocket, failed 10 times")
-            return
-        logger.warning("Websocket died, re-establishing in 2 seconds")
-        await asyncio.sleep(2)
+        started = asyncio.get_running_loop().time()
+        try:
+            await pers.homely.run_websocket()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa
+            logger.error(f"Homely websocket failed: {err!r}")
+        if asyncio.get_running_loop().time() - started > 300:
+            delay = 2  # It was healthy for a while
+        logger.warning(f"Websocket died, re-establishing in {delay} seconds")
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, 120)
 
 
 async def update_openhab_from_websocket_message(pers, data):
@@ -91,24 +118,41 @@ async def update_openhab_from_websocket_message(pers, data):
                 logger.error("That is a bug, fix")
             if len(oh_item) == 1:
                 oh_item = oh_item[0]
-                await pers.openhab.set_item(
-                    oh_item["openhab_item"],
-                    str(change["value"]),
-                    log=True,
-                    method="post",
+                oh_value, method = to_openhab_value(oh_item, change["value"])
+                await set_item_logged(
+                    pers, "websocket", oh_item["openhab_item"], oh_value, method
                 )
+    elif data["type"] == "alarm-state-changed":
+        location_name = pers.homely.location_names.get(data["data"]["locationId"])
+        oh_value = ALARMSTATE_MAP.get(data["data"]["state"])
+        if location_name == ALARM_LOCATION_NAME and oh_value is not None:
+            await set_item_logged(pers, "websocket", ALARM_ARMED_ITEM, oh_value)
     else:
         pprint.pprint(data)
+
+
+async def set_item_logged(pers, source, item, value, method="post"):
+    """Set an OpenHAB item, logging whether it came from polling or websocket"""
+    logger.info("OpenHAB: Setting %s to %s (homely %s)", item, value, source)
+    await pers.openhab.set_item(item, value, log=False, method=method)
+
+
+def to_openhab_value(conf_item: dict, value: Any) -> tuple:
+    """Convert a homely value to an OpenHAB value and the http method to use"""
+    if str(conf_item.get("type")) == "bool":
+        return {True: "ON", False: "OFF"}[value], "post"
+    if str(conf_item.get("type")) == "door":
+        return {True: "OPEN", False: "CLOSED"}[value], "put"
+    return str(value), "post"
 
 
 async def update_openhab(pers, data):
     # "Alarm state" is not a "device" in the homely API response. Handled
     # outside the yaml file..
-    if data["name"].strip() == "Råtun 40":
-        alarmstate_map = {"ARMED_AWAY": "ON", "DISARMED": "OFF", "ARM_PENDING": "OFF"}
-        await pers.openhab.set_item(
-            ALARM_ARMED_ITEM, alarmstate_map[data["alarmState"]], log=True
-        )
+    if data["name"].strip() == ALARM_LOCATION_NAME:
+        oh_value = ALARMSTATE_MAP.get(data["alarmState"])
+        if oh_value is not None:
+            await set_item_logged(pers, "polling", ALARM_ARMED_ITEM, oh_value)
 
     devices_used = set(value["name"] for value in pers.homely.config)
     homely_devices = set(value["name"] for value in data["devices"])
@@ -131,18 +175,10 @@ async def update_openhab(pers, data):
             )
             continue
 
-        if str(conf_item.get("type")) == "bool":
-            oh_value = {True: "ON", False: "OFF"}[value]
-            method = "post"
-        elif str(conf_item.get("type")) == "door":
-            oh_value = {True: "OPEN", False: "CLOSED"}[value]
-            method = "put"
-        else:
-            oh_value = str(value)
-            method = "post"
+        oh_value, method = to_openhab_value(conf_item, value)
 
-        await pers.openhab.set_item(
-            conf_item["openhab_item"], oh_value, log=True, method=method
+        await set_item_logged(
+            pers, "polling", conf_item["openhab_item"], oh_value, method
         )
 
 
@@ -165,5 +201,19 @@ if __name__ == "__main__":
         action="store_true",
         help="Dry run, do not submit to OpenHAB",
     )
+    parser.add_argument(
+        "--websocket",
+        "-w",
+        action="store_true",
+        help="Listen to the websocket after polling. With --dryrun, the "
+        "polled data and each received message are printed only.",
+    )
     args = parser.parse_args()
-    asyncio.run(amain(pers=None, dryrun=args.dryrun, debug=args.debug))
+    asyncio.run(
+        amain(
+            pers=None,
+            dryrun=args.dryrun,
+            debug=args.debug or (args.dryrun and args.websocket),
+            do_websocket=args.websocket,
+        )
+    )

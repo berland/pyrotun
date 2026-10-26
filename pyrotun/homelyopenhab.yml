@@ -67,6 +67,12 @@
   openhab_item: Sensor_Inngangsdor_temperatur
   featurepath: temperature/states/temperature/value
 
+- name: Inngangsdør lås
+  openhab_item: DoorLocked
+  featurepath: lock/states/state/value
+  type: bool
+  id: 4da5a9c3-49e8-4af6-b86f-c510bb5705ea
+
 - name: Verksteddør
   openhab_item: BakdorVerksted
   featurepath: alarm/states/alarm/value

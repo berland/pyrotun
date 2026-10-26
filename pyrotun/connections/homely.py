@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import Awaitable, List, Optional
 
 import aiohttp
-
-# import socketio
+import socketio
 import yaml
 
 import pyrotun
@@ -18,8 +17,6 @@ import pyrotun.persist
 
 logger = pyrotun.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-SIO = None  # socketio.AsyncClient(logger=logger, reconnection_attempts=3)
 
 SERVER = "sdk.iotiliti.cloud"
 BASE_URL = f"https://{SERVER}/homely/"
@@ -33,6 +30,7 @@ class HomelyConnection:
         self.access_token = None
         self.refresh_token = None
         self.location_ids: Optional[List[str]] = None
+        self.location_names: dict = {}
 
         self.config = None  # Defines the link to OpenHAB
 
@@ -118,6 +116,10 @@ class HomelyConnection:
         ) as resp:
             locations = await resp.json()
             self.location_ids = [location["locationId"] for location in locations]
+            self.location_names = {
+                location["locationId"]: location.get("name", "").strip()
+                for location in locations
+            }
 
     async def get_data(self) -> List[dict]:
         logger.info("Polling for all homely data...")
@@ -150,34 +152,52 @@ class HomelyConnection:
         return data
 
     async def run_websocket(self):
-        disconnects = 0
+        """Connect to homely's socket.io server (one client per location)
+        and dispatch events to message_handler. Returns when any of the
+        connections is lost, so that a supervisor can reconnect with a
+        fresh token."""
+        while self.location_ids is None or self.access_token is None:
+            await asyncio.sleep(0.1)
 
-        @SIO.event
-        async def connect():
-            logger.info("Connected to homely websocket server")
-            if disconnects > 0:
-                logger.warning(f"(after {disconnects} disconnects")
+        lost = asyncio.Event()
+        clients = []
+        for location_id in self.location_ids:
+            sio = socketio.AsyncClient(reconnection=False)
 
-        @SIO.event
-        async def disconnect():
-            logger.warning("Disconnected to homely websocket server")
-            disconnects += 1  # noqa
+            @sio.event
+            async def connect():
+                logger.info("Connected to homely websocket server")
 
-        @SIO.on("event")
-        async def on_message(data):
-            if self.message_handler is not None:
-                await self.message_handler(data)
-            else:
-                pprint.pprint(data)
+            @sio.event
+            async def disconnect():
+                logger.warning("Disconnected from homely websocket server")
+                lost.set()
 
-        url = (
-            f"https://{SERVER}"
-            f"?locationId={self.location_id}"
-            f"&token=Bearer%20{self.access_token}"
-        )
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "locationId": self.location_id,
-        }
-        await SIO.connect(url, headers)
-        await SIO.wait()
+            @sio.on("event")
+            async def on_message(data):
+                try:
+                    if self.message_handler is not None:
+                        await self.message_handler(data)
+                    else:
+                        pprint.pprint(data)
+                except Exception:  # noqa
+                    logger.exception("Failed handling homely websocket message")
+
+            url = (
+                f"https://{SERVER}"
+                f"?locationId={location_id}"
+                f"&token=Bearer%20{self.access_token}"
+            )
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "locationId": location_id,
+            }
+            clients.append(sio)
+            await sio.connect(url, headers=headers)
+
+        try:
+            await lost.wait()
+        finally:
+            for sio in clients:
+                if sio.connected:
+                    await sio.disconnect()

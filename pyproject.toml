@@ -38,6 +38,7 @@ dependencies = [
     "pylunar",
     "python-dotenv",
     "python-openhab",
+    "python-socketio[asyncio_client]<5.0",  # homely server needs the old protocol
     "pytibber",
     "pyyaml",
     "requests",
