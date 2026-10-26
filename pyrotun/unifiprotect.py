@@ -18,7 +18,8 @@ UNIFI_PORT = os.getenv("UNIFI_PORT")
 UNIFI_USERNAME = os.getenv("UNIFI_USERNAME")
 UNIFI_PASSWORD = os.getenv("UNIFI_PASSWORD")
 
-CAMERA_FILENAME: Path = Path("/etc/openhab/html/garagecamera.png")
+# CAMERA_FILENAME: Path = Path("/etc/openhab/html/garagecamera.png")
+CAMERA_FILENAME: Path = Path("/var/www/html/webcam/garagecamera.png")
 
 # Global variable to make it available to the websocket
 # callback

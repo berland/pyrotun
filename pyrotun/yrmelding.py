@@ -20,7 +20,8 @@ LONGITUDE = os.getenv("LOCAL_LONGITUDE")
 LATITUDE = os.getenv("LOCAL_LATITUDE")
 MET_CLIENT_ID = os.getenv("FROST_CLIENT_ID")
 MET_LOCATION_ID = "1-92917"  # Used to fetch meteogram svg
-METEOGRAM_SVG_FILENAME = Path("/etc/openhab/html/meteogram.svg")
+# METEOGRAM_SVG_FILENAME = Path("/etc/openhab/html/meteogram.svg")
+METEOGRAM_SVG_FILENAME = Path("/var/www/html/webcam/meteogram.svg")
 
 
 async def main(pers=None):

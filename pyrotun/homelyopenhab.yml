@@ -82,3 +82,6 @@
 - name: Røyksensor stue
   openhab_item: Sensor_Stue_Elvatunet_temperatur
   featurepath: temperature/states/temperature/value
+- name: Røyksensor gang
+  openhab_item: Sensor_Gang_Elvatunet_temperatur
+  featurepath: temperature/states/temperature/value

@@ -57,6 +57,7 @@ EVERY_SECOND = "* * * * * *"
 EVERY_4_SECOND = "* * * * * */4"
 EVERY_10_SECOND = "* * * * * */10"
 EVERY_15_SECOND = "* * * * * */15"
+EVERY_30_SECOND = "* * * * * */30"
 EVERY_MINUTE = "* * * * *"
 EVERY_5_MINUTE = "*/5 * * * *"
 EVERY_8_MINUTE = "*/8 * * * *"
@@ -204,7 +205,7 @@ def setup_crontabs(pers):
             os.getenv("UNIFI_RTSP"),
             "-vframes",
             "1",
-            "/etc/openhab/html/garagecamera.png",
+            "/var/www/html/webcam/garagecamera.png",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -214,7 +215,7 @@ def setup_crontabs(pers):
             logger.error(stdout_data.decode())
             logger.error(stderr_data.decode())
 
-    @aiocron.crontab(EVERY_15_SECOND)
+    @aiocron.crontab(EVERY_30_SECOND)
     async def poll_homely():
         logger.info(" ** Polling Homely")
         await pyrotun.pollhomely.amain(pers)
