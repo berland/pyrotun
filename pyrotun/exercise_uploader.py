@@ -36,7 +36,9 @@ MAP_SPORT_INFO = {
 
 EXERCISE_DIR = Path.home() / "polar_dump"
 
-DONE_FILE = "done"
+DONE_FILE = "done"  # contains the treningsdagbok session id once uploaded
+STRAVA_FILE = "strava_id"  # written by strava/main.py when it matches this exercise
+LINKED_FILE = "strava_linked"  # marks that the Strava id reached treningsdagbok
 
 URL = os.getenv("EXERCISE_URL")
 
@@ -173,7 +175,7 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
             max_beat = exercise_summary["heart-rate"]["maximum"]
         details += f"Puls {avg_beat} / {max_beat}."
 
-    return {
+    postdata = {
         "date": exercise_datetime.strftime("%Y-%m-%d"),
         "what": title,
         "high": threezones_df.loc["hoy"]["hh:mm"],
@@ -183,27 +185,87 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
         "stretch": "0:00",
         "details": details,
     }
+    strava_file = Path(dirname) / STRAVA_FILE
+    if strava_file.is_file():
+        postdata["strava_id"] = strava_file.read_text().strip()
+    return postdata
 
 
-async def post_exercise_data(pers, postdata: dict) -> bool:
+def exercise_auth():
+    if not os.getenv("EXERCISE_HTTP_USER"):
+        return None
+    return aiohttp.BasicAuth(
+        os.getenv("EXERCISE_HTTP_USER"), os.getenv("EXERCISE_HTTP_PASSWORD", "")
+    )
+
+
+async def post_exercise_data(pers, postdata: dict) -> str | None:
+    """Returns the new treningsdagbok session id, or None on failure."""
     logger.info("Submitting exercise data %s", str(postdata))
-    auth = None
-    if os.getenv("EXERCISE_HTTP_USER"):
-        auth = aiohttp.BasicAuth(
-            os.getenv("EXERCISE_HTTP_USER"), os.getenv("EXERCISE_HTTP_PASSWORD", "")
-        )
     async with pers.websession.post(
         url=os.getenv("EXERCISE_URL"),
         data=postdata,
-        auth=auth,
+        auth=exercise_auth(),
         allow_redirects=False,
     ) as response:
         # treningsdagbok answers 302 on success and 400 on invalid input
         if response.status != 302:
             logger.error("Exercise post failed: %s", response.status)
             logger.error(await response.text())
+            return None
+        return response.headers.get("X-Session-Id", "")
+
+
+async def link_strava_id(pers, session_id: str, strava_id: str) -> bool:
+    # EXERCISE_URL is <base>/<user>/ny
+    url = f"{os.getenv('EXERCISE_URL').rsplit('/', 1)[0]}/{session_id}/strava"
+    logger.info("Linking session %s to Strava activity %s", session_id, strava_id)
+    async with pers.websession.post(
+        url=url,
+        data={"strava_id": strava_id},
+        auth=exercise_auth(),
+        allow_redirects=False,
+    ) as response:
+        if response.status == 409:
+            logger.warning("Strava id %s already linked elsewhere", strava_id)
+        elif response.status != 204:
+            logger.error("Strava link failed: %s", response.status)
             return False
     return True
+
+
+async def upload_new_exercise(dirname: Path, pers, dryrun: bool):
+    logger.info("making post data")
+    postdata = await make_http_post_data(dirname)
+    logger.info("postdata is %s", str(postdata))
+    if postdata is None:
+        return
+    if dryrun or pers is None:
+        logger.info("DRY-run, would have submitted %s", str(postdata))
+        return
+    session_id = await post_exercise_data(pers, postdata)
+    if session_id is not None:
+        (dirname / DONE_FILE).write_text(session_id)
+        if "strava_id" in postdata:
+            (dirname / LINKED_FILE).touch()
+
+
+async def link_uploaded_exercise(dirname: Path, pers, dryrun: bool):
+    """The Strava id may arrive after the exercise was uploaded."""
+    strava_file = dirname / STRAVA_FILE
+    linked_file = dirname / LINKED_FILE
+    if not strava_file.is_file() or linked_file.is_file():
+        return
+    session_id = (dirname / DONE_FILE).read_text().strip()
+    if not session_id:
+        logger.info("No session id in %s (uploaded before linking)", dirname)
+        return
+    strava_id = strava_file.read_text().strip()
+    if dryrun or pers is None:
+        logger.info("DRY-run, would have linked %s to Strava %s", session_id, strava_id)
+        return
+    if await link_strava_id(pers, session_id, strava_id):
+        linked_file.touch()
 
 
 async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
@@ -215,22 +277,16 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
     except ValueError as exc:
         logger.warning(f"Skipping strange-looking directory {dirname} due to {exc}")
         return
-    if (dirname / "exercise_summary").is_file() and (
-        dirname / "heart_rate_zones"
-    ).is_file():
-        postdata = None
-        if force or not (dirname / DONE_FILE).is_file():
-            logger.info("making post data")
-            postdata = await make_http_post_data(dirname)
-            logger.info("postdata is %s", str(postdata))
-        if postdata is None:
-            return
+    if not (
+        (dirname / "exercise_summary").is_file()
+        and (dirname / "heart_rate_zones").is_file()
+    ):
+        return
 
-        if not dryrun and pers is not None:
-            if await post_exercise_data(pers, postdata):
-                Path(dirname / DONE_FILE).touch()
-        else:
-            logger.info("DRY-run, would have submitted %s", str(postdata))
+    if force or not (dirname / DONE_FILE).is_file():
+        await upload_new_exercise(dirname, pers, dryrun)
+    else:
+        await link_uploaded_exercise(dirname, pers, dryrun)
 
 
 def prettyprintseconds(seconds):
@@ -258,7 +314,7 @@ async def main(pers=None, dryrun=False):
         logger.info(f"Detected filesystem change: {changes}")
         dirnames = set()
         for change in changes:
-            if Path(change[1]).name == "done":
+            if Path(change[1]).name in (DONE_FILE, LINKED_FILE):
                 continue
             if Path(change[1]).name == "analyzed.pkl":
                 continue

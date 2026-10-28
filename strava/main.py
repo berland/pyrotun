@@ -251,6 +251,12 @@ async def process_activity_update(activity_id: str, aspect_type: str):
             counter += 1
             await asyncio.sleep(1)
         if tcxfilename:
+            strava_file = tcxfilename / "strava_id"
+            if not strava_file.is_file() or strava_file.read_text() != str(
+                activity["id"]
+            ):
+                # Picked up by exercise_uploader, which links it in treningsdagbok
+                strava_file.write_text(str(activity["id"]))
             updates = await exercise_analyzer.make_description_from_tcx(tcxfilename)
             if updates and strava_defaulted_activity_name(activity["name"]):
                 if (
