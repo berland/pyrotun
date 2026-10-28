@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import Dict
 
+import aiohttp
 import dateutil  # type: ignore
 import dotenv
 import gpxpy
@@ -173,28 +174,36 @@ async def make_http_post_data(dirname: Path) -> Dict[str, str]:
         details += f"Puls {avg_beat} / {max_beat}."
 
     return {
-        "legginn": "ja",
-        "navn": os.getenv("EXERCISE_NAME"),
-        "hva": title,
-        "dato": exercise_datetime.strftime("%Y-%m-%d"),
-        "hoyintensitet": threezones_df.loc["hoy"]["hh:mm"],
-        "modintensitet": threezones_df.loc["moderat"]["hh:mm"],
-        "lavintensitet": threezones_df.loc["lav"]["hh:mm"],
-        "styrke": "0:00",
-        "toying": "0:00",
-        "detaljer": details,
+        "date": exercise_datetime.strftime("%Y-%m-%d"),
+        "what": title,
+        "high": threezones_df.loc["hoy"]["hh:mm"],
+        "moderate": threezones_df.loc["moderat"]["hh:mm"],
+        "low": threezones_df.loc["lav"]["hh:mm"],
+        "strength": "0:00",
+        "stretch": "0:00",
+        "details": details,
     }
 
 
-async def post_exercise_data(pers, postdata: dict):
+async def post_exercise_data(pers, postdata: dict) -> bool:
     logger.info("Submitting exercise data %s", str(postdata))
+    auth = None
+    if os.getenv("EXERCISE_HTTP_USER"):
+        auth = aiohttp.BasicAuth(
+            os.getenv("EXERCISE_HTTP_USER"), os.getenv("EXERCISE_HTTP_PASSWORD", "")
+        )
     async with pers.websession.post(
-        url=os.getenv("EXERCISE_URL"), params=postdata
+        url=os.getenv("EXERCISE_URL"),
+        data=postdata,
+        auth=auth,
+        allow_redirects=False,
     ) as response:
-        content = await response.content.read()
-        if response.status != "200":
-            logger.info(str(response))
-            logger.info(content)
+        # treningsdagbok answers 302 on success and 400 on invalid input
+        if response.status != 302:
+            logger.error("Exercise post failed: %s", response.status)
+            logger.error(await response.text())
+            return False
+    return True
 
 
 async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
@@ -218,8 +227,8 @@ async def process_dir(dirname: Path, pers=None, dryrun=False, force=False):
             return
 
         if not dryrun and pers is not None:
-            await post_exercise_data(pers, postdata)
-            Path(dirname / DONE_FILE).touch()
+            if await post_exercise_data(pers, postdata):
+                Path(dirname / DONE_FILE).touch()
         else:
             logger.info("DRY-run, would have submitted %s", str(postdata))
 
