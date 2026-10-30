@@ -4,6 +4,7 @@ import json
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Dict
 
 import aiohttp
@@ -35,6 +36,8 @@ MAP_SPORT_INFO = {
 }
 
 EXERCISE_DIR = Path.home() / "polar_dump"
+# One marker file per Strava activity uploaded directly (not via polar_dump)
+STRAVA_UPLOADED_DIR = Path.home() / ".strava_uploaded"
 
 DONE_FILE = "done"  # contains the treningsdagbok session id once uploaded
 STRAVA_FILE = "strava_id"  # written by strava/main.py when it matches this exercise
@@ -248,6 +251,58 @@ async def upload_new_exercise(dirname: Path, pers, dryrun: bool):
         (dirname / DONE_FILE).write_text(session_id)
         if "strava_id" in postdata:
             (dirname / LINKED_FILE).touch()
+
+
+def make_http_post_data_from_strava(activity: dict) -> Dict[str, str] | None:
+    """For activities not recorded by Polar (Zwift), built from Strava's activity."""
+    moving_time = float(activity.get("moving_time", 0))
+    if moving_time < 120:
+        return None
+    start = dateutil.parser.isoparse(str(activity["start_date_local"]))
+    distance_km = float(activity.get("distance", 0)) / 1000
+    details = f"Zwift. {distance_km:.1f} km. "
+    if distance_km > 0:
+        details += f"{prettyprintseconds(moving_time / distance_km)} min/km. "
+    details += f"Tid: {prettyprintseconds(moving_time)}. "
+    if activity.get("has_heartrate"):
+        avg_beat = round(activity.get("average_heartrate", 0))
+        max_beat = round(activity.get("max_heartrate", 0))
+        details += f"Puls {avg_beat} / {max_beat}."
+    return {
+        "date": start.strftime("%Y-%m-%d"),
+        "what": "Løp, Zwift",
+        "high": "0:00",
+        "moderate": "0:00",
+        "low": timedeltaformatter(moving_time),
+        "strength": "0:00",
+        "stretch": "0:00",
+        "details": details,
+        "strava_id": str(activity["id"]),
+    }
+
+
+async def upload_strava_activity(activity: dict, pers=None) -> bool:
+    """Uploads an activity directly from its Strava data, bypassing the polar_dump
+    directory watching. Returns True if the activity was uploaded (now or earlier).
+    """
+    STRAVA_UPLOADED_DIR.mkdir(parents=True, exist_ok=True)
+    marker = STRAVA_UPLOADED_DIR / str(activity["id"])
+    if marker.is_file():
+        return True
+    postdata = make_http_post_data_from_strava(activity)
+    if postdata is None:
+        logger.warning("Skipping too short Strava activity %s", activity["id"])
+        return False
+    if pers is None:
+        async with aiohttp.ClientSession() as websession:
+            return await upload_strava_activity(
+                activity, SimpleNamespace(websession=websession)
+            )
+    session_id = await post_exercise_data(pers, postdata)
+    if session_id is None:
+        return False
+    marker.write_text(session_id)
+    return True
 
 
 async def link_uploaded_exercise(dirname: Path, pers, dryrun: bool):

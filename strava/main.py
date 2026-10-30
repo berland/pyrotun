@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from pyrotun import exercise_analyzer
+from pyrotun import exercise_analyzer, exercise_uploader
 
 VERIFY_TOKEN = "vapourfly"  # Only used for initial handshake
 
@@ -212,6 +212,9 @@ async def process_activity_update(activity_id: str, aspect_type: str):
             updates["description"] = "Zwift"
         print(f"Submitting activity updates: {updates}")
         update_activity(activity_id, updates)
+        if not updates.get("private") and aspect_type == "create":
+            # No Polar export exists for Zwift, so upload directly
+            await exercise_uploader.upload_strava_activity(activity)
     elif activity.get("sport_type", "") == "WeightTraining":
         start_time = datetime.datetime.fromisoformat(str(activity["start_date_local"]))
         if start_time.weekday() == 0 and 8 < start_time.hour < 11:  # Mandag
